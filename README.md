@@ -66,13 +66,13 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 
 ### Download
 
-> **[Download TapWisper v1.0.3](https://github.com/zeyadelosherey/tapwisper-desktop/releases/latest)**
+> **[Download TapWisper v1.1.0](https://github.com/zeyadelosherey/tapwisper-desktop/releases/latest)**
 
 | Platform | Download | Architecture |
 |----------|----------|--------------|
-| macOS | [TapWisper-1.0.3-arm64.dmg](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.3/tapwisper-desktop-1.0.3-arm64.dmg) | Apple Silicon (M1/M2/M3/M4) |
-| macOS | [TapWisper-1.0.3-x64.dmg](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.3/tapwisper-desktop-1.0.3-x64.dmg) | Intel |
-| Windows | [TapWisper-1.0.3-setup.exe](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.3/tapwisper-desktop-1.0.3-setup.exe) | x64 |
+| macOS | [TapWisper-1.1.0-arm64.dmg](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.1.0/tapwisper-desktop-1.1.0-arm64.dmg) | Apple Silicon (M1/M2/M3/M4) |
+| macOS | [TapWisper-1.1.0-x64.dmg](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.1.0/tapwisper-desktop-1.1.0-x64.dmg) | Intel |
+| Windows | [TapWisper-1.1.0-setup.exe](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.1.0/tapwisper-desktop-1.1.0-setup.exe) | x64 |
 
 Or browse all versions on the [Releases page](https://github.com/zeyadelosherey/tapwisper-desktop/releases).
 
