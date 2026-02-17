@@ -230,10 +230,10 @@ This project includes configuration files for AI coding assistants so they can u
 
 | Tool | Config File | Description |
 |:----:|-------------|-------------|
-| 🖱️ [Cursor](https://cursor.com) | [`.cursor/rules/`](.cursor/rules/) | Project rules for Cursor AI |
-| 🟣 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | [`CLAUDE.md`](CLAUDE.md) | Project context for Claude Code CLI |
-| 🟢 [OpenAI Codex](https://openai.com/codex) | [`CODEX.md`](CODEX.md) | Project context for OpenAI Codex |
-| 🔵 [GitHub Copilot](https://github.com/features/copilot) | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | Project context for Copilot |
+| [Cursor](https://cursor.com) | [`.cursor/rules/`](.cursor/rules/) | Project rules for Cursor AI |
+| <img src="src/renderer/assets/claude.png" width="20" /> [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | [`CLAUDE.md`](CLAUDE.md) | Project context for Claude Code CLI |
+| <img src="src/renderer/assets/openai.png" width="20" /> [OpenAI Codex](https://openai.com/codex) | [`CODEX.md`](CODEX.md) | Project context for OpenAI Codex |
+| <img src="https://github.githubassets.com/favicons/favicon.svg" width="20" /> [GitHub Copilot](https://github.com/features/copilot) | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | Project context for Copilot |
 
 ---
 
