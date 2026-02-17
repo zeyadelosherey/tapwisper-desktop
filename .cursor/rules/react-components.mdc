@@ -1,0 +1,58 @@
+---
+description: React renderer patterns and component conventions
+globs: src/renderer/**/*.tsx
+alwaysApply: false
+---
+
+# React Renderer Patterns
+
+## Component Structure
+
+- Overlay components (recording pill, pinned panel, command popup, AI panel) are loaded with `React.lazy()`
+- Pages (onboarding, home, settings, triggers, notes, snippets, actions-config) live in `src/renderer/pages/`
+- Shared overlay UI lives in `src/renderer/components/`
+- Routing is hash-based: the renderer reads `window.location.hash` to decide which component to render
+- The main window has an onboarding gate: if `onboardingCompleted` is `false` in the config store, `main-window.tsx` renders the `<Onboarding>` component instead of the normal sidebar + page layout
+
+## State Management
+
+- Use **Zustand** for global state (`src/renderer/store/`)
+- Current stores: `stats.ts` (usage statistics), `activity.ts` (activity tracking)
+- Keep state minimal -- derive computed values instead of storing them
+- Access config via `window.tapwisper.store.*` (IPC to electron-store in main process)
+
+## Path Alias
+
+- `@/` maps to `src/renderer/` (configured in `electron.vite.config.ts`)
+- Example: `import { processText } from '@/services/ai-router'`
+
+## AI Services
+
+- All AI provider clients live in `src/renderer/services/`
+- The router (`ai-router.ts`) dispatches to the correct provider based on user config
+- Each provider exports a single async function: `processWithGemini()`, `transcribeWithWhisper()`, etc.
+- Provider types are defined in `src/renderer/constants/providers.ts`
+
+## Animations
+
+- Use **Framer Motion** for all animations
+- Import from `framer-motion` (e.g. `motion`, `AnimatePresence`)
+
+## Icons
+
+- Use **Lucide React** for UI icons (`lucide-react`)
+- Brand/provider icons use **simple-icons** or static assets in `src/renderer/assets/`
+- Icon mapping utility: `src/renderer/components/icon-map.tsx`
+
+## Hooks
+
+- `use-audio.ts` -- audio recording state and controls
+- `use-ai-action.ts` -- AI text processing actions
+- `use-shortcuts.ts` -- keyboard shortcut handlers in renderer
+
+## Styling
+
+- Tailwind CSS utility classes for all styling
+- Theme colors use CSS variables from `src/renderer/styles/globals.css`
+- RTL support is built in for Arabic locale
+- Dark/light/system theme switching

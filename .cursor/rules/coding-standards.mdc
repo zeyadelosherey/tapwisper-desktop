@@ -1,0 +1,60 @@
+---
+description: Coding standards and formatting conventions
+alwaysApply: true
+---
+
+# Coding Standards
+
+## File Naming
+
+- **kebab-case** for all files: `my-component.tsx`, `use-audio.ts`, `ai-router.ts`
+- **PascalCase** for React component exports: `export function MyComponent()`
+- **camelCase** for hooks, utilities, and variables: `useAudio`, `formatDuration`
+
+## TypeScript
+
+- Never use `any` -- use proper type definitions
+- Use `interface` for object shapes, `type` for unions and intersections
+- Define shared types in `src/renderer/models/` or `src/renderer/types/`
+- Prefix unused function parameters with `_` (e.g. `_event`)
+
+## React
+
+- Functional components only -- no class components
+- Extract reusable logic into custom hooks in `src/renderer/hooks/`
+- Keep components focused; split large ones into smaller pieces
+- Use `React.lazy()` for overlay components loaded on demand
+
+## Styling
+
+- Use Tailwind CSS utility classes -- no custom CSS unless necessary
+- Theme-aware colors via CSS variables (defined in `src/renderer/styles/globals.css`)
+- Custom theme values go in `tailwind.config.js`
+
+## Internationalization
+
+- All user-facing strings must use `useTranslation()` from react-i18next
+- Add translations to every locale file in `src/renderer/i18n/` (en, ar, de, es, fr, it)
+
+## Formatting (Prettier)
+
+These rules are enforced by Prettier -- do not deviate:
+
+- No semicolons
+- Single quotes
+- No trailing commas
+- 100 character line width
+- 2-space indentation
+- LF line endings
+- Always use parentheses around arrow function parameters
+
+## Linting (ESLint)
+
+- `@typescript-eslint/no-explicit-any`: warn
+- `@typescript-eslint/no-unused-vars`: warn (ignored if prefixed with `_`)
+- `no-console`: warn -- avoid `console.log` in production code (stripped in prod builds)
+
+## Git Conventions
+
+- Branch names: `feat/description`, `fix/description`, `refactor/description`, `docs/description`
+- Commit messages: `feat: add feature`, `fix: resolve bug`, `refactor: extract utility`

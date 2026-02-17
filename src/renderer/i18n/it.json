@@ -1,0 +1,32 @@
+{
+  "app": { "name": "TapWisper", "tagline": "Dettatura vocale con IA" },
+  "nav": { "home": "Home", "aiProvider": "Provider AI", "actions": "Azioni", "triggers": "Trigger", "miniApps": "Mini App", "notes": "Note", "snippets": "Snippet", "settings": "Impostazioni", "configuration": "Configurazione" },
+  "home": { "welcome": "Benvenuto in TapWisper", "subtitle": "Il tuo assistente di dettatura vocale", "timeSaved": "Tempo risparmiato", "voiceInput": "Input vocale", "aiActions": "Azioni AI", "wordsTyped": "Parole digitate", "quickStart": "Avvio rapido", "thisWeek": "Questa settimana", "timeSavedSub": "vs. digitazione manuale", "wpm": "PPM", "noRecordings": "Nessuna registrazione ancora", "charsGenerated": "caratteri generati", "noActions": "Nessuna azione ancora", "wordsTypedSub": "trascritto dalla voce", "saved": "salvato", "voiceLabel": "Voce", "timeSavedLabel": "Tempo Risparmiato", "chartEmpty": "Inizia a registrare per vedere la tua attività settimanale", "recentActivity": "Attività Recente" },
+  "recording": { "tapToSpeak": "Tocca per parlare", "listening": "In ascolto... Tocca per fermare", "thinking": "Sto pensando...", "accept": "Accetta", "edit": "Modifica", "cancel": "Annulla", "newRecording": "Nuovo", "undo": "Annulla", "editInstruction": "Pronuncia la tua istruzione di modifica...", "hintShorten": "Dì: \"rendilo più corto\"", "hintTranslate": "Dì: \"traduci in arabo\"", "hintFormal": "Dì: \"rendilo più formale\"", "hintGrammar": "Dì: \"correggi la grammatica\"", "hintRephrase": "Dì: \"riformula professionalmente\"" },
+  "actions": { "translate": "Traduci", "rephrase": "Riformula", "format": "Formatta", "grammar": "Grammatica", "askQuestion": "Fai una domanda", "searchActions": "Cerca azioni...", "addCustom": "Aggiungi categoria", "toolbarPreview": "Anteprima barra", "manageCategories": "Gestisci le categorie di azioni AI e la barra degli strumenti", "categories": "Categorie", "actionSingular": "azione", "actionPlural": "azioni", "newCategory": "Nuova categoria", "emoji": "Emoji", "categoryName": "Nome categoria", "defaultPrompt": "Prompt predefinito (opzionale)", "createCategory": "Crea categoria" },
+  "aiProvider": { "title": "Provider AI", "subtitle": "Configura i tuoi modelli AI e le chiavi API", "languageModel": "Modello linguistico", "voiceTranscription": "Trascrizione vocale", "apiKeys": "Chiavi API", "keySaved": "Chiave salvata", "privacyNote": "Le chiavi API sono archiviate localmente sul tuo dispositivo e crittografate. Non vengono mai inviate a nessun server diverso dal rispettivo provider AI." },
+  "notes": { "title": "Note", "subtitle": "Le tue note vocali", "noNotes": "Nessuna nota", "noNotesHint": "Registra una nota vocale per iniziare", "today": "Oggi", "yesterday": "Ieri" },
+  "snippets": { "title": "Snippet", "subtitle": "Scorciatoie di testo che si espandono automaticamente", "noSnippets": "Nessuno snippet", "noSnippetsHint": "Crea scorciatoie come /email o /addr", "addSnippet": "Aggiungi snippet", "triggerPlaceholder": "Trigger (es: /addr)", "expansionPlaceholder": "Testo di espansione" },
+  "settings": { "title": "Impostazioni", "subtitle": "Preferenze e configurazione", "language": "Lingua", "appearance": "Aspetto", "system": "Sistema", "dark": "Scuro", "light": "Chiaro", "keyboardShortcuts": "Scorciatoie da tastiera", "reset": "Ripristina", "shortcutRecord": "Registra", "shortcutRecordDesc": "Tieni premuto per registrare, tocca per alternare", "shortcutPinnedPanel": "Pannello fissato", "shortcutPinnedPanelDesc": "Apri il pannello di registrazione", "shortcutPinnedPanelNote": "La scorciatoia è impostata automaticamente su Registra + Spazio", "pressKeys": "Premi i tasti...", "launchAtStartup": "Avvio automatico", "launchHint": "Avvia TapWisper all'accesso", "privacy": "Privacy", "privacyText": "I tuoi dati restano sul tuo dispositivo.", "privacyEncrypted": "Le chiavi API sono crittografate e archiviate localmente", "privacyAudio": "Le registrazioni audio vengono eliminate dopo la trascrizione", "privacyNoTelemetry": "Non vengono raccolti dati di telemetria o analisi", "privacyDirect": "Tutte le richieste IA vanno direttamente al tuo provider configurato", "selectProvider": "Seleziona provider", "selectModel": "Seleziona modello", "llm": "LLM", "apiKey": "Chiave API", "about": "Info" },
+  "miniApps": { "title": "Mini App", "subtitle": "Sfoglia oltre 100 template di prompt", "searchPrompts": "Cerca prompt...", "addToToolbar": "Aggiungi", "added": "Aggiunto", "all": "Tutti", "noPrompts": "Nessun prompt trovato" },
+  "shortcuts": { "holdToRecord": "Tieni premuto per registrare", "openPinnedPanel": "Apri pannello registrazione", "dismiss": "Chiudi pannello" },
+  "commandPopup": { "title": "Azioni IA", "selectedText": "Testo selezionato:", "noTextSelected": "Nessun testo selezionato" },
+  "aiPanel": { "expand": "Espandi", "collapse": "Riduci", "expandToRead": "Espandi il pannello per leggere e spostarlo. Trascina la barra del titolo per spostare.", "revertHint": "Tocca le evidenziazioni per ripristinare i suggerimenti", "dismiss": "Chiudi", "context": "Contesto:", "copy": "Copia", "askPlaceholder": "Fai una domanda su questo testo..." },
+  "onboarding": {
+    "title": "Configura permessi",
+    "subtitle": "TapWisper ha bisogno di alcuni permessi per funzionare correttamente. Puoi concederli qui sotto.",
+    "microphone": "Microfono",
+    "microphoneDesc": "Necessario per la dettatura vocale e la registrazione audio. TapWisper usa il microfono per trascrivere il parlato in testo.",
+    "accessibility": "Accessibilità",
+    "accessibilityDesc": "Necessario per le scorciatoie da tastiera globali e l'inserimento di testo in altre applicazioni tramite simulazione di tasti.",
+    "screenRecording": "Registrazione schermo",
+    "screenRecordingDesc": "Necessario per leggere il testo selezionato da altre applicazioni in modo che TapWisper possa elaborarlo con l'IA.",
+    "granted": "Concesso",
+    "notGranted": "Non concesso",
+    "grant": "Concedi",
+    "openSettings": "Apri impostazioni",
+    "continue": "Continua",
+    "allGranted": "Tutti i permessi concessi",
+    "permissionsRemaining": "permessi rimanenti"
+  }
+}

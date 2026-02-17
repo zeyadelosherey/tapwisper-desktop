@@ -1,0 +1,191 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ── Light theme (default) ─────────────────────────────────── */
+  /* RGB channel values for Tailwind opacity modifier support */
+  :root {
+    --color-theme-bg: 255 255 255;
+    --color-theme-surface: 240 240 242;
+    --color-theme-card: 247 247 248;
+    --color-theme-border: 230 230 234;
+    --color-theme-text: 26 26 26;
+    --color-theme-text-secondary: 26 26 26;
+    --tw-text-secondary-alpha: 0.6;
+    --color-theme-text-tertiary: 26 26 26;
+    --tw-text-tertiary-alpha: 0.4;
+    --color-theme-text-muted: 26 26 26;
+    --tw-text-muted-alpha: 0.25;
+    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+  }
+
+  /* ── Dark theme (true black) ─────────────────────────────── */
+  .dark {
+    --color-theme-bg: 0 0 0;
+    --color-theme-surface: 32 32 32;
+    --color-theme-card: 14 14 14;
+    --color-theme-border: 38 38 38;
+    --color-theme-text: 255 255 255;
+    --color-theme-text-secondary: 255 255 255;
+    --tw-text-secondary-alpha: 0.6;
+    --color-theme-text-tertiary: 255 255 255;
+    --tw-text-tertiary-alpha: 0.4;
+    --color-theme-text-muted: 255 255 255;
+    --tw-text-muted-alpha: 0.25;
+    --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.22);
+  }
+
+  /* Prevent text selection in overlay windows */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Make windows draggable */
+  .drag-region {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  /* Body defaults */
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-color: rgb(var(--color-theme-bg));
+    color: rgb(var(--color-theme-text));
+  }
+
+  /* Arabic font for RTL */
+  [dir="rtl"] body {
+    font-family: 'SF Arabic', 'Geeza Pro', 'Arial', system-ui, sans-serif;
+  }
+
+  /* Transparent window backgrounds */
+  html.transparent,
+  html.transparent body {
+    background: transparent !important;
+  }
+}
+
+@layer components {
+  /* Glass morphism effect for floating panels */
+  .glass {
+    background-color: rgb(var(--color-theme-bg) / 0.9);
+    border: 1px solid rgb(var(--color-theme-border));
+    @apply backdrop-blur-xl;
+  }
+
+  .glass-surface {
+    background-color: rgb(var(--color-theme-surface) / 0.8);
+    border: 1px solid rgb(var(--color-theme-border) / 0.5);
+    @apply backdrop-blur-md;
+  }
+
+  /* Waveform bar base styles */
+  .waveform-bar {
+    @apply rounded-full transition-all duration-75 ease-out;
+  }
+
+  /* Mic button glow */
+  .mic-glow {
+    box-shadow: 0 0 20px rgba(126, 182, 224, 0.4), 0 0 60px rgba(126, 182, 224, 0.1);
+  }
+
+  .mic-glow-recording {
+    box-shadow: 0 0 20px rgba(240, 69, 69, 0.5), 0 0 60px rgba(240, 69, 69, 0.15);
+  }
+
+  /* Pill shadow */
+  .pill-shadow {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Custom scrollbar for dark overlays (result panel) */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  /* Panel shadow */
+  .panel-shadow {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Lighter shadow for floating popups over page content */
+  .popup-shadow {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Green accent for accepted changes */
+  .diff-added {
+    @apply underline decoration-green-accent decoration-2 underline-offset-2;
+  }
+
+  /* Action pill button */
+  .action-pill {
+    @apply px-3 py-1.5 rounded-pill text-sm font-medium transition-all duration-150;
+    @apply hover:scale-105 active:scale-95;
+  }
+
+  /* Primary button — near-black bg, white text (matches Wispr Flow "Add new" style) */
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all;
+    background-color: #000000;
+    color: #FFFFFF;
+  }
+  .btn-primary:hover {
+    background-color: #1A1A1A;
+  }
+  .dark .btn-primary {
+    background-color: #FFFFFF;
+    color: #000000;
+  }
+  .dark .btn-primary:hover {
+    background-color: #E5E5E5;
+  }
+}
+
+@layer utilities {
+  /* RTL support */
+  [dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
+  }
+}

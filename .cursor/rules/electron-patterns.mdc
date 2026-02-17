@@ -1,0 +1,54 @@
+---
+description: Electron main process patterns and conventions
+globs: src/main/**/*.ts
+alwaysApply: false
+---
+
+# Electron Main Process Patterns
+
+## Window Management
+
+- Windows are created in `src/main/windows.ts`
+- Overlay windows (recording pill, pinned panel, command popup, AI panel) are pre-warmed at startup
+- Each overlay loads the same renderer entry point but with a different hash route
+- Main window is 1000x700 and resizable; overlays are small, frameless, and always-on-top
+
+## IPC Communication
+
+- IPC handlers are registered in `src/main/ipc-handlers.ts`
+- Use `ipcMain.handle()` for async request/response patterns
+- Use `ipcMain.on()` for fire-and-forget events
+- Send events to renderer via `webContents.send()`
+- The preload script (`src/preload/index.ts`) exposes all IPC methods as `window.tapwisper.*`
+
+## Global Shortcuts
+
+- Keyboard shortcuts use `uiohook-napi` (not Electron's globalShortcut)
+- Shortcut logic lives in `src/main/shortcuts.ts`
+- Key constants (hold threshold, grace period, cooldown) are in `src/main/constants.ts`
+
+## Data Storage
+
+- **Config**: `electron-store` for user settings (API keys, preferences)
+- **Database**: `better-sqlite3` for activity tracking and stats (`src/main/database.ts`)
+- **Migrations**: Data migration utilities in `src/main/migrate-data.ts`
+
+## Security
+
+- Context isolation is enabled -- renderer cannot access Node.js APIs directly
+- All renderer-to-main communication must go through the preload contextBridge
+- Never expose raw `ipcRenderer` to the renderer process
+- API keys are stored via electron-store (encrypted at rest)
+
+## Audio
+
+- Audio recording and encoding logic is in `src/main/audio.ts`
+- Audio blobs are passed to the renderer for transcription via AI providers
+
+## Permissions
+
+- Platform-aware permission checking and requesting lives in `src/main/permissions.ts`
+- macOS: checks microphone (`systemPreferences.getMediaAccessStatus`), accessibility (`isTrustedAccessibilityClient`), and screen recording
+- Windows/Linux: only microphone is relevant; accessibility and screen recording are always reported as `'granted'`
+- IPC handlers: `permissions:check` returns all statuses, `permissions:request` triggers the native prompt or opens system settings
+- Exposed to renderer via `window.tapwisper.permissions.check()` and `window.tapwisper.permissions.request(type)`

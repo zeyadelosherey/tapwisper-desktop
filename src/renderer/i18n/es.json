@@ -1,0 +1,32 @@
+{
+  "app": { "name": "TapWisper", "tagline": "Dictado por voz con IA" },
+  "nav": { "home": "Inicio", "aiProvider": "Proveedor IA", "actions": "Acciones", "triggers": "Disparadores", "miniApps": "Mini Apps", "notes": "Notas", "snippets": "Fragmentos", "settings": "Ajustes", "configuration": "Configuración" },
+  "home": { "welcome": "Bienvenido a TapWisper", "subtitle": "Tu asistente de dictado por voz", "timeSaved": "Tiempo ahorrado", "voiceInput": "Entrada de voz", "aiActions": "Acciones IA", "wordsTyped": "Palabras escritas", "quickStart": "Inicio rápido", "thisWeek": "Esta semana", "timeSavedSub": "vs. escritura manual", "wpm": "PPM", "noRecordings": "Aún no hay grabaciones", "charsGenerated": "caracteres generados", "noActions": "Aún no hay acciones", "wordsTypedSub": "transcrito por voz", "saved": "guardado", "voiceLabel": "Voz", "timeSavedLabel": "Tiempo Ahorrado", "chartEmpty": "Comienza a grabar para ver tu actividad semanal", "recentActivity": "Actividad Reciente" },
+  "recording": { "tapToSpeak": "Toca para hablar", "listening": "Escuchando... Toca para parar", "thinking": "Pensando...", "accept": "Aceptar", "edit": "Editar", "cancel": "Cancelar", "newRecording": "Nuevo", "undo": "Deshacer", "editInstruction": "Di tu instrucción de edición...", "hintShorten": "Di: \"hazlo más corto\"", "hintTranslate": "Di: \"traduce al árabe\"", "hintFormal": "Di: \"hazlo más formal\"", "hintGrammar": "Di: \"corrige la gramática\"", "hintRephrase": "Di: \"reformula profesionalmente\"" },
+  "actions": { "translate": "Traducir", "rephrase": "Reformular", "format": "Formatear", "grammar": "Gramática", "askQuestion": "Hacer una pregunta", "searchActions": "Buscar acciones...", "addCustom": "Añadir categoría", "toolbarPreview": "Vista previa", "manageCategories": "Gestiona tus categorías de acciones IA y la barra de herramientas", "categories": "Categorías", "actionSingular": "acción", "actionPlural": "acciones", "newCategory": "Nueva categoría", "emoji": "Emoji", "categoryName": "Nombre de la categoría", "defaultPrompt": "Prompt predeterminado (opcional)", "createCategory": "Crear categoría" },
+  "aiProvider": { "title": "Proveedor IA", "subtitle": "Configura tus modelos de IA y claves API", "languageModel": "Modelo de lenguaje", "voiceTranscription": "Transcripción de voz", "apiKeys": "Claves API", "keySaved": "Clave guardada", "privacyNote": "Las claves API se almacenan localmente en tu dispositivo y están cifradas. Nunca se envían a ningún servidor que no sea el proveedor IA respectivo." },
+  "notes": { "title": "Notas", "subtitle": "Tus notas de voz", "noNotes": "Sin notas aún", "noNotesHint": "Graba una nota de voz para empezar", "today": "Hoy", "yesterday": "Ayer" },
+  "snippets": { "title": "Fragmentos", "subtitle": "Atajos de texto que se expanden automáticamente", "noSnippets": "Sin fragmentos aún", "noSnippetsHint": "Crea atajos como /email o /addr", "addSnippet": "Añadir fragmento", "triggerPlaceholder": "Disparador (ej: /addr)", "expansionPlaceholder": "Texto de expansión" },
+  "settings": { "title": "Ajustes", "subtitle": "Preferencias y configuración", "language": "Idioma", "appearance": "Apariencia", "system": "Sistema", "dark": "Oscuro", "light": "Claro", "keyboardShortcuts": "Atajos de teclado", "reset": "Restablecer", "shortcutRecord": "Grabar", "shortcutRecordDesc": "Mantener para grabar, tocar para alternar", "shortcutPinnedPanel": "Panel fijado", "shortcutPinnedPanelDesc": "Abrir panel de grabación fijado", "shortcutPinnedPanelNote": "El atajo se establece automáticamente en Grabar + Espacio", "pressKeys": "Pulsa las teclas...", "launchAtStartup": "Iniciar al arrancar", "launchHint": "Iniciar TapWisper al conectarse", "privacy": "Privacidad", "privacyText": "Tus datos permanecen en tu dispositivo.", "privacyEncrypted": "Las claves API se cifran y almacenan localmente", "privacyAudio": "Las grabaciones de audio se eliminan después de la transcripción", "privacyNoTelemetry": "No se recopilan datos de telemetría ni análisis", "privacyDirect": "Todas las solicitudes de IA van directamente a tu proveedor configurado", "selectProvider": "Seleccionar proveedor", "selectModel": "Seleccionar modelo", "llm": "LLM", "apiKey": "Clave API", "about": "Acerca de" },
+  "miniApps": { "title": "Mini Apps", "subtitle": "Explora más de 100 plantillas de prompts", "searchPrompts": "Buscar prompts...", "addToToolbar": "Añadir", "added": "Añadido", "all": "Todos", "noPrompts": "No se encontraron prompts" },
+  "shortcuts": { "holdToRecord": "Mantén para grabar, toca para alternar", "openPinnedPanel": "Abrir panel de grabación", "dismiss": "Cerrar panel" },
+  "commandPopup": { "title": "Acciones IA", "selectedText": "Texto seleccionado:", "noTextSelected": "Ningún texto seleccionado" },
+  "aiPanel": { "expand": "Expandir", "collapse": "Contraer", "expandToRead": "Expande el panel para leer y moverlo. Arrastra la barra del título para mover.", "revertHint": "Toca los resaltados para revertir sugerencias", "dismiss": "Cerrar", "context": "Contexto:", "copy": "Copiar", "askPlaceholder": "Haz una pregunta sobre este texto..." },
+  "onboarding": {
+    "title": "Configurar permisos",
+    "subtitle": "TapWisper necesita algunos permisos para funcionar correctamente. Puedes concederlos a continuación.",
+    "microphone": "Micrófono",
+    "microphoneDesc": "Necesario para el dictado por voz y la grabación de audio. TapWisper usa tu micrófono para transcribir el habla a texto.",
+    "accessibility": "Accesibilidad",
+    "accessibilityDesc": "Necesario para los atajos de teclado globales y la inserción de texto en otras aplicaciones mediante pulsaciones de teclas simuladas.",
+    "screenRecording": "Grabación de pantalla",
+    "screenRecordingDesc": "Necesario para leer el texto seleccionado de otras aplicaciones para que TapWisper pueda procesarlo con IA.",
+    "granted": "Concedido",
+    "notGranted": "No concedido",
+    "grant": "Conceder",
+    "openSettings": "Abrir ajustes",
+    "continue": "Continuar",
+    "allGranted": "Todos los permisos concedidos",
+    "permissionsRemaining": "permisos pendientes"
+  }
+}

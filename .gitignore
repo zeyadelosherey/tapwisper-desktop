@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+release/
+
+# Environment & secrets
+*.env
+*.env.*
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / IDE
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Coverage & testing
+coverage/
+
+# Electron builder output
+*.dmg
+*.snap
+*.AppImage
+*.deb
+*.rpm
+*.exe
+*.msi
+*.blockmap
+*.yml.bak
+latest*.yml
+
+# Misc
+*.tgz
+.cache/
+.temp/
+tmp/

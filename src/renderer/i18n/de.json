@@ -1,0 +1,32 @@
+{
+  "app": { "name": "TapWisper", "tagline": "Sprachdiktat mit KI" },
+  "nav": { "home": "Start", "aiProvider": "KI-Anbieter", "actions": "Aktionen", "triggers": "Auslöser", "miniApps": "Mini-Apps", "notes": "Notizen", "snippets": "Snippets", "settings": "Einstellungen", "configuration": "Konfiguration" },
+  "home": { "welcome": "Willkommen bei TapWisper", "subtitle": "Dein Sprachdiktat-Assistent", "timeSaved": "Zeit gespart", "voiceInput": "Spracheingabe", "aiActions": "KI-Aktionen", "wordsTyped": "Wörter getippt", "quickStart": "Schnellstart", "thisWeek": "Diese Woche", "timeSavedSub": "vs. manuelles Tippen", "wpm": "WPM", "noRecordings": "Noch keine Aufnahmen", "charsGenerated": "Zeichen generiert", "noActions": "Noch keine Aktionen", "wordsTypedSub": "per Sprache transkribiert", "saved": "gespeichert", "voiceLabel": "Stimme", "timeSavedLabel": "Zeit Gespart", "chartEmpty": "Beginnen Sie mit der Aufnahme, um Ihre wöchentliche Aktivität zu sehen", "recentActivity": "Letzte Aktivität" },
+  "recording": { "tapToSpeak": "Tippen zum Sprechen", "listening": "Hört zu... Tippen zum Stoppen", "thinking": "Denke nach...", "accept": "Akzeptieren", "edit": "Bearbeiten", "cancel": "Abbrechen", "newRecording": "Neu", "undo": "Rückgängig", "editInstruction": "Sag deine Bearbeitungsanweisung...", "hintShorten": "Sag: \"Mach es kürzer\"", "hintTranslate": "Sag: \"Übersetze ins Arabische\"", "hintFormal": "Sag: \"Mach es formeller\"", "hintGrammar": "Sag: \"Korrigiere die Grammatik\"", "hintRephrase": "Sag: \"Formuliere es professionell um\"" },
+  "actions": { "translate": "Übersetzen", "rephrase": "Umformulieren", "format": "Formatieren", "grammar": "Grammatik", "askQuestion": "Frage stellen", "searchActions": "Aktionen suchen...", "addCustom": "Kategorie hinzufügen", "toolbarPreview": "Vorschau", "manageCategories": "KI-Aktionskategorien und Symbolleiste verwalten", "categories": "Kategorien", "actionSingular": "Aktion", "actionPlural": "Aktionen", "newCategory": "Neue Kategorie", "emoji": "Emoji", "categoryName": "Kategoriename", "defaultPrompt": "Standard-Prompt (optional)", "createCategory": "Kategorie erstellen" },
+  "aiProvider": { "title": "KI-Anbieter", "subtitle": "KI-Modelle und API-Schlüssel konfigurieren", "languageModel": "Sprachmodell", "voiceTranscription": "Sprachtranskription", "apiKeys": "API-Schlüssel", "keySaved": "Schlüssel gespeichert", "privacyNote": "API-Schlüssel werden lokal gespeichert und verschlüsselt." },
+  "notes": { "title": "Notizen", "subtitle": "Deine Sprachnotizen", "noNotes": "Keine Notizen", "noNotesHint": "Nimm eine Sprachnotiz auf", "today": "Heute", "yesterday": "Gestern" },
+  "snippets": { "title": "Snippets", "subtitle": "Textabkürzungen, die automatisch erweitert werden", "noSnippets": "Keine Snippets", "noSnippetsHint": "Erstelle Abkürzungen wie /email oder /addr", "addSnippet": "Snippet hinzufügen", "triggerPlaceholder": "Auslöser (z.B. /addr)", "expansionPlaceholder": "Erweiterungstext" },
+  "settings": { "title": "Einstellungen", "subtitle": "App-Einstellungen und Konfiguration", "language": "Sprache", "appearance": "Erscheinungsbild", "system": "System", "dark": "Dunkel", "light": "Hell", "keyboardShortcuts": "Tastaturkürzel", "reset": "Zurücksetzen", "shortcutRecord": "Aufnehmen", "shortcutRecordDesc": "Halten zum Aufnehmen, tippen zum Umschalten", "shortcutPinnedPanel": "Angeheftetes Panel", "shortcutPinnedPanelDesc": "Aufnahmepanel öffnen", "shortcutPinnedPanelNote": "Das Kürzel wird automatisch auf Aufnehmen + Leertaste gesetzt", "pressKeys": "Tasten drücken...", "launchAtStartup": "Beim Start öffnen", "launchHint": "TapWisper beim Anmelden starten", "privacy": "Datenschutz", "privacyText": "Deine Daten bleiben auf deinem Gerät.", "privacyEncrypted": "API-Schlüssel werden verschlüsselt und lokal gespeichert", "privacyAudio": "Audioaufnahmen werden nach der Transkription gelöscht", "privacyNoTelemetry": "Es werden keine Telemetrie- oder Analysedaten gesammelt", "privacyDirect": "Alle KI-Anfragen gehen direkt an deinen konfigurierten Anbieter", "selectProvider": "Anbieter auswählen", "selectModel": "Modell auswählen", "llm": "LLM", "apiKey": "API-Schlüssel", "about": "Über" },
+  "miniApps": { "title": "Mini-Apps", "subtitle": "Über 100 Prompt-Vorlagen durchsuchen", "searchPrompts": "Prompts suchen...", "addToToolbar": "Hinzufügen", "added": "Hinzugefügt", "all": "Alle", "noPrompts": "Keine Prompts gefunden" },
+  "shortcuts": { "holdToRecord": "Halten zum Aufnehmen", "openPinnedPanel": "Aufnahmepanel öffnen", "dismiss": "Panel schließen" },
+  "commandPopup": { "title": "KI-Aktionen", "selectedText": "Markierter Text:", "noTextSelected": "Kein Text markiert" },
+  "aiPanel": { "expand": "Erweitern", "collapse": "Verkleinern", "expandToRead": "Panel vergrößern zum Lesen und Verschieben. Titelleiste ziehen zum Verschieben.", "revertHint": "Markierungen antippen, um Vorschläge zurückzusetzen", "dismiss": "Schließen", "context": "Kontext:", "copy": "Kopieren", "askPlaceholder": "Stelle eine Frage zu diesem Text..." },
+  "onboarding": {
+    "title": "Berechtigungen einrichten",
+    "subtitle": "TapWisper benötigt einige Berechtigungen, um richtig zu funktionieren. Du kannst sie unten erteilen.",
+    "microphone": "Mikrofon",
+    "microphoneDesc": "Erforderlich für Sprachdiktat und Audioaufnahmen. TapWisper nutzt dein Mikrofon, um Sprache in Text umzuwandeln.",
+    "accessibility": "Bedienungshilfen",
+    "accessibilityDesc": "Erforderlich für globale Tastaturkürzel und das Einfügen von Text in andere Anwendungen über simulierte Tastenanschläge.",
+    "screenRecording": "Bildschirmaufnahme",
+    "screenRecordingDesc": "Erforderlich zum Lesen von markiertem Text aus anderen Anwendungen, damit TapWisper ihn mit KI verarbeiten kann.",
+    "granted": "Erteilt",
+    "notGranted": "Nicht erteilt",
+    "grant": "Erteilen",
+    "openSettings": "Einstellungen öffnen",
+    "continue": "Weiter",
+    "allGranted": "Alle Berechtigungen erteilt",
+    "permissionsRemaining": "Berechtigungen ausstehend"
+  }
+}

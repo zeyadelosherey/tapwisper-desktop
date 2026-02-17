@@ -1,0 +1,71 @@
+---
+description: TapWisper Desktop project overview and architecture
+alwaysApply: true
+---
+
+# TapWisper Desktop
+
+Open-source, system-wide voice dictation with AI, built with **Electron 33 + React 19 + TypeScript + Tailwind CSS**.
+
+## Architecture
+
+Three Electron processes:
+
+- **Main** (`src/main/`) -- system tray, global shortcuts, window management, IPC handlers, clipboard, audio recording, permission checking, SQLite database, config store
+- **Preload** (`src/preload/`) -- context bridge exposing `window.tapwisper.*` API to the renderer
+- **Renderer** (`src/renderer/`) -- React UI with Tailwind CSS, Zustand state, Framer Motion animations
+
+## Multi-Window System
+
+| Window | Purpose |
+|--------|---------|
+| Main Window | Settings and configuration (1000x700) |
+| Recording Pill | Floating recording indicator (140x50) |
+| Pinned Panel | Persistent recording panel |
+| Command Popup | Action/command selector overlay |
+| AI Panel | AI suggestion overlay |
+
+Overlay windows use hash-based routing (`#/recording-pill`, `#/pinned-panel`, etc.) and are pre-warmed to avoid first-use delay.
+
+## Directory Map
+
+```
+src/
+  main/            # Electron main process
+  preload/         # Context bridge (secure IPC)
+  renderer/
+    components/    # Overlay UI components
+    pages/         # Settings window pages (includes onboarding)
+    services/      # AI provider clients (Gemini, OpenAI, Claude, Together, Soniox)
+    hooks/         # React hooks (audio, shortcuts, AI actions)
+    store/         # Zustand state stores (stats, activity)
+    models/        # TypeScript type definitions
+    constants/     # Shared constants (colors, providers)
+    utils/         # Utility functions (formatting)
+    i18n/          # Translations (en, ar, de, es, fr, it)
+    assets/        # Static assets (logos)
+    styles/        # Global CSS and theme variables
+    types/         # Global type declarations
+```
+
+## Key Patterns
+
+- **IPC**: All renderer-to-main communication goes through `window.tapwisper.*` (defined in preload)
+- **Permissions**: `src/main/permissions.ts` checks/requests platform-specific permissions; exposed via `window.tapwisper.permissions.*`
+- **Onboarding**: First-launch permission setup in `src/renderer/pages/onboarding.tsx`, gated in `main-window.tsx`
+- **AI Router**: `src/renderer/services/ai-router.ts` routes requests to the configured LLM/voice provider
+- **AI Providers**: Gemini, Together AI, OpenAI, Claude (LLM); Together Whisper, Soniox (voice)
+- **Path Alias**: `@/` maps to `src/renderer/` (configured in electron-vite)
+
+## Commands
+
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Development mode with hot reload |
+| `npm run build` | Production build |
+| `npm run typecheck` | TypeScript type checking |
+| `npm run lint` | ESLint |
+| `npm run format` | Prettier formatting |
+| `npm run dist:mac` | Package for macOS |
+| `npm run dist:win` | Package for Windows |
+| `npm run dist:linux` | Package for Linux |

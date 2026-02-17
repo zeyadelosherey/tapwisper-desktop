@@ -1,0 +1,32 @@
+{
+  "app": { "name": "TapWisper", "tagline": "Dictée vocale avec IA" },
+  "nav": { "home": "Accueil", "aiProvider": "Fournisseur IA", "actions": "Actions", "triggers": "Déclencheurs", "miniApps": "Mini Apps", "notes": "Notes", "snippets": "Extraits", "settings": "Paramètres", "configuration": "Configuration" },
+  "home": { "welcome": "Bienvenue sur TapWisper", "subtitle": "Votre assistant de dictée vocale", "timeSaved": "Temps gagné", "timeSavedSub": "vs. saisie manuelle", "voiceInput": "Entrée vocale", "wpm": "MPM", "noRecordings": "Pas encore d'enregistrements", "aiActions": "Actions IA", "charsGenerated": "caractères générés", "noActions": "Pas encore d'actions", "wordsTyped": "Mots transcrits", "wordsTypedSub": "transcrits par la voix", "quickStart": "Démarrage rapide", "thisWeek": "Cette semaine", "saved": "gagné", "voiceLabel": "Voix", "timeSavedLabel": "Temps gagné", "chartEmpty": "Commencez à enregistrer pour voir votre activité", "recentActivity": "Activité récente" },
+  "recording": { "tapToSpeak": "Appuyez pour parler", "listening": "Écoute en cours... Appuyez pour arrêter", "thinking": "Réflexion...", "accept": "Accepter", "edit": "Modifier", "cancel": "Annuler", "newRecording": "Nouveau", "undo": "Annuler", "editInstruction": "Dites votre instruction de modification...", "hintShorten": "Dites : \"raccourcis-le\"", "hintTranslate": "Dites : \"traduis en arabe\"", "hintFormal": "Dites : \"rends-le plus formel\"", "hintGrammar": "Dites : \"corrige la grammaire\"", "hintRephrase": "Dites : \"reformule professionnellement\"" },
+  "actions": { "translate": "Traduire", "rephrase": "Reformuler", "format": "Formater", "grammar": "Grammaire", "askQuestion": "Poser une question", "searchActions": "Rechercher des actions...", "addCustom": "Ajouter une catégorie", "toolbarPreview": "Aperçu", "manageCategories": "Gérer vos catégories d'actions IA et la barre d'outils", "categories": "Catégories", "actionSingular": "action", "actionPlural": "actions", "newCategory": "Nouvelle catégorie", "emoji": "Emoji", "categoryName": "Nom de la catégorie", "defaultPrompt": "Prompt par défaut (optionnel)", "createCategory": "Créer la catégorie" },
+  "aiProvider": { "title": "Fournisseur IA", "subtitle": "Configurez vos modèles IA et clés API", "languageModel": "Modèle de langage", "voiceTranscription": "Transcription vocale", "apiKeys": "Clés API", "keySaved": "Clé sauvegardée", "privacyNote": "Les clés API sont stockées localement et chiffrées. Elles ne sont jamais envoyées à un autre serveur que le fournisseur IA respectif." },
+  "notes": { "title": "Notes", "subtitle": "Vos notes vocales", "noNotes": "Aucune note", "noNotesHint": "Enregistrez une note vocale pour commencer", "today": "Aujourd'hui", "yesterday": "Hier" },
+  "snippets": { "title": "Extraits", "subtitle": "Raccourcis texte qui s'étendent automatiquement", "noSnippets": "Aucun extrait", "noSnippetsHint": "Créez des raccourcis comme /email ou /addr", "addSnippet": "Ajouter un extrait", "triggerPlaceholder": "Déclencheur (ex: /addr)", "expansionPlaceholder": "Texte d'expansion" },
+  "settings": { "title": "Paramètres", "subtitle": "Préférences et configuration", "language": "Langue", "appearance": "Apparence", "system": "Système", "dark": "Sombre", "light": "Clair", "keyboardShortcuts": "Raccourcis clavier", "reset": "Réinitialiser", "shortcutRecord": "Enregistrer", "shortcutRecordDesc": "Maintenir pour enregistrer, appuyer pour basculer", "shortcutPinnedPanel": "Panneau épinglé", "shortcutPinnedPanelDesc": "Ouvrir le panneau d'enregistrement", "shortcutPinnedPanelNote": "Le raccourci est automatiquement défini sur Enregistrer + Espace", "pressKeys": "Appuyez sur les touches...", "launchAtStartup": "Lancer au démarrage", "launchHint": "Démarrer TapWisper à la connexion", "privacy": "Confidentialité", "privacyText": "Vos données restent sur votre appareil.", "privacyEncrypted": "Les clés API sont chiffrées et stockées localement", "privacyAudio": "Les enregistrements audio sont supprimés après la transcription", "privacyNoTelemetry": "Aucune donnée de télémétrie ou d'analyse n'est collectée", "privacyDirect": "Toutes les requêtes IA vont directement à votre fournisseur configuré", "selectProvider": "Sélectionner le fournisseur", "selectModel": "Sélectionner le modèle", "llm": "LLM", "apiKey": "Clé API", "about": "À propos" },
+  "miniApps": { "title": "Mini Apps", "subtitle": "Parcourez plus de 100 modèles de prompts", "searchPrompts": "Rechercher des prompts...", "addToToolbar": "Ajouter", "added": "Ajouté", "all": "Tous", "noPrompts": "Aucun prompt trouvé" },
+  "shortcuts": { "holdToRecord": "Maintenez pour enregistrer", "openPinnedPanel": "Ouvrir le panneau d'enregistrement", "dismiss": "Fermer le panneau" },
+  "commandPopup": { "title": "Actions IA", "selectedText": "Texte sélectionné :", "noTextSelected": "Aucun texte sélectionné" },
+  "aiPanel": { "expand": "Agrandir", "collapse": "Réduire", "expandToRead": "Agrandir le panneau pour lire et le déplacer. Glissez la barre de titre pour déplacer.", "revertHint": "Appuyez sur les surlignages pour annuler les suggestions", "dismiss": "Fermer", "context": "Contexte :", "copy": "Copier", "askPlaceholder": "Posez une question sur ce texte..." },
+  "onboarding": {
+    "title": "Configurer les permissions",
+    "subtitle": "TapWisper a besoin de quelques permissions pour fonctionner correctement. Vous pouvez les accorder ci-dessous.",
+    "microphone": "Microphone",
+    "microphoneDesc": "Requis pour la dictée vocale et l'enregistrement audio. TapWisper utilise votre microphone pour transcrire la parole en texte.",
+    "accessibility": "Accessibilité",
+    "accessibilityDesc": "Requis pour les raccourcis clavier globaux et l'insertion de texte dans d'autres applications via des frappes simulées.",
+    "screenRecording": "Enregistrement d'écran",
+    "screenRecordingDesc": "Requis pour lire le texte sélectionné dans d'autres applications afin que TapWisper puisse le traiter avec l'IA.",
+    "granted": "Accordé",
+    "notGranted": "Non accordé",
+    "grant": "Accorder",
+    "openSettings": "Ouvrir les paramètres",
+    "continue": "Continuer",
+    "allGranted": "Toutes les permissions accordées",
+    "permissionsRemaining": "permissions restantes"
+  }
+}
