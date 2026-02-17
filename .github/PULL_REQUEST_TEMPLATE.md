@@ -9,11 +9,18 @@ Brief description of the changes in this PR.
 
 ## Type of Change
 
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Refactoring (no functional changes)
-- [ ] Documentation update
+- [ ] Bug fix (`fix/`)
+- [ ] New feature (`feat/`)
+- [ ] Refactoring (`refactor/`)
+- [ ] Documentation (`docs/`)
+- [ ] Hotfix (`hotfix/`)
+- [ ] Release (`release/`)
 - [ ] Other (describe below)
+
+## Target Branch
+
+- [ ] `develop` (features, fixes, refactors, docs)
+- [ ] `main` (hotfixes and releases only)
 
 ## Testing
 
@@ -25,11 +32,13 @@ Describe how you tested the changes:
 
 ## Checklist
 
+- [ ] Branch follows naming convention (`feat/`, `fix/`, `refactor/`, `docs/`, `hotfix/`, `release/`)
+- [ ] Commit messages follow conventional format (`type: description`)
 - [ ] My code follows the project coding standards
 - [ ] I have run `npm run typecheck` with no errors
 - [ ] I have run `npm run lint` with no errors
 - [ ] I have updated documentation if needed
-- [ ] I have added translations for new user-facing strings
+- [ ] I have added translations for new user-facing strings (all 6 locales)
 
 ## Screenshots
 

@@ -18,6 +18,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="Platform" />
   <a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/Electron-33+-47848F.svg" alt="Electron" /></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-61DAFB.svg" alt="React" /></a>
+  <a href="https://github.com/sponsors/zeyadelosherey"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink.svg" alt="Sponsor" /></a>
 </p>
 
 <p align="center">
@@ -211,6 +212,28 @@ This project includes configuration files for AI coding assistants so they can u
 | [Cursor](https://cursor.com) | [`.cursor/rules/`](.cursor/rules/) | Project rules for Cursor AI (architecture, coding standards, patterns) |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | [`CLAUDE.md`](CLAUDE.md) | Project context for Claude Code CLI agent |
 | [OpenAI Codex](https://openai.com/codex) | [`CODEX.md`](CODEX.md) | Project context for OpenAI Codex agent |
+| [GitHub Copilot](https://github.com/features/copilot) | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | Project context for GitHub Copilot |
+
+---
+
+## Sponsor TapWisper
+
+TapWisper is free and open source. If you find it useful, please consider supporting its development:
+
+### Individual Supporters
+
+You can sponsor the project through GitHub Sponsors -- every contribution helps keep the project maintained and growing:
+
+> **[Become a Sponsor on GitHub](https://github.com/sponsors/zeyadelosherey)**
+
+### Corporate Sponsorship
+
+If your company uses TapWisper and would like to sponsor the project, partner on features, or discuss enterprise support, we'd love to hear from you:
+
+- **Email**: [support@tapwisper.ai](mailto:support@tapwisper.ai)
+- **GitHub Discussions**: [Start a conversation](https://github.com/zeyadelosherey/tapwisper-desktop/discussions)
+
+Corporate sponsors get visibility on this README and priority feature discussions.
 
 ---
 
