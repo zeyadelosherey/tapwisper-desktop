@@ -35,6 +35,20 @@
 
 ---
 
+## 🎬 Demo
+
+<p align="center">
+  <a href="https://youtu.be/qNLpSK1ctOo">
+    <img src="https://img.youtube.com/vi/qNLpSK1ctOo/maxresdefault.jpg" alt="TapWisper Demo Video" width="720" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/qNLpSK1ctOo">▶️ Watch the full demo on YouTube</a>
+</p>
+
+---
+
 ## 📥 Download
 
 <p align="center">
