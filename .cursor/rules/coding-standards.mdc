@@ -54,7 +54,62 @@ These rules are enforced by Prettier -- do not deviate:
 - `@typescript-eslint/no-unused-vars`: warn (ignored if prefixed with `_`)
 - `no-console`: warn -- avoid `console.log` in production code (stripped in prod builds)
 
-## Git Conventions
+## Git Branching Strategy (Git Flow)
 
-- Branch names: `feat/description`, `fix/description`, `refactor/description`, `docs/description`
-- Commit messages: `feat: add feature`, `fix: resolve bug`, `refactor: extract utility`
+### Primary Branches
+
+| Branch | Purpose | Merges Into |
+|--------|---------|-------------|
+| `main` | Production-ready releases. Always stable and tagged. | -- |
+| `develop` | Integration branch for features. All new work starts here. | `main` (via `release/*`) |
+
+### Supporting Branches
+
+| Prefix | Purpose | Branch From | Merge Into |
+|--------|---------|-------------|------------|
+| `feat/` | New features | `develop` | `develop` |
+| `fix/` | Bug fixes (non-urgent) | `develop` | `develop` |
+| `refactor/` | Code refactoring | `develop` | `develop` |
+| `docs/` | Documentation changes | `develop` | `develop` |
+| `release/vX.Y.Z` | Release preparation and final QA | `develop` | `main` + `develop` |
+| `hotfix/` | Urgent production fixes | `main` | `main` + `develop` |
+
+### Branch Naming
+
+- Always use lowercase with hyphens: `feat/voice-trigger-editing`
+- Be descriptive but concise: `fix/audio-recording-crash`, not `fix/bug`
+- Include issue number when applicable: `feat/123-custom-actions`
+
+### Workflow
+
+1. Create feature branch from `develop`: `git checkout -b feat/my-feature develop`
+2. Commit with conventional messages (see below)
+3. Open a PR targeting `develop`
+4. After review and CI pass, merge into `develop`
+5. When ready for release, create `release/vX.Y.Z` from `develop`
+6. After QA on release branch, merge into `main` and tag: `git tag vX.Y.Z`
+7. Merge release back into `develop` to capture any last-minute fixes
+8. For urgent production bugs, branch `hotfix/` from `main`, fix, then merge into both `main` and `develop`
+
+### Commit Messages (Conventional Commits)
+
+Format: `type: short description`
+
+| Type | When to Use |
+|------|-------------|
+| `feat` | New feature: `feat: add voice trigger editing` |
+| `fix` | Bug fix: `fix: resolve audio recording crash on Windows` |
+| `refactor` | Restructuring without behavior change: `refactor: extract audio utility` |
+| `docs` | Documentation only: `docs: update API key setup guide` |
+| `chore` | Tooling, deps, config: `chore: bump electron to v33.2` |
+| `style` | Formatting, whitespace: `style: fix indentation in ai-router` |
+| `test` | Adding or fixing tests: `test: add unit tests for formatting utils` |
+| `perf` | Performance improvement: `perf: optimize overlay window preloading` |
+
+### Rules
+
+- Never force-push to `main` or `develop`
+- Always open a PR -- no direct pushes to `main` or `develop`
+- Run `npm run typecheck && npm run lint` before pushing
+- Delete feature branches after merging
+- Tag every production release on `main`: `vX.Y.Z`

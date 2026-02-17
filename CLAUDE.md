@@ -117,6 +117,46 @@ Zustand stores in `src/renderer/store/`. Config data lives in electron-store (ac
 ### Path Alias
 `@/` maps to `src/renderer/` (configured in `electron.vite.config.ts`).
 
+## Git Branching Strategy (Git Flow)
+
+### Primary Branches
+
+- **`main`** -- Production-ready releases. Always stable and tagged with `vX.Y.Z`.
+- **`develop`** -- Integration branch. All feature work branches from here and merges back here.
+
+### Supporting Branch Prefixes
+
+| Prefix | Branch From | Merge Into | Example |
+|--------|-------------|------------|---------|
+| `feat/` | `develop` | `develop` | `feat/voice-trigger-editing` |
+| `fix/` | `develop` | `develop` | `fix/audio-recording-crash` |
+| `refactor/` | `develop` | `develop` | `refactor/extract-audio-utility` |
+| `docs/` | `develop` | `develop` | `docs/update-api-guide` |
+| `release/vX.Y.Z` | `develop` | `main` + `develop` | `release/v1.2.0` |
+| `hotfix/` | `main` | `main` + `develop` | `hotfix/critical-crash` |
+
+### Workflow
+
+1. Branch from `develop`: `git checkout -b feat/my-feature develop`
+2. Commit with conventional messages: `feat: add feature`, `fix: resolve bug`
+3. Open PR targeting `develop`
+4. After review, merge into `develop` (delete feature branch)
+5. For releases: `release/vX.Y.Z` from `develop` -> merge into `main`, tag, merge back to `develop`
+6. For hotfixes: `hotfix/description` from `main` -> merge into both `main` and `develop`
+
+### Commit Message Format
+
+`type: short description`
+
+Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `style`, `test`, `perf`
+
+### Rules
+
+- Never force-push to `main` or `develop`
+- Always open a PR -- no direct pushes to `main` or `develop`
+- Run `npm run typecheck && npm run lint` before pushing
+- Tag every production release on `main`
+
 ## Common Pitfalls
 
 - Do not use `any` -- the linter will warn
@@ -125,3 +165,5 @@ Zustand stores in `src/renderer/store/`. Config data lives in electron-store (ac
 - Overlay windows are frameless and transparent -- test visual changes in all overlay contexts
 - API keys are stored in electron-store; never log or expose them
 - The main process externalizes `better-sqlite3` -- it must be a native module, not bundled
+- Always branch from `develop` for new work, never from `main` (unless hotfix)
+- Delete feature branches after merge to keep the repo clean
