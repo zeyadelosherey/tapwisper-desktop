@@ -1,7 +1,7 @@
 {
   "name": "tapwisper-desktop",
   "productName": "TapWisper",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "TapWisper Desktop - Open-source, system-wide voice dictation with AI",
   "main": "./out/main/index.js",
   "author": "TapWisper",
