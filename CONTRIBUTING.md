@@ -96,35 +96,46 @@ src/
 
 ## Making Changes
 
-### Workflow
+### Workflow (Git Flow)
+
+This project uses **Git Flow**. The `develop` branch is the integration branch for all new work. The `main` branch is reserved for production releases.
 
 1. Fork the repository
-2. Create a feature branch from `main`: `git checkout -b feat/my-feature`
+2. Create a feature branch from `develop`: `git checkout -b feat/my-feature develop`
 3. Make your changes
 4. Run checks: `npm run typecheck && npm run lint`
 5. Commit with a clear message (see below)
-6. Push and open a Pull Request
+6. Push and open a Pull Request **targeting `develop`**
 
 ### Branch Naming
 
-- `feat/description` -- new features
-- `fix/description` -- bug fixes
-- `refactor/description` -- code refactoring
-- `docs/description` -- documentation changes
+| Prefix | Purpose | Branch From | Merge Into |
+|--------|---------|-------------|------------|
+| `feat/` | New features | `develop` | `develop` |
+| `fix/` | Bug fixes | `develop` | `develop` |
+| `refactor/` | Code refactoring | `develop` | `develop` |
+| `docs/` | Documentation changes | `develop` | `develop` |
+| `hotfix/` | Urgent production fixes | `main` | `main` + `develop` |
+| `release/vX.Y.Z` | Release preparation | `develop` | `main` + `develop` |
 
-### Commit Messages
+### Commit Messages (Conventional Commits)
 
-Use clear, descriptive commit messages:
+Format: `type: short description`
 
 ```
 feat: add speech-to-text provider selection
 fix: resolve clipboard race condition on macOS
 refactor: extract shared formatting utilities
 docs: update README with new project structure
+chore: bump electron to v33.2
+perf: optimize overlay window preloading
 ```
+
+Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `style`, `test`, `perf`
 
 ## Pull Request Guidelines
 
+- Open PRs against `develop` (not `main`)
 - Keep PRs focused on a single change
 - Include a clear description of what and why
 - Reference any related issues
