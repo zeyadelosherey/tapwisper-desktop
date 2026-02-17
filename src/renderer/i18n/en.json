@@ -146,7 +146,9 @@
     "selectModel": "Select Model",
     "llm": "LLM",
     "apiKey": "API Key",
-    "about": "About"
+    "about": "About",
+    "contact": "Contact & Support",
+    "contactDesc": "Have a question, found a bug, or want to request a feature? Reach out to us."
   },
   "miniApps": {
     "title": "Mini Apps",

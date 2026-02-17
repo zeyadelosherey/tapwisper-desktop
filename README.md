@@ -65,13 +65,13 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 
 ### Download
 
-> **[Download TapWisper v1.0.1](https://github.com/zeyadelosherey/tapwisper-desktop/releases/latest)**
+> **[Download TapWisper v1.0.2](https://github.com/zeyadelosherey/tapwisper-desktop/releases/latest)**
 
 | Platform | Download | Architecture |
 |----------|----------|--------------|
-| macOS | [TapWisper-1.0.1-arm64.dmg](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.1/tapwisper-desktop-1.0.1-arm64.dmg) | Apple Silicon (M1/M2/M3/M4) |
-| macOS | [TapWisper-1.0.1-x64.dmg](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.1/tapwisper-desktop-1.0.1-x64.dmg) | Intel |
-| Windows | [TapWisper-1.0.1-setup.exe](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.1/tapwisper-desktop-1.0.1-setup.exe) | x64 |
+| macOS | [TapWisper-1.0.2-arm64.dmg](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.2/tapwisper-desktop-1.0.2-arm64.dmg) | Apple Silicon (M1/M2/M3/M4) |
+| macOS | [TapWisper-1.0.2-x64.dmg](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.2/tapwisper-desktop-1.0.2-x64.dmg) | Intel |
+| Windows | [TapWisper-1.0.2-setup.exe](https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.0.2/tapwisper-desktop-1.0.2-setup.exe) | x64 |
 
 Or browse all versions on the [Releases page](https://github.com/zeyadelosherey/tapwisper-desktop/releases).
 
@@ -213,6 +213,13 @@ This project includes configuration files for AI coding assistants so they can u
 | [OpenAI Codex](https://openai.com/codex) | [`CODEX.md`](CODEX.md) | Project context for OpenAI Codex agent |
 
 ---
+
+## Support
+
+Have a question, found a bug, or want to request a feature? Reach out to us:
+
+- **Email**: [support@tapwisper.ai](mailto:support@tapwisper.ai)
+- **Issues**: [GitHub Issues](https://github.com/zeyadelosherey/tapwisper-desktop/issues)
 
 ## Contributing
 

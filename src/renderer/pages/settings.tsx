@@ -2,7 +2,7 @@ import { type JSX, useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Globe, Shield, Info, Monitor, Moon, Sun, Keyboard, RotateCcw,
-  Eye, EyeOff, Check, AlertCircle, Cpu, Settings2, Mic, Search, X
+  Eye, EyeOff, Check, AlertCircle, Cpu, Settings2, Mic, Search, X, Mail
 } from 'lucide-react'
 import { updateDirection } from '../i18n'
 import appLogo from '../assets/logo.png'
@@ -1218,6 +1218,28 @@ export function Settings(): JSX.Element {
             <p>Platform: {platformInfo?.platform || 'Loading...'}</p>
             <p>Electron: {platformInfo?.version || 'Loading...'}</p>
           </div>
+        </div>
+      </section>
+
+      {/* Contact / Support */}
+      <section className="mt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Mail className="w-4 h-4 text-theme-text-secondary" />
+          <h2 className="text-sm font-semibold text-theme-text-secondary uppercase tracking-wider">
+            {t('settings.contact', 'Contact & Support')}
+          </h2>
+        </div>
+        <div className="bg-theme-card rounded-xl p-4 border border-theme-border/50">
+          <p className="text-sm text-theme-text-secondary mb-2">
+            {t('settings.contactDesc', 'Have a question, found a bug, or want to request a feature? Reach out to us.')}
+          </p>
+          <a
+            href="mailto:support@tapwisper.ai"
+            className="inline-flex items-center gap-2 text-sm text-sky-accent hover:text-sky-accent/80 transition-colors"
+          >
+            <Mail className="w-4 h-4" />
+            support@tapwisper.ai
+          </a>
         </div>
       </section>
 
