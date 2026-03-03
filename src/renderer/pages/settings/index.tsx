@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useState, useCallback } from 'react'
+import { type JSX, type ReactNode, useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Settings2, Cpu, Keyboard, Info } from 'lucide-react'
 import { updateDirection } from '../../i18n'
@@ -10,7 +10,7 @@ import { AIProviderTab } from './ai-provider-tab'
 import { ShortcutsTab } from './shortcuts-tab'
 import { AboutTab } from './about-tab'
 
-const TABS: { id: SettingsTab; labelKey: string; icon: React.ReactNode }[] = [
+const TABS: { id: SettingsTab; labelKey: string; icon: ReactNode }[] = [
   { id: 'general', labelKey: 'settings.tabGeneral', icon: <Settings2 className="w-4 h-4" /> },
   { id: 'ai-provider', labelKey: 'settings.tabAIProvider', icon: <Cpu className="w-4 h-4" /> },
   { id: 'shortcuts', labelKey: 'settings.tabShortcuts', icon: <Keyboard className="w-4 h-4" /> },
