@@ -79,6 +79,19 @@ function getDayIndex(): number {
   return day === 0 ? 6 : day - 1
 }
 
+function patchDailyStats(
+  dailyStats: DailyStats[],
+  dayIdx: number,
+  patch: Partial<DailyStats>
+): DailyStats[] {
+  const updated = [...dailyStats]
+  if (!updated[dayIdx]) {
+    updated[dayIdx] = { voiceSeconds: 0, aiActions: 0, wordCount: 0, timeSavedSeconds: 0 }
+  }
+  updated[dayIdx] = { ...updated[dayIdx], ...patch }
+  return updated
+}
+
 function emptyDailyStats(): DailyStats[] {
   return Array.from({ length: 7 }, () => ({
     voiceSeconds: 0,
@@ -169,18 +182,13 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     const typingSeconds = (words / 40) * 60
     const timeSaved = Math.max(0, typingSeconds - seconds)
 
-    // Update daily stats
     const dayIdx = getDayIndex()
-    const dailyStats = [...state.dailyStats]
-    if (!dailyStats[dayIdx]) {
-      dailyStats[dayIdx] = { voiceSeconds: 0, aiActions: 0, wordCount: 0, timeSavedSeconds: 0 }
-    }
-    dailyStats[dayIdx] = {
-      ...dailyStats[dayIdx],
-      voiceSeconds: dailyStats[dayIdx].voiceSeconds + seconds,
-      wordCount: dailyStats[dayIdx].wordCount + words,
-      timeSavedSeconds: dailyStats[dayIdx].timeSavedSeconds + timeSaved
-    }
+    const prev = state.dailyStats[dayIdx] || { voiceSeconds: 0, aiActions: 0, wordCount: 0, timeSavedSeconds: 0 }
+    const dailyStats = patchDailyStats(state.dailyStats, dayIdx, {
+      voiceSeconds: prev.voiceSeconds + seconds,
+      wordCount: prev.wordCount + words,
+      timeSavedSeconds: prev.timeSavedSeconds + timeSaved
+    })
 
     // Add activity entry
     const activity: ActivityEntry = {
@@ -226,17 +234,12 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     // Estimate time saved: average 15 seconds per AI action manually
     const timeSaved = 15
 
-    // Update daily stats
     const dayIdx = getDayIndex()
-    const dailyStats = [...state.dailyStats]
-    if (!dailyStats[dayIdx]) {
-      dailyStats[dayIdx] = { voiceSeconds: 0, aiActions: 0, wordCount: 0, timeSavedSeconds: 0 }
-    }
-    dailyStats[dayIdx] = {
-      ...dailyStats[dayIdx],
-      aiActions: dailyStats[dayIdx].aiActions + 1,
-      timeSavedSeconds: dailyStats[dayIdx].timeSavedSeconds + timeSaved
-    }
+    const prev = state.dailyStats[dayIdx] || { voiceSeconds: 0, aiActions: 0, wordCount: 0, timeSavedSeconds: 0 }
+    const dailyStats = patchDailyStats(state.dailyStats, dayIdx, {
+      aiActions: prev.aiActions + 1,
+      timeSavedSeconds: prev.timeSavedSeconds + timeSaved
+    })
 
     // Add activity entry
     const prettyCategory = category.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())

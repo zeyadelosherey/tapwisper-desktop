@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Clock, Mic, Zap, Type, TrendingUp, ArrowUpRight,
   Activity, Sparkles, Timer, LayoutDashboard, History,
-  Copy, Trash2, X, ChevronDown, ChevronUp, Code,
+  Copy, Trash2, X, ChevronDown, ChevronUp,
   Search, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useStatsStore, type ActivityEntry } from '../store/stats'
@@ -12,6 +12,7 @@ import { useActivityStore, type TranscriptionRecord } from '../store/activity'
 // ── Helpers ──────────────────────────────────────────────────────
 
 import { formatDuration, formatTimeAgo, formatDate, formatTime } from '../utils/formatting'
+import { renderTextWithCodeBlocks } from '../utils/render-text'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -44,11 +45,11 @@ export function Home(): JSX.Element {
     deleteRecord
   } = useActivityStore()
 
-  // Refresh stats and activity on mount and when switching between Dashboard/Activity tabs
+  // Load stats and activity once on mount
   useEffect(() => {
     loadStats()
     loadRecords()
-  }, [activeTab, loadStats, loadRecords])
+  }, [loadStats, loadRecords])
 
   const timeSavedMinutes = useMemo(
     () => Math.round((voiceTimeSavedSeconds + aiTimeSavedSeconds) / 60),
@@ -207,62 +208,6 @@ interface ActivityTabProps {
   t: (key: string, fallback?: string) => string
 }
 
-// Helper to render text with code blocks
-function renderTextWithCodeBlocks(text: string): JSX.Element {
-  // Match code blocks: ```language\ncode\n``` or ```\ncode\n```
-  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
-  const parts: JSX.Element[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  while ((match = codeBlockRegex.exec(text)) !== null) {
-    // Add text before code block
-    if (match.index > lastIndex) {
-      const textBefore = text.slice(lastIndex, match.index)
-      parts.push(
-        <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-          {textBefore}
-        </span>
-      )
-    }
-
-    // Add code block
-    const language = match[1] || 'code'
-    const code = match[2]
-    parts.push(
-      <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden border border-theme-border/30">
-        <div className="flex items-center justify-between px-3 py-1.5 bg-theme-surface/50 border-b border-theme-border/20">
-          <div className="flex items-center gap-2">
-            <Code className="w-3 h-3 text-theme-text-muted" />
-            <span className="text-[10px] text-theme-text-muted uppercase font-medium">{language}</span>
-          </div>
-          <button
-            onClick={() => navigator.clipboard.writeText(code)}
-            className="text-[10px] text-theme-text-muted hover:text-theme-text transition-colors"
-          >
-            Copy
-          </button>
-        </div>
-        <pre className="p-3 bg-theme-surface/30 overflow-x-auto">
-          <code className="text-xs text-theme-text font-mono">{code}</code>
-        </pre>
-      </div>
-    )
-
-    lastIndex = match.index + match[0].length
-  }
-
-  // Add remaining text
-  if (lastIndex < text.length) {
-    parts.push(
-      <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-        {text.slice(lastIndex)}
-      </span>
-    )
-  }
-
-  return <>{parts}</>
-}
 
 function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
   const [selectedRecord, setSelectedRecord] = useState<TranscriptionRecord | null>(null)
