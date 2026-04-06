@@ -21,12 +21,14 @@ const api = {
     expand: () => ipcRenderer.invoke('recording-pill:expand'),
     collapse: () => ipcRenderer.invoke('recording-pill:collapse'),
     expandFull: () => ipcRenderer.invoke('recording-pill:expand-full'),
-    collapseToResults: () => ipcRenderer.invoke('recording-pill:collapse-to-results')
+    collapseToResults: () => ipcRenderer.invoke('recording-pill:collapse-to-results'),
+    setClickable: (clickable: boolean) => ipcRenderer.invoke('recording-pill:set-clickable', clickable)
   },
 
   // ── Recording Control ────────────────────────────────────────────
   recording: {
-    cancel: () => ipcRenderer.invoke('recording:cancel')
+    cancel: () => ipcRenderer.invoke('recording:cancel'),
+    transcriptionDone: (text: string) => ipcRenderer.invoke('recording:transcription-done', text)
   },
 
   // ── Clipboard ──────────────────────────────────────────────────

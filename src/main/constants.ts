@@ -10,3 +10,6 @@ export const START_GRACE_PERIOD_MS = 1500
 
 /** Cooldown after stopping to prevent immediately re-starting a new recording */
 export const STOP_COOLDOWN_MS = 600
+
+/** How long after transcription the shortcut opens the command popup instead of starting a new recording */
+export const POST_RECORDING_TIMEOUT_MS = 30_000
