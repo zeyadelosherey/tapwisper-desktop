@@ -2,7 +2,7 @@ import { processWithGemini } from './gemini'
 import { processWithTogether } from './together'
 import { processWithOpenAI } from './openai'
 import { processWithClaude } from './claude'
-import { transcribeWithWhisper } from './whisper'
+import { transcribeWithWhisper, transcribeWithOpenAIWhisper } from './whisper'
 import { transcribeWithSoniox } from './soniox'
 
 export type { LLMProvider, VoiceProvider } from '../constants/providers'
@@ -72,9 +72,13 @@ export async function transcribeAudio(
 ): Promise<TranscriptionResponse> {
   const config = await window.tapwisper.store.getAll() as any
   const provider: VoiceProvider = config.voiceProvider || 'whisper'
-  const apiKey = provider === 'whisper'
-    ? config.apiKeys?.together
-    : config.apiKeys?.soniox
+
+  const voiceApiKeyMap: Record<VoiceProvider, string> = {
+    whisper: 'together',
+    'openai-whisper': 'openai',
+    soniox: 'soniox'
+  }
+  const apiKey = config.apiKeys?.[voiceApiKeyMap[provider]] || ''
   const voiceModel = config.voiceModels?.[provider]
 
   if (!apiKey) {
@@ -84,6 +88,8 @@ export async function transcribeAudio(
   switch (provider) {
     case 'whisper':
       return transcribeWithWhisper(audioBlob, apiKey, language, voiceModel)
+    case 'openai-whisper':
+      return transcribeWithOpenAIWhisper(audioBlob, apiKey, language, voiceModel)
     case 'soniox':
       return transcribeWithSoniox(audioBlob, apiKey, language)
     default:
