@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  release-mac:
+  release-mac-arm64:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,15 +32,51 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build macOS app
-        run: npm run dist:mac
+      - name: Build macOS arm64 app
+        run: npx electron-vite build && npx electron-builder --mac --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload macOS artifacts
+      - name: Upload macOS arm64 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: macos-artifacts
+          name: macos-arm64-artifacts
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          retention-days: 1
+
+  release-mac-x64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install setuptools (needed by node-gyp)
+        run: pip install setuptools
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS x64 app
+        run: npx electron-vite build && npx electron-builder --mac --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload macOS x64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-x64-artifacts
           path: |
             dist/*.dmg
             dist/*.zip
@@ -82,17 +118,23 @@ jobs:
           retention-days: 1
 
   create-release:
-    needs: [release-mac, release-win]
+    needs: [release-mac-arm64, release-mac-x64, release-win]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download macOS artifacts
+      - name: Download macOS arm64 artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-artifacts
+          name: macos-arm64-artifacts
+          path: macos-artifacts
+
+      - name: Download macOS x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-x64-artifacts
           path: macos-artifacts
 
       - name: Download Windows artifacts
