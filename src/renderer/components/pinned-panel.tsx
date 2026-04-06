@@ -128,7 +128,6 @@ export function PinnedPanel(): JSX.Element {
         window.tapwisper.recordingPill.show()
         window.tapwisper.window.send('recordingPill', 'result-panel:loading')
 
-        // Hide pinned panel (pill takes over from here)
         window.tapwisper.window.hide('pinnedPanel')
         setState('idle')
 
@@ -139,13 +138,11 @@ export function PinnedPanel(): JSX.Element {
             systemInstruction: 'You are a helpful writing assistant. The user has selected some text and given you a voice instruction about what to do with it. Follow their instruction precisely. Only return the result text, nothing else — no explanations, no quotes, no markdown formatting.'
           })
 
-          // Send result to RecordingPill
           window.tapwisper.window.send('recordingPill', 'result-panel:result', aiResult.result)
+          window.tapwisper.recording.transcriptionDone(aiResult.result || transcription)
 
-          // ── Track AI action analytics ──
           addAIAction('voice-command', aiResult.result?.length || 0)
 
-          // ── Track full activity record with LLM ──
           addTranscriptionWithLLM({
             transcription,
             durationSeconds: recordingSeconds,
@@ -154,31 +151,27 @@ export function PinnedPanel(): JSX.Element {
             llmInput: selectedText,
             llmResult: aiResult.result || ''
           })
-        } catch (err: any) {
-          console.error('AI processing failed:', err)
+        } catch (err: unknown) {
           const errorMsg = err instanceof Error ? err.message : 'AI processing failed'
           window.tapwisper.window.send('recordingPill', 'result-panel:error', errorMsg)
         }
       } else if (transcription) {
-        // No selected text — paste transcription directly into focused field
-        
-        // ── Track full activity record (voice only) ──
         addTranscription({
           transcription,
           durationSeconds: recordingSeconds,
           wordCount: words
         })
 
-        // Hide overlays first so focus returns to the user's app
         window.tapwisper.window.hide('pinnedPanel')
 
-        // Small delay so focus has returned to the user's app before pasting
         await new Promise((r) => setTimeout(r, 50))
         await window.tapwisper.clipboard.insertText(transcription)
-        
-        // Stop loading state immediately after paste
+
+        // Activate post-recording state so the shortcut can open the action panel
+        window.tapwisper.recording.transcriptionDone(transcription)
+
         setState('idle')
-        window.tapwisper.recordingPill.hide()
+        window.tapwisper.window.send('recordingPill', 'post-recording:show', transcription)
       } else {
         // No transcription at all
         window.tapwisper.recordingPill.hide()

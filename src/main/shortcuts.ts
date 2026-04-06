@@ -3,7 +3,12 @@ import { uIOhook, UiohookKey } from 'uiohook-napi'
 import { WindowManager } from './windows'
 import { ClipboardManager } from './clipboard'
 import { getStore } from './store'
-import { HOLD_THRESHOLD_MS, START_GRACE_PERIOD_MS, STOP_COOLDOWN_MS } from './constants'
+import {
+  HOLD_THRESHOLD_MS,
+  START_GRACE_PERIOD_MS,
+  STOP_COOLDOWN_MS,
+  POST_RECORDING_TIMEOUT_MS
+} from './constants'
 
 let isRecording = false
 let recordingMode: 'push-to-talk' | 'toggle' | null = null
@@ -13,8 +18,15 @@ let recordingStartTime = 0
 let primaryKeyDown = false
 let primaryKeyDownTime = 0
 
-
 let windowManagerRef: WindowManager | null = null
+
+// ── Post-recording state ──────────────────────────────────────────
+// After transcription completes, pressing the record shortcut opens the
+// command popup instead of starting a new recording. This state auto-clears
+// after POST_RECORDING_TIMEOUT_MS or when the user dismisses overlays.
+let postRecordingActive = false
+let postRecordingText: string | null = null
+let postRecordingTimer: ReturnType<typeof setTimeout> | null = null
 
 // Current registered Electron accelerators (to unregister on reload)
 let registeredElectronAccelerator: string | null = null
@@ -154,6 +166,62 @@ function toElectronAccelerator(shortcutStr: string): string {
     .replace(/\bControl\b/gi, 'Ctrl')
 }
 
+function clearPostRecordingState(): void {
+  postRecordingActive = false
+  postRecordingText = null
+  if (postRecordingTimer) {
+    clearTimeout(postRecordingTimer)
+    postRecordingTimer = null
+  }
+}
+
+function openCommandPopup(): void {
+  if (!windowManagerRef) return
+  windowManagerRef.showCommandPopup(postRecordingText || undefined, {
+    grabText: !postRecordingText
+  })
+  windowManagerRef.sendToWindow('recordingPill', 'post-recording:action-panel-opened')
+  clearPostRecordingState()
+}
+
+/**
+ * Called from IPC when the renderer finishes transcription.
+ * Activates the post-recording window where the record shortcut
+ * opens the command popup instead of starting a new recording.
+ */
+export function setPostRecordingState(text: string): void {
+  clearPostRecordingState()
+  postRecordingActive = true
+  postRecordingText = text
+  postRecordingTimer = setTimeout(clearPostRecordingState, POST_RECORDING_TIMEOUT_MS)
+}
+
+/**
+ * Handle the record shortcut press. Routes to the correct action based on
+ * current state: stop recording, open command popup, or start recording.
+ */
+function handleRecordShortcutPress(): void {
+  const sinceStart = Date.now() - recordingStartTime
+  if (isRecording && sinceStart >= START_GRACE_PERIOD_MS) {
+    stopRecording()
+    return
+  }
+
+  if (!isRecording && !isStartingRecording) {
+    if (postRecordingActive) {
+      openCommandPopup()
+      return
+    }
+
+    const sinceLast = Date.now() - lastStopTime
+    if (sinceLast >= STOP_COOLDOWN_MS) {
+      primaryKeyDown = true
+      recordingMode = 'push-to-talk'
+      startRecording()
+    }
+  }
+}
+
 /**
  * Register Electron's globalShortcut to consume the keystroke
  * so it never reaches the focused application.
@@ -164,21 +232,10 @@ function registerElectronShortcut(): void {
   const shortcuts = store.get('shortcuts')
   const accelerator = toElectronAccelerator(shortcuts.record)
 
-  // Unregister previous shortcut if any
   unregisterElectronShortcut()
 
   try {
-    const registered = globalShortcut.register(accelerator, () => {
-      const sinceLast = Date.now() - lastStopTime
-      const sinceStart = Date.now() - recordingStartTime
-      if (isRecording && sinceStart >= START_GRACE_PERIOD_MS) {
-        stopRecording()
-      } else if (!isRecording && !isStartingRecording && sinceLast >= STOP_COOLDOWN_MS) {
-        primaryKeyDown = true
-        recordingMode = 'push-to-talk'
-        startRecording()
-      }
-    })
+    const registered = globalShortcut.register(accelerator, handleRecordShortcutPress)
 
     if (registered) {
       registeredElectronAccelerator = accelerator
@@ -210,6 +267,7 @@ let lastStopTime = 0
 
 async function startRecording(): Promise<void> {
   if (!windowManagerRef || isRecording || isStartingRecording) return
+  clearPostRecordingState()
   isStartingRecording = true
   recordingStartTime = Date.now()
 
@@ -240,6 +298,7 @@ function stopRecording(): void {
 
 export function cancelRecording(): void {
   if (!windowManagerRef) return
+  clearPostRecordingState()
   if (isRecording) {
     isRecording = false
     recordingMode = null
@@ -283,13 +342,7 @@ function attachHookListeners(_windowManager: WindowManager): void {
         // uiohook only tracks the key state for push-to-talk keyup detection.
         // If globalShortcut didn't register (fallback), handle it here.
         if (!registeredElectronAccelerator) {
-          const sinceLast = Date.now() - lastStopTime
-          if (isRecording) {
-            stopRecording()
-          } else if (!isStartingRecording && sinceLast >= STOP_COOLDOWN_MS) {
-            recordingMode = 'push-to-talk'
-            startRecording()
-          }
+          handleRecordShortcutPress()
         }
       }
       return
@@ -310,8 +363,13 @@ function attachHookListeners(_windowManager: WindowManager): void {
       otherKeyPressedDuringModifier = true
     }
 
-    // ── Escape — Dismiss overlays ──
+    // ── Escape — Dismiss overlays and post-recording state ──
     if (e.keycode === UiohookKey.Escape) {
+      if (postRecordingActive) {
+        clearPostRecordingState()
+        if (windowManagerRef) windowManagerRef.hideAllOverlays()
+        return
+      }
       cancelRecording()
       return
     }

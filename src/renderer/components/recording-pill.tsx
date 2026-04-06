@@ -8,7 +8,7 @@ import {
 import { useStatsStore } from '../store/stats'
 import { useActivityStore } from '../store/activity'
 
-type PillState = 'hidden' | 'recording' | 'transcribing' | 'loading-ai' | 'result' | 'error' | 'done'
+type PillState = 'hidden' | 'recording' | 'transcribing' | 'loading-ai' | 'result' | 'error' | 'post-recording' | 'done'
 
 interface ResultEntry {
   id: string
@@ -33,6 +33,8 @@ export function RecordingPill(): JSX.Element {
   const [categories, setCategories] = useState<StoredCategory[]>(BUILT_IN_CATEGORIES)
   const [resultHistory, setResultHistory] = useState<ResultEntry[]>([])
   const [isFullExpanded, setIsFullExpanded] = useState(false)
+  const [postRecordingText, setPostRecordingText] = useState('')
+  const postRecordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const addAIAction = useStatsStore((s) => s.addAIAction)
   const addLLMAction = useActivityStore((s) => s.addLLMAction)
@@ -67,6 +69,11 @@ export function RecordingPill(): JSX.Element {
     setShowActions(false)
     setResultHistory([])
     setIsFullExpanded(false)
+    setPostRecordingText('')
+    if (postRecordingTimerRef.current) {
+      clearTimeout(postRecordingTimerRef.current)
+      postRecordingTimerRef.current = null
+    }
   }, [])
 
   const dismiss = useCallback(() => {
@@ -138,6 +145,21 @@ export function RecordingPill(): JSX.Element {
     setResultHistory((prev) => prev.slice(index + 1))
   }, [resultHistory])
 
+  const handleOpenActions = useCallback(() => {
+    if (!postRecordingText) return
+    if (postRecordingTimerRef.current) clearTimeout(postRecordingTimerRef.current)
+    window.tapwisper.window.send('commandPopup', 'command-popup:set-text', postRecordingText)
+    window.tapwisper.window.show('commandPopup')
+    setState('done')
+    setPostRecordingText('')
+    window.tapwisper.recordingPill.setClickable(false)
+    window.tapwisper.recordingPill.collapse()
+    setTimeout(() => {
+      setState('hidden')
+      window.tapwisper.recordingPill.hide()
+    }, 250)
+  }, [postRecordingText])
+
   const handleToggleFullExpand = useCallback(() => {
     const next = !isFullExpanded
     setIsFullExpanded(next)
@@ -162,6 +184,11 @@ export function RecordingPill(): JSX.Element {
     })
 
     const unsubStart = window.tapwisper.on('recording:start', () => {
+      if (postRecordingTimerRef.current) {
+        clearTimeout(postRecordingTimerRef.current)
+        postRecordingTimerRef.current = null
+      }
+      setPostRecordingText('')
       setState('recording')
     })
 
@@ -210,6 +237,32 @@ export function RecordingPill(): JSX.Element {
       }
     })
 
+    const dismissPostRecording = (): void => {
+      setState('done')
+      setPostRecordingText('')
+      window.tapwisper.recordingPill.setClickable(false)
+      window.tapwisper.recordingPill.collapse()
+      setTimeout(() => {
+        setState('hidden')
+        window.tapwisper.recordingPill.hide()
+      }, 250)
+    }
+
+    const unsubPostRecording = window.tapwisper.on('post-recording:show', (text: unknown) => {
+      if (typeof text === 'string') {
+        setPostRecordingText(text)
+        setState('post-recording')
+        window.tapwisper.recordingPill.setClickable(true)
+        if (postRecordingTimerRef.current) clearTimeout(postRecordingTimerRef.current)
+        postRecordingTimerRef.current = setTimeout(dismissPostRecording, 5000)
+      }
+    })
+
+    const unsubPostRecordingOpened = window.tapwisper.on('post-recording:action-panel-opened', () => {
+      if (postRecordingTimerRef.current) clearTimeout(postRecordingTimerRef.current)
+      dismissPostRecording()
+    })
+
     return () => {
       unsubShow()
       unsubHide()
@@ -220,6 +273,9 @@ export function RecordingPill(): JSX.Element {
       unsubLoading()
       unsubResult()
       unsubError()
+      unsubPostRecording()
+      unsubPostRecordingOpened()
+      if (postRecordingTimerRef.current) clearTimeout(postRecordingTimerRef.current)
       if (animationRef.current) cancelAnimationFrame(animationRef.current)
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
     }
@@ -255,15 +311,24 @@ export function RecordingPill(): JSX.Element {
     <div className="w-full flex flex-col items-center no-select overflow-hidden" style={{ height: '100vh' }}>
       {/* ── Top pill bar ── */}
       <div
+        onClick={state === 'post-recording' ? handleOpenActions : undefined}
         className={`
           shrink-0 flex items-center justify-center gap-3 px-4 py-1.5
           bg-[#0A0A0A]/95 rounded-full pill-shadow
           transition-all duration-300 ease-out
+          ${state === 'post-recording' ? 'cursor-pointer hover:bg-[#1A1A1A]/95' : ''}
           ${isExiting ? 'opacity-0 scale-75' : 'opacity-100 scale-100 animate-scale-up'}
         `}
         style={{ height: 44 }}
       >
-        {state === 'loading-ai' ? (
+        {state === 'post-recording' ? (
+          <div className="flex items-center gap-2 px-1">
+            <svg className="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <span className="text-[11px] text-white/60 font-medium">AI Actions</span>
+          </div>
+        ) : state === 'loading-ai' ? (
           <div className="flex items-center gap-2.5 px-1">
             <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
             <span className="text-[11px] text-white/60 font-medium">Processing...</span>

@@ -3,7 +3,7 @@ import { WindowManager } from './windows'
 import { ClipboardManager } from './clipboard'
 import { getStore } from './store'
 import { encodeWav, saveTempAudio, cleanupAudioFile } from './audio'
-import { reloadShortcuts, cancelRecording, startShortcutsAfterPermission } from './shortcuts'
+import { reloadShortcuts, cancelRecording, startShortcutsAfterPermission, setPostRecordingState } from './shortcuts'
 import { checkPermissions, requestPermission } from './permissions'
 import type { PermissionType } from './permissions'
 import * as db from './database'
@@ -93,9 +93,17 @@ export function registerIpcHandlers(
     windowManager.collapseRecordingPillToResults()
   })
 
+  ipcMain.handle('recording-pill:set-clickable', (_e: IpcMainInvokeEvent, clickable: boolean) => {
+    windowManager.setRecordingPillClickable(clickable)
+  })
+
   // ── Recording Control ───────────────────────────────────────────
   ipcMain.handle('recording:cancel', () => {
     cancelRecording()
+  })
+
+  ipcMain.handle('recording:transcription-done', (_e: IpcMainInvokeEvent, text: string) => {
+    setPostRecordingState(text)
   })
 
   // ── Clipboard ──────────────────────────────────────────────────

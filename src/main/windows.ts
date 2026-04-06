@@ -370,6 +370,14 @@ export class WindowManager {
     }
   }
 
+  setRecordingPillClickable(clickable: boolean): void {
+    const pill = this.windows.get('recordingPill')
+    if (pill && !pill.isDestroyed()) {
+      pill.setIgnoreMouseEvents(!clickable)
+      pill.setFocusable(false)
+    }
+  }
+
   showPinnedPanel(): void {
     const panel = this.ensurePinnedPanel()
 
