@@ -14,7 +14,7 @@ export interface TriggerEntry {
 export interface AppConfig {
   // AI Provider settings
   aiProvider: 'gemini' | 'together' | 'openai' | 'claude'
-  voiceProvider: 'whisper' | 'soniox'
+  voiceProvider: 'whisper' | 'openai-whisper' | 'soniox'
 
   // API Keys
   apiKeys: {
@@ -36,6 +36,7 @@ export interface AppConfig {
   // Voice Models
   voiceModels: {
     whisper: string
+    'openai-whisper': string
     soniox: string
   }
 
@@ -109,6 +110,7 @@ const defaultConfig: AppConfig = {
 
   voiceModels: {
     whisper: 'openai/whisper-large-v3',
+    'openai-whisper': 'whisper-1',
     soniox: 'soniox-stt-async-v3'
   },
 

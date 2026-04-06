@@ -1,22 +1,27 @@
 import type { TranscriptionResponse } from './ai-router'
 
-const DEFAULT_MODEL = 'openai/whisper-large-v3'
-const API_BASE = 'https://api.together.xyz/v1'
+const TOGETHER_API_BASE = 'https://api.together.xyz/v1'
+const OPENAI_API_BASE = 'https://api.openai.com/v1'
 
-export async function transcribeWithWhisper(
+const DEFAULT_TOGETHER_MODEL = 'openai/whisper-large-v3'
+const DEFAULT_OPENAI_MODEL = 'whisper-1'
+
+async function transcribeWithWhisperBase(
   audioBlob: Blob,
   apiKey: string,
-  language?: string,
-  model?: string
+  language: string | undefined,
+  model: string,
+  apiBase: string,
+  providerLabel: string
 ): Promise<TranscriptionResponse> {
   const formData = new FormData()
   formData.append('file', audioBlob, 'recording.wav')
-  formData.append('model', model || DEFAULT_MODEL)
+  formData.append('model', model)
   if (language) {
     formData.append('language', language)
   }
 
-  const response = await fetch(`${API_BASE}/audio/transcriptions`, {
+  const response = await fetch(`${apiBase}/audio/transcriptions`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`
@@ -26,14 +31,46 @@ export async function transcribeWithWhisper(
 
   if (!response.ok) {
     const error = await response.text()
-    throw new Error(`Whisper transcription error: ${response.status} - ${error}`)
+    throw new Error(`${providerLabel} transcription error: ${response.status} - ${error}`)
   }
 
   const data = await response.json()
 
   return {
     text: data.text?.trim() || '',
-    provider: 'whisper',
+    provider: providerLabel,
     duration: data.duration
   }
+}
+
+export async function transcribeWithWhisper(
+  audioBlob: Blob,
+  apiKey: string,
+  language?: string,
+  model?: string
+): Promise<TranscriptionResponse> {
+  return transcribeWithWhisperBase(
+    audioBlob,
+    apiKey,
+    language,
+    model || DEFAULT_TOGETHER_MODEL,
+    TOGETHER_API_BASE,
+    'whisper'
+  )
+}
+
+export async function transcribeWithOpenAIWhisper(
+  audioBlob: Blob,
+  apiKey: string,
+  language?: string,
+  model?: string
+): Promise<TranscriptionResponse> {
+  return transcribeWithWhisperBase(
+    audioBlob,
+    apiKey,
+    language,
+    model || DEFAULT_OPENAI_MODEL,
+    OPENAI_API_BASE,
+    'openai-whisper'
+  )
 }

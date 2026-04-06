@@ -98,6 +98,7 @@ const PROVIDER_LOGOS: Record<string, (props: { className?: string }) => JSX.Elem
   claude: ClaudeLogo,
   together: TogetherLogo,
   whisper: WhisperLogo,
+  'openai-whisper': OpenAILogo,
   soniox: SonioxLogo
 }
 
@@ -107,7 +108,8 @@ const PROVIDER_LOGO_IMAGES: Partial<Record<string, string>> = {
   openai: openaiLogo,
   claude: claudeLogo,
   together: togetherLogo,
-  whisper: togetherLogo, // Together Whisper — use Together logo
+  whisper: togetherLogo,
+  'openai-whisper': openaiLogo,
   soniox: sonioxLogo
 }
 
@@ -120,6 +122,7 @@ const LLM_PROVIDERS: { id: LLMProvider; label: string; shortLabel: string; color
 
 const VOICE_PROVIDERS: { id: VoiceProvider; label: string; shortLabel: string; description: string; color: string }[] = [
   { id: 'whisper', label: 'Together Whisper', shortLabel: 'Whisper', description: 'Whisper Large v3 via Together AI', color: '#10A37F' },
+  { id: 'openai-whisper', label: 'OpenAI Whisper', shortLabel: 'OpenAI', description: 'Whisper & GPT-4o Transcribe via OpenAI', color: '#412991' },
   { id: 'soniox', label: 'Soniox', shortLabel: 'Soniox', description: 'Soniox STT Async v3', color: '#7EB6E0' }
 ]
 
@@ -179,6 +182,11 @@ const VOICE_PROVIDER_MODELS: Record<VoiceProvider, { id: string; label: string; 
     { id: 'openai/whisper-large-v3', label: 'Whisper Large v3', description: 'Best accuracy' },
     { id: 'mistralai/Voxtral-Mini-3B-2507', label: 'Voxtral Mini 3B', description: 'Fast multilingual STT' }
   ],
+  'openai-whisper': [
+    { id: 'whisper-1', label: 'Whisper-1', description: 'Reliable, multilingual' },
+    { id: 'gpt-4o-transcribe', label: 'GPT-4o Transcribe', description: 'Highest quality' },
+    { id: 'gpt-4o-mini-transcribe', label: 'GPT-4o Mini Transcribe', description: 'Fast & affordable' }
+  ],
   soniox: [
     { id: 'soniox-stt-async-v3', label: 'Soniox STT Async v3', description: 'Real-time streaming' }
   ]
@@ -193,6 +201,7 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
 
 const DEFAULT_VOICE_MODELS: Record<VoiceProvider, string> = {
   whisper: 'openai/whisper-large-v3',
+  'openai-whisper': 'whisper-1',
   soniox: 'soniox-stt-async-v3'
 }
 
@@ -205,12 +214,14 @@ const LLM_API_KEY_LABELS: Record<LLMProvider, string> = {
 
 const VOICE_API_KEY_LABELS: Record<VoiceProvider, string> = {
   whisper: 'Together AI API Key',
+  'openai-whisper': 'OpenAI API Key',
   soniox: 'Soniox API Key'
 }
 
-/** Which API key ID to use for a voice provider (whisper shares together's key) */
+/** Which API key ID to use for a voice provider (whisper shares together's key, openai-whisper shares openai's key) */
 const VOICE_API_KEY_ID: Record<VoiceProvider, string> = {
   whisper: 'together',
+  'openai-whisper': 'openai',
   soniox: 'soniox'
 }
 
@@ -944,7 +955,7 @@ export function Settings(): JSX.Element {
               <h2 className="text-xs font-semibold text-theme-text-tertiary uppercase tracking-wider mb-3">
                 {t('settings.selectProvider', 'Select Provider')}
               </h2>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {VOICE_PROVIDERS.map((provider) => {
                   const LogoComponent = PROVIDER_LOGOS[provider.id]
                   const logoImage = PROVIDER_LOGO_IMAGES[provider.id]
@@ -1091,6 +1102,11 @@ export function Settings(): JSX.Element {
                 {selectedVoice === 'whisper' && (
                   <p className="text-[10px] text-theme-text-muted mt-2 italic">
                     {t('settings.whisperSharesKey', 'Whisper uses the same API key as Together AI.')}
+                  </p>
+                )}
+                {selectedVoice === 'openai-whisper' && (
+                  <p className="text-[10px] text-theme-text-muted mt-2 italic">
+                    {t('settings.openaiWhisperSharesKey', 'OpenAI Whisper uses the same API key as OpenAI.')}
                   </p>
                 )}
               </div>
