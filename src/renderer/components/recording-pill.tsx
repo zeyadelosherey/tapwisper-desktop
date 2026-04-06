@@ -184,6 +184,11 @@ export function RecordingPill(): JSX.Element {
     })
 
     const unsubStart = window.tapwisper.on('recording:start', () => {
+      if (postRecordingTimerRef.current) {
+        clearTimeout(postRecordingTimerRef.current)
+        postRecordingTimerRef.current = null
+      }
+      setPostRecordingText('')
       setState('recording')
     })
 
