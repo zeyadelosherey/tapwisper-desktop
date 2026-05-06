@@ -28,6 +28,8 @@ mac:
         - x64
         - arm64
   icon: build/icon.png
+  # Default artifactName applies to mac targets (including zip). dmg overrides below.
+  artifactName: ${name}-${version}-${arch}-mac.${ext}
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
 win:
