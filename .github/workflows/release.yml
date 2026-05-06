@@ -11,9 +11,24 @@ permissions:
 
 jobs:
   release-mac-arm64:
-    runs-on: macos-latest
+    runs-on: macos-latest # Apple Silicon (arm64)
+    env:
+      npm_config_arch: arm64
+      npm_config_target_arch: arm64
+      npm_config_target_platform: darwin
+      npm_config_runtime: electron
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify host architecture is arm64
+        run: |
+          set -e
+          HOST_ARCH=$(uname -m)
+          echo "Host arch: $HOST_ARCH"
+          if [ "$HOST_ARCH" != "arm64" ]; then
+            echo "::error::Expected arm64 host runner, got $HOST_ARCH"
+            exit 1
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -37,19 +52,38 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify packaged native module architecture (arm64)
+        run: bash scripts/verify-app-arch.sh dist/mac-arm64 arm64
+
       - name: Upload macOS arm64 artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-arm64-artifacts
           path: |
-            dist/*.dmg
-            dist/*.zip
+            dist/*-arm64.dmg
+            dist/*-arm64-mac.zip
           retention-days: 1
+          if-no-files-found: error
 
   release-mac-x64:
-    runs-on: macos-15-large
+    runs-on: macos-15-large # Intel x86_64
+    env:
+      npm_config_arch: x64
+      npm_config_target_arch: x64
+      npm_config_target_platform: darwin
+      npm_config_runtime: electron
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify host architecture is x86_64
+        run: |
+          set -e
+          HOST_ARCH=$(uname -m)
+          echo "Host arch: $HOST_ARCH"
+          if [ "$HOST_ARCH" != "x86_64" ]; then
+            echo "::error::Expected x86_64 host runner, got $HOST_ARCH"
+            exit 1
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -73,14 +107,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify packaged native module architecture (x64)
+        run: bash scripts/verify-app-arch.sh dist/mac x64
+
       - name: Upload macOS x64 artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-x64-artifacts
           path: |
-            dist/*.dmg
-            dist/*.zip
+            dist/*-x64.dmg
+            dist/*-x64-mac.zip
           retention-days: 1
+          if-no-files-found: error
 
   release-win:
     runs-on: windows-latest
@@ -116,6 +154,7 @@ jobs:
           path: |
             dist/*.exe
           retention-days: 1
+          if-no-files-found: error
 
   create-release:
     needs: [release-mac-arm64, release-mac-x64, release-win]
