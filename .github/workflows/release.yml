@@ -11,12 +11,7 @@ permissions:
 
 jobs:
   release-mac-arm64:
-    runs-on: macos-latest # Apple Silicon (arm64)
-    env:
-      npm_config_arch: arm64
-      npm_config_target_arch: arm64
-      npm_config_target_platform: darwin
-      npm_config_runtime: electron
+    runs-on: macos-latest # Apple Silicon (arm64) -- free runner
     steps:
       - uses: actions/checkout@v4
 
@@ -66,12 +61,9 @@ jobs:
           if-no-files-found: error
 
   release-mac-x64:
-    runs-on: macos-15-large # Intel x86_64
-    env:
-      npm_config_arch: x64
-      npm_config_target_arch: x64
-      npm_config_target_platform: darwin
-      npm_config_runtime: electron
+    # Free Intel x86_64 runner. macos-15-large is also Intel but is a paid larger runner;
+    # macos-13 stays available until GitHub's deprecation completes (~Dec 2026).
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
 
@@ -121,7 +113,11 @@ jobs:
           if-no-files-found: error
 
   release-win:
-    runs-on: windows-latest
+    # Pin to windows-2022 explicitly. windows-latest currently rolls toward
+    # windows-2025/vs2026 which the node-gyp version bundled by @electron/rebuild
+    # cannot detect -- get-windows then fails to rebuild with "Could not find
+    # any Visual Studio installation to use".
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
