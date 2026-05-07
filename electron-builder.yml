@@ -18,15 +18,15 @@ mac:
     NSMicrophoneUsageDescription: "TapWisper needs microphone access for voice dictation."
     NSAppleEventsUsageDescription: "TapWisper needs accessibility access for global shortcuts and text insertion."
   notarize: false
+  # Do NOT pin arch here. With multiple archs listed, electron-builder rebuilds
+  # native modules for every configured arch even when the CLI passes `--arm64`
+  # (or `--x64`), and the second rebuild overwrites better-sqlite3 in node_modules
+  # before the first .app is fully populated -- producing arch-mismatched binaries.
+  # Each release job in .github/workflows/release.yml drives the arch via the CLI
+  # flag, so leaving arch unset here lets CLI control take effect.
   target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
-    - target: zip
-      arch:
-        - x64
-        - arm64
+    - dmg
+    - zip
   icon: build/icon.png
   # Default artifactName applies to mac targets (including zip). dmg overrides below.
   artifactName: ${name}-${version}-${arch}-mac.${ext}
