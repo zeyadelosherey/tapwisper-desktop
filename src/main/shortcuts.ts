@@ -1,8 +1,9 @@
-import { globalShortcut } from 'electron'
-import { uIOhook, UiohookKey } from 'uiohook-napi'
+import { globalShortcut, systemPreferences } from 'electron'
+import { uIOhook, UiohookKey, type UiohookKeyboardEvent } from 'uiohook-napi'
 import { WindowManager } from './windows'
 import { ClipboardManager } from './clipboard'
 import { getStore } from './store'
+import { trackKeyDown, trackKeyUp } from './key-state'
 import {
   HOLD_THRESHOLD_MS,
   START_GRACE_PERIOD_MS,
@@ -17,6 +18,10 @@ let recordingStartTime = 0
 // Track key state for push-to-talk and combo detection
 let primaryKeyDown = false
 let primaryKeyDownTime = 0
+// True once a physical press of the record shortcut has been acted on, until
+// that key is released. Windows delivers repeated hotkey events while a key is
+// held, which would otherwise stop a push-to-talk recording mid-hold.
+let pressConsumed = false
 
 let windowManagerRef: WindowManager | null = null
 
@@ -111,6 +116,10 @@ function parseShortcut(accelerator: string): ParsedShortcut | null {
     } else if (upper === 'ALT' || upper === 'OPTION') {
       alt = true
     } else {
+      // Exactly one non-modifier key. Anything else (e.g. "Fn+Space", which
+      // Electron can't register) would otherwise degrade to the bare key and
+      // start a recording on every Space press.
+      if (keyName) return null
       keyName = part
     }
   }
@@ -147,11 +156,18 @@ function eventMatchesShortcut(
   return true
 }
 
+const DEFAULT_RECORD_SHORTCUT = 'Option+Space'
+
 function loadShortcutsFromStore(): void {
   const store = getStore()
   const shortcuts = store.get('shortcuts')
 
   recordShortcut = parseShortcut(shortcuts.record)
+  if (!recordShortcut) {
+    // Unparseable shortcut (e.g. a legacy "Fn+…" combo) — fall back to the default
+    store.set('shortcuts', { ...shortcuts, record: DEFAULT_RECORD_SHORTCUT })
+    recordShortcut = parseShortcut(DEFAULT_RECORD_SHORTCUT)
+  }
 }
 
 /**
@@ -201,6 +217,9 @@ export function setPostRecordingState(text: string): void {
  * current state: stop recording, open command popup, or start recording.
  */
 function handleRecordShortcutPress(): void {
+  if (pressConsumed && primaryKeyDown) return // auto-repeat of the same press
+  pressConsumed = true
+
   const sinceStart = Date.now() - recordingStartTime
   if (isRecording && sinceStart >= START_GRACE_PERIOD_MS) {
     stopRecording()
@@ -310,14 +329,14 @@ export function cancelRecording(): void {
 }
 
 // ── Hook listeners (stored for cleanup) ───────────────────────────
-let keydownHandler: ((e: any) => void) | null = null
-let keyupHandler: ((e: any) => void) | null = null
+let keydownHandler: ((e: UiohookKeyboardEvent) => void) | null = null
+let keyupHandler: ((e: UiohookKeyboardEvent) => void) | null = null
 
 // ── Stop-recording trigger keys ──────────────────────────────────
 // When recording in toggle mode, pressing any of these modifier keys
 // alone will stop recording and trigger processing. This gives the
 // user a quick, single-key way to finish recording.
-const STOP_TRIGGER_KEYCODES = new Set([
+const STOP_TRIGGER_KEYCODES = new Set<number>([
   UiohookKey.Alt,       // Left Option (56)
   UiohookKey.AltRight,  // Right Option (3640)
   UiohookKey.Ctrl,      // Left Ctrl (29)
@@ -333,6 +352,8 @@ const MODIFIER_TAP_MAX_MS = 400                 // max hold time to count as a "
 
 function attachHookListeners(_windowManager: WindowManager): void {
   keydownHandler = (e): void => {
+    trackKeyDown(e.keycode)
+
     // ── Record shortcut (e.g. Ctrl + Space) ──
     if (recordShortcut && eventMatchesShortcut(e, recordShortcut)) {
       if (!primaryKeyDown) {
@@ -376,6 +397,10 @@ function attachHookListeners(_windowManager: WindowManager): void {
   }
 
   keyupHandler = (e): void => {
+    trackKeyUp(e.keycode)
+
+    if (recordShortcut && e.keycode === recordShortcut.keycode) pressConsumed = false
+
     // ── Record key released — Handle push-to-talk stop ──
     if (recordShortcut && e.keycode === recordShortcut.keycode && primaryKeyDown) {
       primaryKeyDown = false
@@ -443,7 +468,6 @@ export function registerGlobalShortcuts(windowManager: WindowManager, _clipboard
   // uIOhook without the permission crashes the app.
   if (process.platform === 'darwin') {
     try {
-      const { systemPreferences } = require('electron')
       const trusted = systemPreferences.isTrustedAccessibilityClient(false)
       if (!trusted) {
         // Don't start the hook yet — it will be started later via
@@ -494,7 +518,6 @@ export function startShortcutsAfterPermission(): void {
   // Re-check that accessibility is now granted
   if (process.platform === 'darwin') {
     try {
-      const { systemPreferences } = require('electron')
       const trusted = systemPreferences.isTrustedAccessibilityClient(false)
       if (!trusted) return
     } catch {
