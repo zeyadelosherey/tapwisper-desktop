@@ -1,5 +1,7 @@
 import Store from 'electron-store'
 import { safeStorage } from 'electron'
+import type { AIEngine, LocalAiSettings, SelfHostedSettings } from '../shared/local-ai/types'
+import { DEFAULT_LOCAL_AI_SETTINGS, DEFAULT_SELF_HOSTED } from '../shared/local-ai/catalog'
 
 export interface TriggerEntry {
   id: string
@@ -24,6 +26,9 @@ export interface AppConfig {
     openai: string
     claude: string
     soniox: string
+    /** Optional bearer tokens for the user's own servers */
+    selfHostedStt: string
+    selfHostedLlm: string
   }
 
   // Models
@@ -40,6 +45,15 @@ export interface AppConfig {
     'openai-whisper': string
     soniox: string
   }
+
+  // Where each feature runs. 'cloud' uses voiceProvider / aiProvider above
+  speechEngine: AIEngine
+  llmEngine: AIEngine
+  /** Active on-device models (catalog ids, see src/shared/local-ai/models.json) */
+  localModels: { stt: string | null; llm: string | null }
+  localAi: LocalAiSettings
+  /** OpenAI-compatible servers on the user's network */
+  selfHosted: SelfHostedSettings
 
   // Actions configuration
   actions: ActionCategory[]
@@ -156,7 +170,9 @@ const defaultConfig: AppConfig = {
     together: '',
     openai: '',
     claude: '',
-    soniox: ''
+    soniox: '',
+    selfHostedStt: '',
+    selfHostedLlm: ''
   },
 
   models: {
@@ -171,6 +187,13 @@ const defaultConfig: AppConfig = {
     'openai-whisper': 'whisper-1',
     soniox: 'stt-async-v4'
   },
+
+  // Existing users keep their cloud providers until they opt in
+  speechEngine: 'cloud',
+  llmEngine: 'cloud',
+  localModels: { stt: null, llm: null },
+  localAi: DEFAULT_LOCAL_AI_SETTINGS,
+  selfHosted: DEFAULT_SELF_HOSTED,
 
   actions: [
     {
