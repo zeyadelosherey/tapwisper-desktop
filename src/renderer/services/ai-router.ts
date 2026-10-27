@@ -134,14 +134,47 @@ export async function transcribeAudio(
     prompt: buildVocabularyPrompt(config.speechVocabulary, config.triggers)
   }
 
+  let response: TranscriptionResponse
   switch (provider) {
     case 'whisper':
-      return transcribeWithWhisper(audioBlob, apiKey, options, voiceModel)
+      response = await transcribeWithWhisper(audioBlob, apiKey, options, voiceModel)
+      break
     case 'openai-whisper':
-      return transcribeWithOpenAIWhisper(audioBlob, apiKey, options, voiceModel)
+      response = await transcribeWithOpenAIWhisper(audioBlob, apiKey, options, voiceModel)
+      break
     case 'soniox':
-      return transcribeWithSoniox(audioBlob, apiKey, options, voiceModel)
+      response = await transcribeWithSoniox(audioBlob, apiKey, options, voiceModel)
+      break
     default:
       throw new Error(`Unknown voice provider: ${provider}`)
   }
+
+  // On unclear audio Whisper can echo its prompt back verbatim — never paste that
+  if (options.prompt && isPromptEcho(response.text, options.prompt)) {
+    return { ...response, text: '' }
+  }
+  return response
+}
+
+function normalizeForCompare(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+}
+
+/**
+ * True if the output is just consecutive vocabulary terms (2+), i.e. the prompt
+ * echoed back. A single term is allowed — the user may really have said it.
+ */
+export function isPromptEcho(text: string, prompt: string): boolean {
+  const t = normalizeForCompare(text)
+  if (!t) return false
+  const terms = prompt.split(',').map(normalizeForCompare).filter(Boolean)
+  for (let start = 0; start < terms.length; start++) {
+    for (let end = start + 2; end <= terms.length; end++) {
+      if (terms.slice(start, end).join(' ') === t) return true
+    }
+  }
+  return false
 }
