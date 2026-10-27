@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Open-source, system-wide voice dictation with AI.</strong><br/>
-  Bring Your Own API key. Download, configure, and start using it in seconds.
+  Bring your own API key, or run open-source models on your computer. Download, configure, and start using it in seconds.
 </p>
 
 <p align="center">
@@ -72,11 +72,11 @@
 ## 🚀 Quick Start
 
 1. **📥 Download** the installer for your platform from the table above
-2. **⚙️ Open** the app and go to **Settings → AI Provider**
-3. **🔑 Paste** your API key (Gemini, OpenAI, Claude, or Together AI)
+2. **⚙️ Open** the app and go to **Settings → Speech-to-Text** and **Language Models**
+3. **🔑 Paste** your API key (Gemini, OpenAI, Claude, Together AI or Soniox) — or pick **Local** and download an open-source model, or point **Self-hosted** at your own server
 4. **🎤 Start using it** — hold <kbd>fn</kbd> (Mac), <kbd>Ctrl</kbd>+<kbd>Win</kbd> (Windows) or <kbd>Right Ctrl</kbd> (Linux) and speak
 
-> 💡 No account needed. No sign-up. Just your API key and you're ready to go.
+> 💡 No account needed. No sign-up. Just your API key — or no key at all with local models.
 
 ---
 
@@ -106,7 +106,7 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 |:-:|---------|-------------|
 | 🔑 | **BYOAPI** | Bring Your Own API key — no subscriptions, no middleman |
 | 🔓 | **100% Open Source** | Inspect, modify, and contribute. MIT licensed |
-| 🛡️ | **Privacy First** | Audio & text go directly to your chosen provider. Nothing passes through our servers |
+| 🛡️ | **Privacy First** | Audio & text go directly to your chosen provider — or never leave your computer with local models. Nothing passes through our servers |
 | 🖥️ | **Cross-Platform** | macOS, Windows, and Linux |
 
 ---
@@ -119,6 +119,7 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 | 🤖 | **AI Text Transformations** | Rewrite, summarize, translate, fix grammar, and more |
 | 🔌 | **Multiple AI Providers** | Google Gemini, Together AI, OpenAI, Claude |
 | 🗣️ | **Multiple Voice Providers** | Together Whisper, OpenAI Whisper / GPT-4o Transcribe, Soniox — any spoken language, auto-detected |
+| 💻 | **Local & Self-hosted Models** | Run Whisper, Parakeet, Qwen3-ASR and open LLMs (Qwen, Gemma, Llama, Phi, Mistral, SmolLM, Granite, gpt-oss and more) offline on your computer, or use your own Ollama / LM Studio / vLLM server — see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md) |
 | ⚡ | **Custom Actions** | Create your own AI action categories and prompts |
 | 🎯 | **Voice Triggers** | Hands-free automation with voice commands (tolerant of small transcription errors) |
 | 📋 | **Text Snippets** | Quick text expansion via trigger phrases |
@@ -187,6 +188,7 @@ npm run dist:linux   # Linux (AppImage)
 | `npm run typecheck` | ✅ Run TypeScript type checking |
 | `npm run lint` | 🔍 Run ESLint |
 | `npm run format` | 💅 Format code with Prettier |
+| `npm run build:runtimes` | 🧠 Build the bundled whisper.cpp / llama.cpp servers for local models ([details](docs/LOCAL_MODELS.md#building-the-runtimes)) |
 
 ---
 
@@ -215,6 +217,8 @@ npm run dist:linux   # Linux (AppImage)
 | <img src="src/renderer/assets/openai.png" width="20" /> **OpenAI** | LLM | GPT models for text processing |
 | <img src="src/renderer/assets/claude.png" width="20" /> **Claude** | LLM | Anthropic's Claude models |
 | <img src="src/renderer/assets/soniox.png" width="20" /> **Soniox** | Voice | High-accuracy speech-to-text |
+| 💻 **Local** | LLM + Voice | whisper.cpp and llama.cpp with Whisper, Parakeet, Qwen3-ASR and 25+ open-source language models, on your computer |
+| 🖧 **Self-hosted** | LLM + Voice | Any OpenAI-compatible server on your network |
 
 ---
 
@@ -223,7 +227,9 @@ npm run dist:linux   # Linux (AppImage)
 ```
 src/
   main/            # ⚙️ Electron main process (tray, shortcuts, windows, IPC)
+    local-ai/      #   🧠 Local inference servers, model downloads, self-hosted client
   preload/         # 🔒 Context bridge (secure API for renderer)
+  shared/          # 🤝 Code shared by main and renderer (local model catalog, WAV encoder)
   renderer/        # 🎨 React frontend
     components/    #   🧩 Overlay UI (recording pill, pinned panel, command popup)
     pages/         #   📄 Settings window pages (home, settings, triggers, etc.)

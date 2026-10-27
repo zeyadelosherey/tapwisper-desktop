@@ -18,6 +18,7 @@ import {
   getMeetingState,
   type MeetingState
 } from './notetaker'
+import { registerLocalAi, stopLocalAi } from './local-ai'
 
 // macOS: system-audio loopback for meeting capture (ScreenCaptureKit).
 // Unknown feature names are ignored by Chromium, so this is safe everywhere.
@@ -170,6 +171,7 @@ function initialize(): void {
   // Register IPC handlers
   registerIpcHandlers(windowManager, clipboardManager)
   registerNotetaker(windowManager, updateTrayMenu)
+  registerLocalAi(windowManager)
 
   // Register global shortcuts (deferred on macOS if accessibility isn't granted yet)
   try {
@@ -220,6 +222,7 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   unregisterAllShortcuts()
+  stopLocalAi()
   closeDatabase()
   // Clean up temp audio files on quit
   cleanupAllAudio().catch(() => {})

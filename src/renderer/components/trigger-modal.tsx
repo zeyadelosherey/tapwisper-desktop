@@ -725,10 +725,16 @@ function AIChatConfigForm({
           {t('triggerModal.aiProviderHint', 'Uses your configured API key from Settings')}
         </p>
         <OptionGroup
-          options={['gemini', 'together', 'openai', 'claude'] as const}
+          options={['default', 'gemini', 'together', 'openai', 'claude'] as const}
           value={config.provider}
           onChange={(v) => update({ provider: v as AIChatConfig['provider'] })}
-          labels={{ gemini: 'Gemini', together: 'Together AI', openai: 'OpenAI', claude: 'Claude' }}
+          labels={{
+            default: t('triggerModal.providerDefault', 'Default'),
+            gemini: 'Gemini',
+            together: 'Together AI',
+            openai: 'OpenAI',
+            claude: 'Claude'
+          }}
         />
       </div>
 

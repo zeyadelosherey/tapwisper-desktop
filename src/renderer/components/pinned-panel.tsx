@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { WaveformBars } from './waveform-bars'
 import { useAudio } from '../hooks/use-audio'
 import { transcribeAudio, processText } from '../services/ai-router'
+import { warmUpLocalModels } from '../services/local-ai'
 import type { Snippet } from '../models/snippet'
 import type { DictionaryEntry } from '../models/dictionary'
 import type { WritingStyles } from '../models/style'
@@ -72,7 +73,7 @@ function friendlyError(err: unknown): string {
   if (/\b401\b|\b403\b|invalid.*key|unauthori[sz]ed/i.test(raw)) {
     return i18n.t(
       'errors.voiceKeyRejected',
-      'Your voice provider rejected the API key. Check it in Settings > AI Provider.'
+      'Your voice provider rejected the API key. Check it in Settings > Speech-to-Text.'
     )
   }
   if (/\b429\b|rate limit|quota/i.test(raw)) {
@@ -374,6 +375,8 @@ export function PinnedPanel(): JSX.Element {
     recordingStartRef.current = uiStartTime
     isRecordingRef.current = true
     setState('recording')
+    // Local models load while the user is still speaking
+    void warmUpLocalModels('dictation')
 
     // Start actual recording (should be instant if permission already granted)
     try {

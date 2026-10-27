@@ -40,7 +40,8 @@ export interface WebSearchConfig {
 
 export interface AIChatConfig {
   type: 'ai-chat'
-  provider: 'gemini' | 'together' | 'openai' | 'claude'
+  /** 'default' follows Settings › Language Models (cloud, local or self-hosted) */
+  provider: 'default' | 'gemini' | 'together' | 'openai' | 'claude'
   model: string
   responseHandling: ResponseHandling
   systemPrompt?: string
@@ -203,7 +204,7 @@ export function getDefaultActionConfig(actionType: TriggerActionType): TriggerAc
     case 'ai-chat':
       return {
         type: 'ai-chat',
-        provider: 'gemini',
+        provider: 'default',
         model: '',
         responseHandling: 'modal',
         systemPrompt: ''

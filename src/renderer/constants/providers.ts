@@ -4,3 +4,4 @@
 
 export type LLMProvider = 'gemini' | 'together' | 'openai' | 'claude'
 export type VoiceProvider = 'whisper' | 'openai-whisper' | 'soniox'
+export type { AIEngine } from '../../shared/local-ai/types'

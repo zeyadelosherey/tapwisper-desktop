@@ -10,6 +10,7 @@ import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
 import { app } from 'electron'
+import { encodeWav as encodeWavBytes } from '../shared/audio/wav'
 
 const TEMP_DIR = path.join(app.getPath('temp'), 'tapwisper-audio')
 
@@ -38,45 +39,10 @@ export function ensureAudioDirSync(): string {
 /**
  * Encode raw PCM float32 samples to WAV format (16kHz, mono, 16-bit)
  */
-export function encodeWav(
-  samples: Float32Array,
-  sampleRate: number = 16000
-): Buffer {
-  const numChannels = 1
-  const bitsPerSample = 16
-  const byteRate = (sampleRate * numChannels * bitsPerSample) / 8
-  const blockAlign = (numChannels * bitsPerSample) / 8
-  const dataSize = samples.length * (bitsPerSample / 8)
-  const headerSize = 44
-  const buffer = Buffer.alloc(headerSize + dataSize)
-
-  // RIFF header
-  buffer.write('RIFF', 0)
-  buffer.writeUInt32LE(36 + dataSize, 4)
-  buffer.write('WAVE', 8)
-
-  // fmt chunk
-  buffer.write('fmt ', 12)
-  buffer.writeUInt32LE(16, 16) // chunk size
-  buffer.writeUInt16LE(1, 20) // PCM format
-  buffer.writeUInt16LE(numChannels, 22)
-  buffer.writeUInt32LE(sampleRate, 24)
-  buffer.writeUInt32LE(byteRate, 28)
-  buffer.writeUInt16LE(blockAlign, 32)
-  buffer.writeUInt16LE(bitsPerSample, 34)
-
-  // data chunk
-  buffer.write('data', 36)
-  buffer.writeUInt32LE(dataSize, 40)
-
-  // Convert float32 to int16
-  for (let i = 0; i < samples.length; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]))
-    const val = s < 0 ? s * 0x8000 : s * 0x7fff
-    buffer.writeInt16LE(Math.round(val), headerSize + i * 2)
-  }
-
-  return buffer
+export function encodeWav(samples: Float32Array, sampleRate: number = 16000): Buffer {
+  const bytes = encodeWavBytes(samples, sampleRate)
+  // Wraps the encoded bytes instead of copying them
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 }
 
 /**
@@ -109,9 +75,7 @@ export async function cleanupAudioFile(filepath: string): Promise<void> {
 export async function cleanupAllAudio(): Promise<void> {
   try {
     const files = await fsp.readdir(TEMP_DIR)
-    await Promise.all(
-      files.map((file) => fsp.unlink(path.join(TEMP_DIR, file)).catch(() => {}))
-    )
+    await Promise.all(files.map((file) => fsp.unlink(path.join(TEMP_DIR, file)).catch(() => {})))
   } catch {
     // Ignore cleanup errors (directory may not exist)
   }

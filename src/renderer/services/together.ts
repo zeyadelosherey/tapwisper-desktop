@@ -1,4 +1,5 @@
 import type { AIRequest, AIResponse } from './ai-router'
+import { toChatMessages } from '../../shared/local-ai/catalog'
 
 const DEFAULT_MODEL = 'meta-llama/Llama-3.3-70B-Instruct-Turbo'
 const API_BASE = 'https://api.together.xyz/v1'
@@ -19,15 +20,7 @@ export async function processWithTogether(
 ): Promise<AIResponse> {
   const modelId = model || DEFAULT_MODEL
 
-  const messages = [
-    ...(request.systemInstruction
-      ? [{ role: 'system', content: request.systemInstruction }]
-      : []),
-    {
-      role: 'user',
-      content: `${request.prompt}\n\nText: ${request.text}`
-    }
-  ]
+  const messages = toChatMessages(request)
 
   const response = await fetch(`${API_BASE}/chat/completions`, {
     method: 'POST',

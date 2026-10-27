@@ -5,7 +5,18 @@ import prettier from 'eslint-config-prettier/flat'
 import globals from 'globals'
 
 export default [
-  { ignores: ['out/', 'dist/', 'node_modules/', '.claude/', '**/*.js', '**/*.cjs', '**/*.mjs'] },
+  {
+    ignores: [
+      'out/',
+      'dist/',
+      'node_modules/',
+      '.claude/',
+      '.cache/',
+      '**/*.js',
+      '**/*.cjs',
+      '**/*.mjs'
+    ]
+  },
   js.configs.recommended,
   ...tsPlugin.configs['flat/recommended'],
   react.configs.flat.recommended,
@@ -19,7 +30,10 @@ export default [
     },
     settings: { react: { version: 'detect' } },
     rules: {
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
+      ],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
       'react/prop-types': 'off',

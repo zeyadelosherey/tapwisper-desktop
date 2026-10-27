@@ -4,7 +4,7 @@
  * provider (processText) over the transcript and the user's own notes.
  */
 import type { MeetingSegment as MeetingSegmentDTO, SegmentSource } from '../models/meeting'
-import { processText } from './ai-router'
+import { getMaxInputChars, processText } from './ai-router'
 
 export interface MeetingContext {
   segments: MeetingSegmentDTO[]
@@ -18,8 +18,25 @@ export interface MeetingContext {
 /** Default speaker labels; the UI shows translated versions */
 const DEFAULT_SPEAKERS: Record<SegmentSource, string> = { you: 'You', others: 'Others' }
 
-/** Characters of transcript sent in one request (fits every supported model) */
+/** Transcript characters summarized per request; smaller when the model's context is */
 const MAX_CHUNK_CHARS = 60_000
+
+/** Rounds of condensing a very long meeting into notes before the final summary */
+const MAX_CONDENSE_ROUNDS = 3
+
+/** Characters kept for instructions and the conversation around the material */
+const PROMPT_ROOM_CHARS = 2000
+
+/** The first `max` characters (the notes and summary are read from the top) */
+function clipStart(text: string, max: number): string {
+  return text.length > max ? text.slice(0, Math.max(max, 0)) : text
+}
+
+/** The last `max` characters (in a transcript, the most recent part matters most) */
+function clipEnd(text: string, max: number): string {
+  if (text.length <= max) return text
+  return max > 0 ? text.slice(-max) : ''
+}
 
 export function speakerLabel(
   source: SegmentSource,
@@ -100,13 +117,27 @@ function parseTitle(output: string): { title: string; summary: string } {
   return { title, summary }
 }
 
-/** Split a long transcript on line boundaries */
-function chunkTranscript(text: string): string[] {
-  if (text.length <= MAX_CHUNK_CHARS) return [text]
+/** A line longer than `maxChars` (one speaker talking for a long time), cut between words */
+function splitLine(line: string, maxChars: number): string[] {
+  const pieces: string[] = []
+  let rest = line
+  while (rest.length > maxChars) {
+    const space = rest.lastIndexOf(' ', maxChars)
+    const cut = space > maxChars / 2 ? space : maxChars
+    pieces.push(rest.slice(0, cut))
+    rest = rest.slice(cut).trimStart()
+  }
+  pieces.push(rest)
+  return pieces
+}
+
+/** Split a long transcript into chunks of at most `maxChars`, on line boundaries where possible */
+export function chunkTranscript(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text]
   const chunks: string[] = []
   let current = ''
-  for (const line of text.split('\n')) {
-    if (current.length + line.length > MAX_CHUNK_CHARS && current) {
+  for (const line of text.split('\n').flatMap((l) => splitLine(l, maxChars))) {
+    if (current && current.length + 1 + line.length > maxChars) {
       chunks.push(current)
       current = ''
     }
@@ -135,16 +166,25 @@ export async function generateMeetingSummary(
   ]
     .filter(Boolean)
     .join(' ')
-  const notesBlock = ctx.notes?.trim() ? `\n\nNOTE-TAKER'S OWN NOTES:\n${ctx.notes.trim()}` : ''
+  // The user's notes go into the final request too, so they share its budget
+  const limit = await getMaxInputChars()
+  const notes = clipStart(ctx.notes?.trim() ?? '', limit / 4)
+  const notesBlock = notes ? `\n\nNOTE-TAKER'S OWN NOTES:\n${notes}` : ''
 
+  // Map: condense parts into dense notes (keeping timestamps for ordering) until
+  // everything fits in one request — local models may need more than one round
+  const maxChars = Math.min(
+    MAX_CHUNK_CHARS,
+    Math.max(limit - notesBlock.length - PROMPT_ROOM_CHARS, limit / 2)
+  )
   let material = transcript
-  const chunks = chunkTranscript(transcript)
-  if (chunks.length > 1) {
-    // Map: dense notes per part, keeping timestamps for ordering
+  let condensed = false
+  for (let round = 0; material.length > maxChars && round < MAX_CONDENSE_ROUNDS; round++) {
+    const chunks = chunkTranscript(material, maxChars)
     const partials: string[] = []
     for (let i = 0; i < chunks.length; i++) {
       const part = await processText({
-        prompt: `This is part ${i + 1} of ${chunks.length} of a meeting transcript. Write dense, factual notes of everything important in this part (topics, facts, numbers, decisions, action items with owners). ${speakerNote(ctx.speakerNames)}`,
+        prompt: `This is part ${i + 1} of ${chunks.length} of a meeting ${condensed ? 'notes' : 'transcript'}. Write dense, factual notes of everything important in this part (topics, facts, numbers, decisions, action items with owners). ${speakerNote(ctx.speakerNames)}`,
         text: chunks[i],
         systemInstruction: 'You take precise meeting notes. Output only the notes.',
         maxTokens: 3000,
@@ -153,11 +193,14 @@ export async function generateMeetingSummary(
       partials.push(`PART ${i + 1}:\n${part.result}`)
     }
     material = partials.join('\n\n')
+    condensed = true
   }
+  // Notes that still don't fit after every round are cut rather than rejected
+  material = clipStart(material, maxChars)
 
   const response = await processText({
     prompt: `${header}\n\n${SUMMARY_FORMAT}`,
-    text: `${chunks.length > 1 ? 'NOTES FROM EACH PART OF THE MEETING' : 'TRANSCRIPT'}:\n${material}${notesBlock}`,
+    text: `${condensed ? 'NOTES FROM EACH PART OF THE MEETING' : 'TRANSCRIPT'}:\n${material}${notesBlock}`,
     systemInstruction:
       'You write meeting summaries people actually read: skimmable, specific and accurate.',
     maxTokens: 4096,
@@ -195,20 +238,31 @@ export async function askMeeting(
   history: ChatTurn[] = []
 ): Promise<string> {
   const transcript = transcriptToText(ctx.segments, ctx.speakerNames)
-  // Most recent part wins when the meeting is very long
-  const clipped =
-    transcript.length > MAX_CHUNK_CHARS * 2 ? transcript.slice(-MAX_CHUNK_CHARS * 2) : transcript
+  const limit = await getMaxInputChars()
+  const summary = clipStart(ctx.summary?.trim() ?? '', limit / 4)
+  const notes = clipStart(ctx.notes?.trim() ?? '', limit / 4)
+  const conversation = clipEnd(
+    history
+      .slice(-6)
+      .map((t) => `${t.role === 'user' ? 'Q' : 'A'}: ${t.content}`)
+      .join('\n'),
+    limit / 8
+  )
+  // Most recent part wins when the meeting is longer than the model can read
+  const room =
+    limit -
+    summary.length -
+    notes.length -
+    conversation.length -
+    question.length -
+    PROMPT_ROOM_CHARS
   const context = [
-    ctx.summary?.trim() ? `SUMMARY:\n${ctx.summary.trim()}` : '',
-    ctx.notes?.trim() ? `NOTE-TAKER'S NOTES:\n${ctx.notes.trim()}` : '',
-    `TRANSCRIPT:\n${clipped}`
+    summary ? `SUMMARY:\n${summary}` : '',
+    notes ? `NOTE-TAKER'S NOTES:\n${notes}` : '',
+    `TRANSCRIPT:\n${clipEnd(transcript, room)}`
   ]
     .filter(Boolean)
     .join('\n\n')
-  const conversation = history
-    .slice(-6)
-    .map((t) => `${t.role === 'user' ? 'Q' : 'A'}: ${t.content}`)
-    .join('\n')
 
   const response = await processText({
     prompt: `${conversation ? `Earlier in this conversation:\n${conversation}\n\n` : ''}Question: ${question}\n\nAnswer from the meeting material only. Quote timestamps like [12:03] when useful. If the answer isn't in the material, say so. ${speakerNote(ctx.speakerNames)} Answer in the language of the question.`,

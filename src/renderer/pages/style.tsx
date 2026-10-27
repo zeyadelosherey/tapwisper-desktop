@@ -51,9 +51,10 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
       window.tapwisper.store.get('smartFormatting'),
       window.tapwisper.store.get('writingStyles'),
       window.tapwisper.store.get('aiProvider'),
-      window.tapwisper.store.get('apiKeys')
+      window.tapwisper.store.get('apiKeys'),
+      window.tapwisper.store.get('llmEngine')
     ])
-      .then(([sf, ws, ai, keys]) => {
+      .then(([sf, ws, ai, keys, engine]) => {
         setEnabled(sf === true)
         if (ws && typeof ws === 'object') {
           const merged = { ...DEFAULT_WRITING_STYLES }
@@ -66,7 +67,9 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
         const p = (typeof ai === 'string' && ai in PROVIDER_NAMES ? ai : 'gemini') as LLMProvider
         setProvider(p)
         const key = (keys as Record<string, unknown> | undefined)?.[p]
-        setHasKey(typeof key === 'string' && key.trim().length > 0)
+        // Local and self-hosted models need no key
+        const cloud = !engine || engine === 'cloud'
+        setHasKey(!cloud || (typeof key === 'string' && key.trim().length > 0))
       })
       .catch(() => {})
   }, [])
@@ -122,7 +125,7 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
-                    onClick={() => onNavigate('settings', 'ai-provider')}
+                    onClick={() => onNavigate('settings', 'language-models')}
                   >
                     {t('style.addKey', 'Add API key')}
                   </button>

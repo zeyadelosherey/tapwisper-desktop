@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Meeting, MeetingSegment, SegmentSource } from '../models/meeting'
 import { applyDictionary, type DictionaryEntry } from '../models/dictionary'
 import { transcribeAudio } from '../services/ai-router'
+import { LocalEngineError, warmUpLocalModels } from '../services/local-ai'
 import { MIN_WORDS_FOR_AUTO_SUMMARY, summarizeMeeting } from '../services/meetings'
 import {
   ChunkRecorder,
@@ -40,6 +41,7 @@ export type RecorderError =
   | 'mic-not-found'
   | 'mic-in-use'
   | 'no-api-key'
+  | 'engine-not-ready'
   | 'transcription-failed'
   | 'start-failed'
 
@@ -199,6 +201,10 @@ export function useMeetingRecorder(): MeetingRecorder {
             setError('no-api-key')
             return
           }
+          if (err instanceof LocalEngineError && err.needsSetup) {
+            setError('engine-not-ready')
+            return
+          }
           if (attempt >= MAX_RETRIES) {
             setError('transcription-failed')
             return
@@ -311,6 +317,8 @@ export function useMeetingRecorder(): MeetingRecorder {
         setStatusBoth('idle')
         return
       }
+      // A local speech model loads while the first chunk is being recorded
+      void warmUpLocalModels('meeting')
       const audio = await openMeetingAudio()
       setMeetingAudio(audio.state)
 

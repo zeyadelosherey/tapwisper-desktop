@@ -43,10 +43,18 @@ import { SpeechLanguagePicker } from '../components/speech-language-picker'
 import { MicrophonePicker } from '../components/microphone-picker'
 import { NotetakerSettings } from '../components/meeting/notetaker-settings'
 import { LanguageSelect } from '../components/meeting/translate-control'
+import { EngineSettings } from '../components/settings/engine-settings'
+import { SELF_HOSTED_KEY_IDS } from '../../shared/local-ai/catalog'
 
 type Theme = 'system' | 'dark' | 'light'
-export type SettingsTab = 'general' | 'speech' | 'notetaker' | 'ai-provider' | 'shortcuts' | 'about'
-type ProviderSubTab = 'ai' | 'transcription'
+export type SettingsTab =
+  | 'general'
+  | 'speech'
+  | 'notetaker'
+  | 'speech-to-text'
+  | 'language-models'
+  | 'shortcuts'
+  | 'about'
 
 // ── Provider Logos (inline SVGs) ────────────────────────────────
 
@@ -423,7 +431,8 @@ const TABS: { id: SettingsTab; labelKey: string; fallback: string }[] = [
   { id: 'general', labelKey: 'settings.tabGeneral', fallback: 'General' },
   { id: 'speech', labelKey: 'settings.tabSpeech', fallback: 'Speech' },
   { id: 'notetaker', labelKey: 'settings.tabNotetaker', fallback: 'Notetaker' },
-  { id: 'ai-provider', labelKey: 'settings.tabAIProvider', fallback: 'AI Provider' },
+  { id: 'speech-to-text', labelKey: 'settings.tabSpeechToText', fallback: 'Speech-to-Text' },
+  { id: 'language-models', labelKey: 'settings.tabLanguageModels', fallback: 'Language Models' },
   { id: 'shortcuts', labelKey: 'settings.tabShortcuts', fallback: 'Shortcuts' },
   { id: 'about', labelKey: 'settings.tabAbout', fallback: 'About' }
 ]
@@ -619,7 +628,6 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
   const [dictationTranslateTo, setDictationTranslateTo] = useState('')
 
   // AI Provider
-  const [providerSubTab, setProviderSubTab] = useState<ProviderSubTab>('ai')
   const [selectedLLM, setSelectedLLM] = useState<LLMProvider>('gemini')
   const [selectedVoice, setSelectedVoice] = useState<VoiceProvider>('whisper')
   const [models, setModels] = useState<Record<string, string>>(DEFAULT_MODELS)
@@ -629,7 +637,9 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
     together: '',
     openai: '',
     claude: '',
-    soniox: ''
+    soniox: '',
+    selfHostedStt: '',
+    selfHostedLlm: ''
   })
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({})
   const [modelSearch, setModelSearch] = useState('')
@@ -699,7 +709,7 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
         setPlatformInfo(platform as { platform: string; isMac: boolean; version: string })
         if (llm) setSelectedLLM(llm as LLMProvider)
         if (voice) setSelectedVoice(voice as VoiceProvider)
-        if (keys) setApiKeys(keys as Record<string, string>)
+        if (keys) setApiKeys((prev) => ({ ...prev, ...(keys as Record<string, string>) }))
         if (mdls) setModels({ ...DEFAULT_MODELS, ...(mdls as Record<string, string>) })
         if (vMdls) setVoiceModels({ ...DEFAULT_VOICE_MODELS, ...(vMdls as Record<string, string>) })
       }
@@ -1009,121 +1019,106 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
     </Section>
   )
 
-  const renderAIProviderTab = (): JSX.Element => {
+  // Cloud provider settings, shown when the engine is "Cloud providers"
+  const renderCloudLanguageModel = (): JSX.Element => {
     const currentLLMProvider = LLM_PROVIDERS.find((p) => p.id === selectedLLM) ?? LLM_PROVIDERS[0]
-    const currentVoiceProvider =
-      VOICE_PROVIDERS.find((p) => p.id === selectedVoice) ?? VOICE_PROVIDERS[0]
-
     return (
       <>
-        <div className="mb-5">
-          <Segmented<ProviderSubTab>
-            label={t('settings.tabAIProvider', 'AI Provider')}
-            value={providerSubTab}
-            onChange={setProviderSubTab}
-            options={[
-              { value: 'ai', label: t('settings.aiProvider', 'AI Provider') },
-              {
-                value: 'transcription',
-                label: t('settings.transcriptionProvider', 'Transcription')
-              }
-            ]}
-          />
-        </div>
-
-        {providerSubTab === 'ai' ? (
-          <>
-            <Section title={t('settings.selectProvider', 'Select Provider')}>
-              <div
-                role="radiogroup"
-                aria-label={t('settings.selectProvider', 'Select Provider')}
-                className="grid grid-cols-2 gap-2 md:grid-cols-4"
-              >
-                {LLM_PROVIDERS.map((provider) => (
-                  <ProviderTile
-                    key={provider.id}
-                    id={provider.id}
-                    label={provider.shortLabel}
-                    selected={selectedLLM === provider.id}
-                    onSelect={() => handleSelectLLM(provider.id)}
-                  />
-                ))}
-              </div>
-            </Section>
-            {renderApiKeyField(
-              selectedLLM,
-              t('settings.providerApiKey', '{{provider}} API Key', {
-                provider: LLM_API_KEY_PROVIDERS[selectedLLM]
-              })
-            )}
-            <Disclosure
-              label={`${t('settings.llm', 'LLM')} — ${currentLLMProvider.shortLabel}: ${modelLabel(
-                PROVIDER_MODELS[selectedLLM],
-                models[selectedLLM] || DEFAULT_MODELS[selectedLLM]
-              )}`}
-            >
-              <ModelList
-                models={PROVIDER_MODELS[selectedLLM]}
-                selectedId={models[selectedLLM] || DEFAULT_MODELS[selectedLLM]}
-                onSelect={(id) => handleModelChange(selectedLLM, id)}
-                search={modelSearch}
-                onSearch={setModelSearch}
+        <Section title={t('settings.selectProvider', 'Select Provider')}>
+          <div
+            role="radiogroup"
+            aria-label={t('settings.selectProvider', 'Select Provider')}
+            className="grid grid-cols-2 gap-2 md:grid-cols-4"
+          >
+            {LLM_PROVIDERS.map((provider) => (
+              <ProviderTile
+                key={provider.id}
+                id={provider.id}
+                label={provider.shortLabel}
+                selected={selectedLLM === provider.id}
+                onSelect={() => handleSelectLLM(provider.id)}
               />
-            </Disclosure>
-          </>
-        ) : (
-          <>
-            <Section title={t('settings.selectProvider', 'Select Provider')}>
-              <div
-                role="radiogroup"
-                aria-label={t('settings.selectProvider', 'Select Provider')}
-                className="grid grid-cols-3 gap-2"
-              >
-                {VOICE_PROVIDERS.map((provider) => (
-                  <ProviderTile
-                    key={provider.id}
-                    id={provider.id}
-                    label={provider.shortLabel}
-                    description={t(
-                      `settings.voiceProviderDescriptions.${provider.id}`,
-                      provider.description
-                    )}
-                    selected={selectedVoice === provider.id}
-                    onSelect={() => handleSelectVoice(provider.id)}
-                  />
-                ))}
-              </div>
-            </Section>
-            {renderApiKeyField(
-              VOICE_API_KEY_ID[selectedVoice],
-              t('settings.providerApiKey', '{{provider}} API Key', {
-                provider: VOICE_API_KEY_PROVIDERS[selectedVoice]
-              }),
-              selectedVoice === 'whisper'
-                ? t('settings.whisperSharesKey', 'Whisper uses the same API key as Together AI.')
-                : selectedVoice === 'openai-whisper'
-                  ? t(
-                      'settings.openaiWhisperSharesKey',
-                      'OpenAI Whisper uses the same API key as OpenAI.'
-                    )
-                  : undefined
-            )}
-            <Disclosure
-              label={`${t('settings.selectModel', 'Select Model')} — ${currentVoiceProvider.shortLabel}: ${modelLabel(
-                VOICE_PROVIDER_MODELS[selectedVoice],
-                voiceModels[selectedVoice] || DEFAULT_VOICE_MODELS[selectedVoice]
-              )}`}
-            >
-              <ModelList
-                models={VOICE_PROVIDER_MODELS[selectedVoice]}
-                selectedId={voiceModels[selectedVoice] || DEFAULT_VOICE_MODELS[selectedVoice]}
-                onSelect={(id) => handleVoiceModelChange(selectedVoice, id)}
-                search={voiceModelSearch}
-                onSearch={setVoiceModelSearch}
-              />
-            </Disclosure>
-          </>
+            ))}
+          </div>
+        </Section>
+        {renderApiKeyField(
+          selectedLLM,
+          t('settings.providerApiKey', '{{provider}} API Key', {
+            provider: LLM_API_KEY_PROVIDERS[selectedLLM]
+          })
         )}
+        <Disclosure
+          label={`${t('settings.llm', 'LLM')} — ${currentLLMProvider.shortLabel}: ${modelLabel(
+            PROVIDER_MODELS[selectedLLM],
+            models[selectedLLM] || DEFAULT_MODELS[selectedLLM]
+          )}`}
+        >
+          <ModelList
+            models={PROVIDER_MODELS[selectedLLM]}
+            selectedId={models[selectedLLM] || DEFAULT_MODELS[selectedLLM]}
+            onSelect={(id) => handleModelChange(selectedLLM, id)}
+            search={modelSearch}
+            onSearch={setModelSearch}
+          />
+        </Disclosure>
+      </>
+    )
+  }
+
+  const renderCloudSpeech = (): JSX.Element => {
+    const currentVoiceProvider =
+      VOICE_PROVIDERS.find((p) => p.id === selectedVoice) ?? VOICE_PROVIDERS[0]
+    return (
+      <>
+        <Section title={t('settings.selectProvider', 'Select Provider')}>
+          <div
+            role="radiogroup"
+            aria-label={t('settings.selectProvider', 'Select Provider')}
+            className="grid grid-cols-3 gap-2"
+          >
+            {VOICE_PROVIDERS.map((provider) => (
+              <ProviderTile
+                key={provider.id}
+                id={provider.id}
+                label={provider.shortLabel}
+                description={t(
+                  `settings.voiceProviderDescriptions.${provider.id}`,
+                  provider.description
+                )}
+                selected={selectedVoice === provider.id}
+                onSelect={() => handleSelectVoice(provider.id)}
+              />
+            ))}
+          </div>
+        </Section>
+        {renderApiKeyField(
+          VOICE_API_KEY_ID[selectedVoice],
+          t('settings.providerApiKey', '{{provider}} API Key', {
+            provider: VOICE_API_KEY_PROVIDERS[selectedVoice]
+          }),
+          selectedVoice === 'whisper'
+            ? t('settings.whisperSharesKey', 'Whisper uses the same API key as Together AI.')
+            : selectedVoice === 'openai-whisper'
+              ? t(
+                  'settings.openaiWhisperSharesKey',
+                  'OpenAI Whisper uses the same API key as OpenAI.'
+                )
+              : undefined
+        )}
+        <Disclosure
+          label={`${t('settings.selectModel', 'Select Model')} — ${currentVoiceProvider.shortLabel}: ${modelLabel(
+            VOICE_PROVIDER_MODELS[selectedVoice],
+            voiceModels[selectedVoice] || DEFAULT_VOICE_MODELS[selectedVoice]
+          )}`}
+        >
+          <ModelList
+            models={VOICE_PROVIDER_MODELS[selectedVoice]}
+            selectedId={voiceModels[selectedVoice] || DEFAULT_VOICE_MODELS[selectedVoice]}
+            onSelect={(id) => handleVoiceModelChange(selectedVoice, id)}
+            search={voiceModelSearch}
+            onSearch={setVoiceModelSearch}
+          />
+        </Disclosure>
       </>
     )
   }
@@ -1233,7 +1228,7 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
       <div
         role="tablist"
         aria-label={t('settings.title', 'Settings')}
-        className="mb-6 flex gap-1 border-b border-hairline"
+        className="mb-6 flex flex-wrap gap-1 border-b border-hairline"
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id
@@ -1258,7 +1253,24 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
         {activeTab === 'general' && renderGeneralTab()}
         {activeTab === 'speech' && renderSpeechTab()}
         {activeTab === 'notetaker' && <NotetakerSettings />}
-        {activeTab === 'ai-provider' && renderAIProviderTab()}
+        {activeTab === 'speech-to-text' && (
+          <EngineSettings
+            kind="stt"
+            cloud={renderCloudSpeech()}
+            languages={speechLanguages}
+            selfHostedKey={apiKeys[SELF_HOSTED_KEY_IDS.stt] ?? ''}
+            onSelfHostedKeyChange={(value) => handleKeyChange(SELF_HOSTED_KEY_IDS.stt, value)}
+          />
+        )}
+        {activeTab === 'language-models' && (
+          <EngineSettings
+            kind="llm"
+            cloud={renderCloudLanguageModel()}
+            languages={[]}
+            selfHostedKey={apiKeys[SELF_HOSTED_KEY_IDS.llm] ?? ''}
+            onSelfHostedKeyChange={(value) => handleKeyChange(SELF_HOSTED_KEY_IDS.llm, value)}
+          />
+        )}
         {activeTab === 'shortcuts' && renderShortcutsTab()}
         {activeTab === 'about' && renderAboutTab()}
       </div>

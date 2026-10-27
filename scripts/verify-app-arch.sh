@@ -97,6 +97,26 @@ done < <(find "$APP_DIR" -name "*.node")
 echo ""
 echo "Checked $checked active-load .node files."
 
+# Bundled executables and their libraries (fn-monitor, whisper-server, llama-server).
+# They must contain the target arch; fn-monitor is universal, so 'contains' is enough.
+bin_dir="$APP_DIR/Contents/Resources/app.asar.unpacked/resources/bin"
+if [ -d "$bin_dir" ]; then
+  while IFS= read -r f; do
+    desc=$(file -b "$f" || echo "unknown")
+    case "$desc" in
+      *Mach-O*) ;;
+      *) continue ;;
+    esac
+    if printf '%s' "$desc" | grep -qw "$EXPECTED_FILE_ARCH"; then
+      echo "  OK   [bin]    $f"
+    else
+      echo "  FAIL [bin]    $f -- $desc"
+      echo "::error::Bundled binary $f is not $EXPECTED_FILE_ARCH (got: $desc)"
+      fail=1
+    fi
+  done < <(find "$bin_dir" -type f)
+fi
+
 if [ "$checked" -eq 0 ]; then
   echo "::error::No active-load .node files were found in $APP_DIR -- this is unexpected."
   exit 1

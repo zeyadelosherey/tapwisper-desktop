@@ -1,0 +1,25 @@
+{
+  "whisper": {
+    "repo": "https://github.com/ggml-org/whisper.cpp",
+    "tag": "v1.9.5",
+    "targets": ["whisper-server", "parakeet-cli"],
+    "options": [
+      "-DWHISPER_BUILD_TESTS=OFF",
+      "-DWHISPER_BUILD_EXAMPLES=ON",
+      "-DWHISPER_BUILD_SERVER=ON"
+    ]
+  },
+  "llama": {
+    "repo": "https://github.com/ggml-org/llama.cpp",
+    "tag": "b11928",
+    "targets": ["llama-server"],
+    "options": [
+      "-DLLAMA_BUILD_TESTS=OFF",
+      "-DLLAMA_BUILD_EXAMPLES=OFF",
+      "-DLLAMA_BUILD_TOOLS=ON",
+      "-DLLAMA_BUILD_SERVER=ON",
+      "-DLLAMA_OPENSSL=OFF",
+      "-DLLAMA_CURL=OFF"
+    ]
+  }
+}

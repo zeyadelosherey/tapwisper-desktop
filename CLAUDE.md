@@ -4,7 +4,7 @@ This file provides context for Claude Code (the `claude` CLI agent) when working
 
 ## Project Summary
 
-TapWisper Desktop is an open-source, system-wide voice dictation tool with AI, built with **Electron 33**, **React 19**, **TypeScript 5.7**, and **Tailwind CSS 3.4**. It provides voice dictation, AI text transformations, custom actions, voice triggers, text snippets, and voice notes. It supports multiple AI providers (Gemini, Together AI, OpenAI, Claude) and voice providers (Together Whisper, Soniox).
+TapWisper Desktop is an open-source, system-wide voice dictation tool with AI, built with **Electron 33**, **React 19**, **TypeScript 5.7**, and **Tailwind CSS 3.4**. It provides voice dictation, AI text transformations, custom actions, voice triggers, text snippets, and voice notes. It supports multiple AI providers (Gemini, Together AI, OpenAI, Claude) and voice providers (Together Whisper, OpenAI Whisper, Soniox), plus local open-source models (whisper.cpp / llama.cpp) and self-hosted OpenAI-compatible servers — see `docs/LOCAL_MODELS.md`.
 
 ## Architecture
 
@@ -17,7 +17,12 @@ Electron Main Process (src/main/)
   ├── Audio recording/encoding
   ├── Permission checking (microphone, accessibility, screen recording)
   ├── SQLite database (better-sqlite3)
-  └── Config store (electron-store)
+  ├── Config store (electron-store)
+  └── local-ai/  Local inference servers (whisper-server, llama-server), model downloads,
+                 device profile, self-hosted client — IPC namespaces localAi:* / selfHosted:*
+
+Shared (src/shared/)
+  └── local-ai/ (types, model catalog, rating helpers), audio/wav.ts — no Node/DOM imports
 
 Preload Script (src/preload/)
   └── contextBridge → exposes window.tapwisper.* API
@@ -48,6 +53,8 @@ npm run format       # Prettier formatting
 npm run dist:mac     # Package for macOS
 npm run dist:win     # Package for Windows
 npm run dist:linux   # Package for Linux
+npm test             # Vitest unit tests
+npm run build:runtimes  # Build whisper-server / llama-server into resources/bin (optional for dev)
 ```
 
 Always run `npm run typecheck && npm run lint` before committing.
@@ -103,7 +110,7 @@ From `.eslintrc.cjs`:
 All renderer-to-main communication uses `window.tapwisper.*` (exposed via contextBridge in `src/preload/index.ts`). Never use `ipcRenderer` directly.
 
 ### AI Router
-`src/renderer/services/ai-router.ts` is the central dispatch for AI requests. It reads the user's configured provider from electron-store and routes to the correct service module. Each provider exports a single async function (`processWithGemini`, `processWithOpenAI`, etc.).
+`src/renderer/services/ai-router.ts` is the central dispatch for AI requests. It reads the configured engine (`speechEngine` / `llmEngine`: `cloud`, `local` or `self-hosted`) from electron-store. Cloud requests go to a provider module, each exporting a single async function (`processWithGemini`, `processWithOpenAI`, etc.). Local and self-hosted requests go through `services/local-ai.ts` to the main process (`src/main/local-ai/`), which returns `LocalAiResult` codes that the renderer translates (`errors.local.*`). Long inputs must respect `getMaxInputChars()`.
 
 ### Multi-Window
 The app has 5 windows: main settings window + 4 overlay windows (recording pill, pinned panel, command popup, AI panel). Overlays are pre-warmed at startup and use hash-based routing.

@@ -1,0 +1,92 @@
+# Builds the bundled whisper.cpp / llama.cpp programs on every release platform,
+# downloads small real models with the app's own download code and runs them
+# through the app's own launch and request code.
+name: Local AI runtimes
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/build-runtimes.mjs'
+      - 'scripts/runtimes.json'
+      - 'src/main/local-ai/**'
+      - 'src/shared/local-ai/**'
+      - '.github/workflows/local-runtimes.yml'
+  workflow_dispatch:
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Every catalog model resolves on Hugging Face
+        env:
+          LOCAL_AI_CHECK_CATALOG: '1'
+        run: npx vitest run src/main/local-ai/__tests__/catalog.online.test.ts
+
+  smoke:
+    name: smoke (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CPU build, as on Intel Macs and Linux source builds
+          - label: ubuntu-latest
+            os: ubuntu-latest
+          # Vulkan build: the backend must load and the CPU fallback work without a GPU.
+          # (Mesa's software Vulkan device is far too slow to transcribe within the timeouts.)
+          - label: ubuntu-latest-vulkan
+            os: ubuntu-latest
+            vulkan: true
+          # Metal build; the runner has no usable Metal, so models run on the CPU
+          - label: macos-latest
+            os: macos-latest
+          # The release build (with Vulkan); the runner has no GPU, so this is the CPU fallback
+          - label: windows-2022
+            os: windows-2022
+            vulkan: true
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Install Vulkan build tools
+        if: matrix.vulkan && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslc libvulkan-dev spirv-headers
+
+      # The full LunarG SDK, as llama.cpp's CI installs it: ggml's Vulkan backend also
+      # needs the SDK's SPIRV-Headers CMake package
+      - name: Install Vulkan SDK
+        if: matrix.vulkan && runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VULKAN_VERSION: 1.4.357.0
+        run: |
+          curl.exe -o "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" -L "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\bin"
+
+      - name: Build local AI runtimes
+        run: npm run build:runtimes -- ${{ matrix.vulkan && '--vulkan' || '' }}
+
+      - name: Download models, transcribe (Whisper, Parakeet, Qwen3-ASR) and chat
+        env:
+          LOCAL_AI_SMOKE_DOWNLOAD: '1'
+          LOCAL_AI_SMOKE_EXPECT_TEXT: '1'
+        run: npx vitest run src/main/local-ai/__tests__/runtimes.smoke.test.ts

@@ -4,23 +4,19 @@ import { processWithOpenAI } from './openai'
 import { processWithClaude } from './claude'
 import { transcribeWithWhisper, transcribeWithOpenAIWhisper } from './whisper'
 import { transcribeWithSoniox } from './soniox'
+import { chatOnDevice, transcribeOnDevice } from './local-ai'
 
 export type { LLMProvider, VoiceProvider } from '../constants/providers'
-import type { LLMProvider, VoiceProvider } from '../constants/providers'
+import type { AIEngine, LLMProvider, VoiceProvider } from '../constants/providers'
+import { LOCAL_LLM_MAX_INPUT_CHARS } from '../../shared/local-ai/catalog'
+import type { ChatInput } from '../../shared/local-ai/types'
 import i18n from '../i18n'
 
-export interface AIRequest {
-  prompt: string
-  text: string
-  systemInstruction?: string
-  /** Override the global AI provider (used by per-trigger configs) */
+export interface AIRequest extends ChatInput {
+  /** Use this cloud provider instead of the configured engine (per-trigger configs) */
   providerOverride?: LLMProvider
   /** Override the global model (used by per-trigger configs) */
   modelOverride?: string
-  /** Output token budget (default 2048) — raise for long outputs like meeting summaries */
-  maxTokens?: number
-  /** Sampling temperature (default 0.7); use low values for faithful rewriting */
-  temperature?: number
 }
 
 export interface AIResponse {
@@ -48,10 +44,21 @@ export interface TranscriptionResponse {
  */
 export async function processText(request: AIRequest): Promise<AIResponse> {
   const config = (await window.tapwisper.store.getAll()) as {
+    llmEngine?: AIEngine
     aiProvider?: LLMProvider
     apiKeys?: Record<string, string>
     models?: Record<string, string>
+    localModels?: { llm?: string | null }
+    selfHosted?: { llm?: { model?: string } }
   }
+  const engine = request.providerOverride ? 'cloud' : (config.llmEngine ?? 'cloud')
+  if (engine !== 'cloud') {
+    const result = await chatOnDevice(engine, request)
+    const model =
+      (engine === 'local' ? config.localModels?.llm : config.selfHosted?.llm?.model) || ''
+    return { result: result.trim(), provider: engine, model }
+  }
+
   const provider: LLMProvider = request.providerOverride || config.aiProvider || 'gemini'
   const apiKey = config.apiKeys?.[provider] || ''
   const model = request.modelOverride || config.models?.[provider] || ''
@@ -60,7 +67,7 @@ export async function processText(request: AIRequest): Promise<AIResponse> {
     throw new Error(
       i18n.t(
         'errors.noApiKey',
-        'No API key configured for {{provider}}. Please add your API key in Settings > AI Provider.',
+        'No API key configured for {{provider}}. Add one in Settings, or choose a local or self-hosted engine there.',
         { provider }
       )
     )
@@ -79,6 +86,18 @@ export async function processText(request: AIRequest): Promise<AIResponse> {
       throw new Error(`Unknown provider: ${provider}`)
   }
 }
+
+/**
+ * How much input text one request may carry. Local and self-hosted models have
+ * small context windows, so long material (meeting transcripts) must be split.
+ */
+export async function getMaxInputChars(): Promise<number> {
+  const engine = (await window.tapwisper.store.get('llmEngine')) as AIEngine | undefined
+  return !engine || engine === 'cloud' ? CLOUD_MAX_INPUT_CHARS : LOCAL_LLM_MAX_INPUT_CHARS
+}
+
+/** Every supported cloud model takes far more; this bounds cost and latency */
+const CLOUD_MAX_INPUT_CHARS = 120_000
 
 /** Per-request transcription hints passed to every voice provider */
 export interface TranscriptionOptions {
@@ -153,14 +172,52 @@ export async function transcribeAudio(
   audioBlob: Blob,
   languageOverride?: string
 ): Promise<TranscriptionResponse> {
-  const config = (await window.tapwisper.store.getAll()) as Record<string, unknown> & {
-    voiceProvider?: VoiceProvider
-    apiKeys?: Record<string, string>
-    voiceModels?: Partial<Record<VoiceProvider, string>>
+  const config = (await window.tapwisper.store.getAll()) as CloudVoiceConfig & {
+    speechEngine?: AIEngine
     speechLanguages?: string[]
     dictionary?: unknown
     triggers?: unknown
   }
+
+  const languages = languageOverride
+    ? [languageOverride]
+    : (config.speechLanguages ?? []).filter((l) => typeof l === 'string' && l)
+  const options: TranscriptionOptions = {
+    language: languages.length === 1 ? languages[0] : undefined,
+    languageHints: languages.length ? languages : undefined,
+    prompt: buildVocabularyPrompt(config.dictionary, config.triggers, languages)
+  }
+
+  const engine = config.speechEngine ?? 'cloud'
+  const response =
+    engine === 'cloud'
+      ? await transcribeWithCloud(audioBlob, options, config)
+      : {
+          text: await transcribeOnDevice(engine, audioBlob, {
+            language: options.language,
+            prompt: options.prompt
+          }),
+          provider: engine
+        }
+
+  // On unclear audio Whisper can echo its prompt back verbatim — never paste that
+  if (options.prompt && isPromptEcho(response.text, options.prompt)) {
+    return { ...response, text: '' }
+  }
+  return { ...response, language: response.language ?? options.language }
+}
+
+interface CloudVoiceConfig {
+  voiceProvider?: VoiceProvider
+  apiKeys?: Record<string, string>
+  voiceModels?: Partial<Record<VoiceProvider, string>>
+}
+
+async function transcribeWithCloud(
+  audioBlob: Blob,
+  options: TranscriptionOptions,
+  config: CloudVoiceConfig
+): Promise<TranscriptionResponse> {
   const provider: VoiceProvider = config.voiceProvider || 'whisper'
 
   const voiceApiKeyMap: Record<VoiceProvider, string> = {
@@ -175,41 +232,22 @@ export async function transcribeAudio(
     throw new Error(
       i18n.t(
         'errors.noApiKey',
-        'No API key configured for {{provider}}. Please add your API key in Settings > AI Provider.',
+        'No API key configured for {{provider}}. Add one in Settings, or choose a local or self-hosted engine there.',
         { provider }
       )
     )
   }
 
-  const languages = languageOverride
-    ? [languageOverride]
-    : (config.speechLanguages ?? []).filter((l) => typeof l === 'string' && l)
-  const options: TranscriptionOptions = {
-    language: languages.length === 1 ? languages[0] : undefined,
-    languageHints: languages.length ? languages : undefined,
-    prompt: buildVocabularyPrompt(config.dictionary, config.triggers, languages)
-  }
-
-  let response: TranscriptionResponse
   switch (provider) {
     case 'whisper':
-      response = await transcribeWithWhisper(audioBlob, apiKey, options, voiceModel)
-      break
+      return transcribeWithWhisper(audioBlob, apiKey, options, voiceModel)
     case 'openai-whisper':
-      response = await transcribeWithOpenAIWhisper(audioBlob, apiKey, options, voiceModel)
-      break
+      return transcribeWithOpenAIWhisper(audioBlob, apiKey, options, voiceModel)
     case 'soniox':
-      response = await transcribeWithSoniox(audioBlob, apiKey, options, voiceModel)
-      break
+      return transcribeWithSoniox(audioBlob, apiKey, options, voiceModel)
     default:
       throw new Error(`Unknown voice provider: ${provider}`)
   }
-
-  // On unclear audio Whisper can echo its prompt back verbatim — never paste that
-  if (options.prompt && isPromptEcho(response.text, options.prompt)) {
-    return { ...response, text: '' }
-  }
-  return { ...response, language: response.language ?? options.language }
 }
 
 function normalizeForCompare(text: string): string {
@@ -231,7 +269,10 @@ export function isPromptEcho(text: string, prompt: string): boolean {
     const n = normalizeForCompare(sentence)
     if (n.split(' ').length >= 4 && n === t) return true
   }
-  const terms = prompt.split(/[,.]\s/).map(normalizeForCompare).filter(Boolean)
+  const terms = prompt
+    .split(/[,.]\s/)
+    .map(normalizeForCompare)
+    .filter(Boolean)
   for (let start = 0; start < terms.length; start++) {
     for (let end = start + 2; end <= terms.length; end++) {
       if (terms.slice(start, end).join(' ') === t) return true
