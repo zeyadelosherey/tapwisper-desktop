@@ -1,1195 +1,787 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
-  Clock, Mic, Zap, Type, TrendingUp, ArrowUpRight,
-  Activity, Sparkles, Timer, LayoutDashboard, History,
-  Copy, Trash2, X, ChevronDown, ChevronUp, Code,
-  Search, ChevronLeft, ChevronRight
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Copy,
+  History as HistoryIcon,
+  Pause,
+  Play,
+  RotateCw,
+  Search,
+  Sparkles,
+  Trash2,
+  WandSparkles,
+  X
 } from 'lucide-react'
-import { useStatsStore, type ActivityEntry } from '../store/stats'
-import {
-  useActivityStore,
-  type ActivityPage,
-  type ActivityQuery,
-  type TranscriptionRecord
-} from '../store/activity'
-
-// ── Helpers ──────────────────────────────────────────────────────
-
-import {
-  formatCompactNumber,
-  formatDuration,
-  formatTimeAgo,
-  formatDate,
-  formatTime,
-  weekdayLabelsMondayFirst
-} from '../utils/formatting'
+import { useStatsStore } from '../store/stats'
+import { useActivityStore, type TranscriptionRecord } from '../store/activity'
+import { getRecordingUrl, hasRecording, retranscribeRecord } from '../services/history'
+import { formatCompactNumber, formatDate, formatDuration, formatTime } from '../utils/formatting'
 import { displayActionName } from '../utils/action-labels'
+import { computeStreak, type StreakInfo } from '../utils/streak'
+import { useRecordShortcut } from '../hooks/use-record-shortcut'
+import { useConfirmDialog } from '../components/confirm-dialog'
+import { ShortcutKeys } from '../components/ui/keycap'
+import { WaveLine } from '../components/ui/wave'
+import { Page, Spinner } from '../components/ui/primitives'
 
-const LEGACY_VOICE_DESCRIPTION = /^Transcribed (\d+) words$/
-const LEGACY_AI_DESCRIPTION = /^AI Action: (.+)$/
-const LEGACY_SECONDS_VALUE = /^(\d+)s$/
-const LEGACY_CHARS_VALUE = /^(\d+) chars$/
+const PAGE_SIZE = 40
+const DAY_MS = 24 * 60 * 60 * 1000
+/** History window used for the streak (extended when the streak reaches it) */
+const STREAK_WINDOW_DAYS = 90
+/** Text longer than this is clamped until expanded */
+const LONG_TEXT = 260
+/** Placeholder used to put a component in the middle of a translated sentence */
+const SLOT = '\u0000'
 
-/** Action names stored as ids (e.g. "miniapp-p1") get a readable fallback */
-function activityActionName(t: TFunction, action: string): string {
-  const name = displayActionName(t, action)
-  if (name !== action || !/^[a-z0-9]+(-[a-z0-9]+)+$/.test(action)) return name
-  return action.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+interface AllTimeStats {
+  words: number
+  seconds: number
 }
 
-/**
- * Text for a dashboard activity entry. Entries carry structured fields;
- * older stored entries only have English text, which is parsed when possible.
- */
-function activityDescription(t: TFunction, entry: ActivityEntry): string {
-  if (entry.type === 'voice') {
-    const legacy = LEGACY_VOICE_DESCRIPTION.exec(entry.description)
-    const words = entry.words ?? (legacy ? Number(legacy[1]) : undefined)
-    return words === undefined
-      ? entry.description
-      : t('home.activityTranscribed', 'Transcribed {{count}} words', { count: words })
-  }
-  const action = entry.action ?? LEGACY_AI_DESCRIPTION.exec(entry.description)?.[1]
-  return action === undefined
-    ? entry.description
-    : t('home.activityAiAction', 'AI action: {{action}}', {
-        action: activityActionName(t, action)
-      })
+function isFailed(record: TranscriptionRecord): boolean {
+  return record.type === 'voice' && !record.transcription?.trim()
 }
 
-function activityValue(t: TFunction, entry: ActivityEntry): string | undefined {
-  const legacySeconds = entry.value ? LEGACY_SECONDS_VALUE.exec(entry.value) : null
-  const seconds = entry.seconds ?? (legacySeconds ? Number(legacySeconds[1]) : undefined)
-  if (seconds !== undefined) return formatDuration(seconds)
-  const legacyChars = entry.value ? LEGACY_CHARS_VALUE.exec(entry.value) : null
-  const chars = entry.chars ?? (legacyChars ? Number(legacyChars[1]) : undefined)
-  if (chars !== undefined) return t('home.charsCount', '{{count}} chars', { count: chars })
-  return entry.value
+/** The text a record produced (AI result for AI actions, else the dictation) */
+function primaryText(record: TranscriptionRecord): string {
+  if (record.type === 'voice-with-llm' && record.llmResult) return record.llmResult
+  return record.transcription || record.llmInput || ''
 }
 
-type HomeTab = 'dashboard' | 'activity'
-
-const IS_MAC = window.tapwisper.platform.os === 'darwin'
-const DEFAULT_RECORD_SHORTCUT = 'Option+Space'
-const RECORDS_PER_PAGE = 25
-
-/** Format a stored accelerator (e.g. "Option+Space") for the current platform. */
-function formatShortcutKey(part: string): string {
-  const upper = part.toUpperCase()
-  switch (upper) {
-    case 'COMMANDORCONTROL':
-    case 'CMDORCTRL':
-      return IS_MAC ? '⌘' : 'Ctrl'
-    case 'CMD':
-    case 'COMMAND':
-    case 'META':
-    case 'SUPER':
-      return IS_MAC ? '⌘' : 'Win'
-    case 'CTRL':
-    case 'CONTROL':
-      return IS_MAC ? '⌃' : 'Ctrl'
-    case 'ALT':
-    case 'OPTION':
-      return IS_MAC ? '⌥' : 'Alt'
-    case 'SHIFT':
-      return IS_MAC ? '⇧' : 'Shift'
-    case 'FN':
-      return IS_MAC ? '🌐' : 'Fn'
-    case 'SPACE':
-      return 'Space'
-    case 'ESCAPE':
-      return 'Esc'
-    default:
-      return part.length === 1 ? upper : part
+function longDate(lang: string): string {
+  const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' }
+  try {
+    return new Date().toLocaleDateString(lang, options)
+  } catch {
+    return new Date().toLocaleDateString(undefined, options)
   }
 }
 
-function formatShortcutParts(accelerator: string): string[] {
-  return accelerator
-    .split('+')
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map(formatShortcutKey)
+function retryErrorMessage(t: TFunction, err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  if (raw === 'recording-missing') {
+    return t(
+      'home.recordingMissing',
+      'The audio for this dictation was not kept, so it can’t be transcribed again.'
+    )
+  }
+  if (/No API key/i.test(raw)) return raw
+  if (/Failed to fetch|NetworkError|network/i.test(raw)) {
+    return t('errors.network', 'Network error — check your internet connection.')
+  }
+  return t('home.retryFailed', 'Transcription failed again: {{error}}', {
+    error: raw.length > 140 ? `${raw.slice(0, 137)}…` : raw
+  })
 }
 
-function joinShortcutParts(parts: string[]): string {
-  return parts.join(IS_MAC ? ' ' : '+')
-}
-
-// ── Component ────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────
 
 export function Home(): JSX.Element {
   const { t, i18n } = useTranslation()
-  const [activeTab, setActiveTab] = useState<HomeTab>('dashboard')
+  const { shortcut } = useRecordShortcut()
+  const { loadStats, voiceTimeSavedSeconds, aiTimeSavedSeconds } = useStatsStore()
+  const { records, totalCount, isLoaded, loadRecords } = useActivityStore()
+  const [allTime, setAllTime] = useState<AllTimeStats | null>(null)
+  const [streak, setStreak] = useState<StreakInfo>({ streak: 0, lastWeek: Array(7).fill(false) })
+  const latestId = records[0]?.id ?? ''
 
-  const {
-    isLoaded,
-    loadStats,
-    voiceSeconds,
-    wordCount,
-    aiActions,
-    voiceTimeSavedSeconds,
-    aiTimeSavedSeconds,
-    wordsPerMinute,
-    dailyStats,
-    recentActivity,
-    outputChars
-  } = useStatsStore()
-
-  const {
-    records: activityRecords,
-    totalCount: activityTotal,
-    isLoaded: activityLoaded,
-    loadRecords,
-    queryRecords,
-    deleteRecord
-  } = useActivityStore()
-
-  const [recordShortcut, setRecordShortcut] = useState(DEFAULT_RECORD_SHORTCUT)
-
-  // Refresh stats and activity on mount and when switching between Dashboard/Activity tabs
   useEffect(() => {
     loadStats()
     loadRecords()
-  }, [activeTab, loadStats, loadRecords])
+  }, [loadStats, loadRecords])
 
-  // The record shortcut is configurable in Settings
+  // All-time totals and the day streak, refreshed whenever history changes
   useEffect(() => {
-    window.tapwisper.store
-      .get('shortcuts')
-      .then((shortcuts) => {
-        const record = (shortcuts as { record?: unknown } | undefined)?.record
-        if (typeof record === 'string' && record.trim()) setRecordShortcut(record)
-      })
-      .catch(() => {
-        // Keep the default
-      })
-  }, [])
-
-  const timeSavedMinutes = useMemo(
-    () => Math.round((voiceTimeSavedSeconds + aiTimeSavedSeconds) / 60),
-    [voiceTimeSavedSeconds, aiTimeSavedSeconds]
-  )
-
-  // Compute max value for weekly chart scaling
-  const chartMax = useMemo(() => {
-    if (!dailyStats) return 1
-    const max = Math.max(...dailyStats.map((d) => d.timeSavedSeconds + d.voiceSeconds))
-    return max > 0 ? max : 1
-  }, [dailyStats])
-
-  // Current day index (Mon=0 ... Sun=6)
-  const todayIdx = useMemo(() => {
-    const day = new Date().getDay()
-    return day === 0 ? 6 : day - 1
-  }, [])
-
-  const statCards = useMemo(() => [
-    {
-      label: t('home.timeSaved'),
-      value: formatDuration(timeSavedMinutes * 60),
-      subtext: t('home.timeSavedSub', 'vs. manual typing'),
-      icon: <Clock className="w-5 h-5" />,
-      color: '#4DC778',
-      gradient: 'from-green-500/10 to-emerald-500/5'
-    },
-    {
-      label: t('home.voiceInput'),
-      value: formatDuration(voiceSeconds),
-      subtext: wordsPerMinute > 0
-        ? t('home.wpmValue', '{{value}} WPM', { value: wordsPerMinute })
-        : t('home.noRecordings', 'No recordings yet'),
-      icon: <Mic className="w-5 h-5" />,
-      color: '#F04545',
-      gradient: 'from-red-500/10 to-rose-500/5'
-    },
-    {
-      label: t('home.aiActions'),
-      value: formatCompactNumber(aiActions),
-      subtext: outputChars > 0
-        ? t('home.charsGeneratedValue', '{{value}} chars generated', {
-            value: formatCompactNumber(outputChars)
-          })
-        : t('home.noActions', 'No actions yet'),
-      icon: <Zap className="w-5 h-5" />,
-      color: '#7EB6E0',
-      gradient: 'from-sky-500/10 to-blue-500/5'
-    },
-    {
-      label: t('home.wordsTyped'),
-      value: formatCompactNumber(wordCount),
-      subtext: t('home.wordsTypedSub', 'transcribed by voice'),
-      icon: <Type className="w-5 h-5" />,
-      color: '#B07CD8',
-      gradient: 'from-purple-500/10 to-violet-500/5'
+    let cancelled = false
+    const now = Date.now()
+    const load = async (): Promise<void> => {
+      try {
+        const totals = (await window.tapwisper.db.activity.getStats(0, now)) as {
+          totalWords?: number | null
+          totalDuration?: number | null
+        } | null
+        if (!cancelled) {
+          setAllTime({ words: totals?.totalWords ?? 0, seconds: totals?.totalDuration ?? 0 })
+        }
+      } catch {
+        if (!cancelled) setAllTime({ words: 0, seconds: 0 })
+      }
+      try {
+        let windowDays = STREAK_WINDOW_DAYS
+        let info: StreakInfo = { streak: 0, lastWeek: Array(7).fill(false) }
+        // Widen the window until the streak fits inside it
+        for (;;) {
+          const rows = ((await window.tapwisper.db.activity.getByDateRange(
+            now - windowDays * DAY_MS,
+            now
+          )) ?? []) as TranscriptionRecord[]
+          const stamps = rows
+            .filter((r) => r.transcription?.trim() || r.llmResult?.trim())
+            .map((r) => r.timestamp)
+          info = computeStreak(stamps, now)
+          if (info.streak < windowDays - 1 || windowDays >= 3650) break
+          windowDays *= 4
+        }
+        if (!cancelled) setStreak(info)
+      } catch {
+        // Streak is informational only
+      }
     }
-    // i18n.language: number/duration formatting follows the UI language
-  ], [
-    t,
-    i18n.language,
-    timeSavedMinutes,
-    voiceSeconds,
-    wordsPerMinute,
-    aiActions,
-    outputChars,
-    wordCount
-  ])
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [totalCount, latestId])
 
-  if (!isLoaded || !activityLoaded) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-theme-border border-t-sky-accent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  const wpm =
+    allTime && allTime.seconds > 0 ? Math.round(allTime.words / (allTime.seconds / 60)) : 0
+  const savedSeconds = voiceTimeSavedSeconds + aiTimeSavedSeconds
 
-  const hasAnyData = voiceSeconds > 0 || aiActions > 0 || wordCount > 0
+  const hintParts = t('home.heroHint', 'Hold {{keys}} in any app and start talking.', {
+    keys: SLOT
+  }).split(SLOT)
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* ── Header ─────────────────────────────────────────── */}
-      <div className="drag-region mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-theme-text tracking-tight">
-              {t('home.welcome')}
-            </h1>
-            <p className="text-sm text-theme-text-secondary mt-0.5">
-              {t('home.subtitle')}
-            </p>
-          </div>
-          {hasAnyData && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-accent/10">
-              <TrendingUp className="w-3.5 h-3.5 text-green-accent" />
-              <span className="text-xs font-medium text-green-accent">
-                {t('home.timeSavedBadge', '{{time}} saved', {
-                  time: formatDuration(timeSavedMinutes * 60)
-                })}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Tabs ─────────────────────────────────────────── */}
-      <div className="flex gap-6 mb-6 border-b border-theme-border/30">
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`
-            flex items-center gap-2 pb-2.5 text-sm font-medium transition-all border-b-2 -mb-px
-            ${activeTab === 'dashboard'
-              ? 'border-theme-text text-theme-text'
-              : 'border-transparent text-theme-text-secondary hover:text-theme-text'
-            }
-          `}
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          {t('home.dashboardTab', 'Dashboard')}
-        </button>
-        <button
-          onClick={() => setActiveTab('activity')}
-          className={`
-            flex items-center gap-2 pb-2.5 text-sm font-medium transition-all border-b-2 -mb-px
-            ${activeTab === 'activity'
-              ? 'border-theme-text text-theme-text'
-              : 'border-transparent text-theme-text-secondary hover:text-theme-text'
-            }
-          `}
-        >
-          <History className="w-4 h-4" />
-          {t('home.activityTab', 'Activity')}
-          {activityTotal > 0 && (
-            <span
-              className="ms-1 min-w-5 h-5 px-1 flex items-center justify-center text-[10px] font-semibold bg-sky-accent/15 text-sky-accent rounded-full"
-              aria-label={t('home.activityCount', '{{count}} records', { count: activityTotal })}
-            >
-              {activityTotal > 99 ? '99+' : activityTotal}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {activeTab === 'activity' ? (
-        <ActivityTab
-          totalCount={activityTotal}
-          refreshToken={`${activityTotal}-${activityRecords[0]?.id ?? ''}`}
-          queryRecords={queryRecords}
-          onDelete={deleteRecord}
-          t={t}
+    <Page>
+      {/* ── Hero ─────────────────────────────────────────── */}
+      <section className="relative animate-rise">
+        <p className="section-label">{longDate(i18n.language)}</p>
+        <h1 className="hero-title mt-3 max-w-[620px] text-balance">
+          <Trans i18nKey="home.hero" components={{ em: <em /> }}>
+            Say it, and it&apos;s <em>on the page</em>.
+          </Trans>
+        </h1>
+        <p className="mt-5 text-[14.5px] leading-[2] text-ink-muted">
+          {hintParts[0]}
+          <ShortcutKeys accelerator={shortcut} size="sm" className="-translate-y-px" />
+          {hintParts[1]}
+        </p>
+        <WaveLine
+          className="pointer-events-none absolute -top-2 end-0 hidden h-16 w-48 opacity-70 lg:block"
+          strokeWidth={1.4}
         />
+      </section>
+
+      {/* ── Stats rail ───────────────────────────────────── */}
+      <section
+        aria-label={t('home.statsLabel', 'Your stats')}
+        className="card mt-9 grid grid-cols-2 overflow-hidden md:grid-cols-4 animate-rise [animation-delay:60ms]"
+      >
+        <Stat
+          label={t('home.statWords', 'Words dictated')}
+          value={allTime ? formatCompactNumber(allTime.words) : '–'}
+          hint={t('home.statWordsHint', 'all time')}
+        />
+        <Stat
+          label={t('home.statPace', 'Average pace')}
+          value={wpm > 0 ? String(wpm) : '–'}
+          unit={wpm > 0 ? t('home.wpm', 'wpm') : undefined}
+          hint={t('home.statPaceHint', 'words per minute')}
+        />
+        <Stat
+          label={t('home.statStreak', 'Day streak')}
+          value={String(streak.streak)}
+          hint={
+            <span className="flex items-center gap-1" aria-hidden="true">
+              {streak.lastWeek.map((active, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    active ? (i === 6 ? 'bg-ember' : 'bg-signal') : 'bg-hairline-strong'
+                  }`}
+                />
+              ))}
+            </span>
+          }
+          srHint={t('home.statStreakHint', '{{count}} days in a row', { count: streak.streak })}
+        />
+        <Stat
+          label={t('home.statSaved', 'Time saved')}
+          value={formatDuration(savedSeconds)}
+          hint={t('home.statSavedHint', 'this week, vs. typing')}
+        />
+      </section>
+
+      {/* ── History ──────────────────────────────────────── */}
+      {!isLoaded ? (
+        <div className="flex justify-center py-16 text-ink-faint">
+          <Spinner className="h-5 w-5" />
+        </div>
       ) : (
-        <DashboardTab
-          statCards={statCards}
-          hasAnyData={hasAnyData}
-          dailyStats={dailyStats}
-          chartMax={chartMax}
-          todayIdx={todayIdx}
-          recentActivity={recentActivity}
-          recordShortcut={recordShortcut}
-          t={t}
+        <HistoryList
+          totalCount={totalCount}
+          refreshToken={`${totalCount}-${latestId}`}
+          shortcut={shortcut}
         />
       )}
+    </Page>
+  )
+}
+
+function Stat({
+  label,
+  value,
+  unit,
+  hint,
+  srHint
+}: {
+  label: string
+  value: string
+  unit?: string
+  hint: React.ReactNode
+  srHint?: string
+}): JSX.Element {
+  return (
+    <div className="border-hairline px-5 py-4 [&:not(:first-child)]:border-s max-md:[&:nth-child(3)]:border-s-0 max-md:[&:nth-child(n+3)]:border-t">
+      <p className="section-label">{label}</p>
+      <p className="mt-2 flex items-baseline gap-1.5">
+        <span className="font-display text-[30px] leading-none text-ink tabular">{value}</span>
+        {unit && <span className="text-[12px] text-ink-muted">{unit}</span>}
+      </p>
+      <div className="mt-2 text-[11.5px] text-ink-soft">{hint}</div>
+      {srHint && <span className="sr-only">{srHint}</span>}
     </div>
   )
 }
 
-// ── Activity Tab Component ────────────────────────────────────────
+// ── History ──────────────────────────────────────────────────────
 
-interface ActivityTabProps {
-  /** Total records in the database (unfiltered) */
+interface HistoryListProps {
   totalCount: number
-  /** Changes whenever records are added/removed so the page is re-queried */
+  /** Changes whenever records are added/removed so the list is re-queried */
   refreshToken: string
-  queryRecords: (query: ActivityQuery) => Promise<ActivityPage>
-  onDelete: (id: string) => void
-  t: TFunction
+  shortcut: string
 }
 
-// Helper to render text with code blocks
-function renderTextWithCodeBlocks(text: string, t: TFunction): JSX.Element {
-  // Match code blocks: ```language\ncode\n``` or ```\ncode\n```
-  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
-  const parts: JSX.Element[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  while ((match = codeBlockRegex.exec(text)) !== null) {
-    // Add text before code block
-    if (match.index > lastIndex) {
-      const textBefore = text.slice(lastIndex, match.index)
-      parts.push(
-        <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-          {textBefore}
-        </span>
-      )
-    }
-
-    // Add code block
-    const language = match[1] || 'code'
-    const code = match[2]
-    parts.push(
-      <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden border border-theme-border/30">
-        <div className="flex items-center justify-between px-3 py-1.5 bg-theme-surface/50 border-b border-theme-border/20">
-          <div className="flex items-center gap-2">
-            <Code className="w-3 h-3 text-theme-text-muted" />
-            <span className="text-[10px] text-theme-text-muted uppercase font-medium">{language}</span>
-          </div>
-          <button
-            onClick={() => navigator.clipboard.writeText(code)}
-            className="text-[10px] text-theme-text-muted hover:text-theme-text transition-colors"
-          >
-            {t('home.copy', 'Copy')}
-          </button>
-        </div>
-        <pre className="p-3 bg-theme-surface/30 overflow-x-auto" dir="ltr">
-          <code className="text-xs text-theme-text font-mono">{code}</code>
-        </pre>
-      </div>
-    )
-
-    lastIndex = match.index + match[0].length
-  }
-
-  // Add remaining text
-  if (lastIndex < text.length) {
-    parts.push(
-      <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-        {text.slice(lastIndex)}
-      </span>
-    )
-  }
-
-  return <>{parts}</>
+interface RetryState {
+  busy: boolean
+  error?: string
 }
 
-function ActivityTab({
-  totalCount,
-  refreshToken,
-  queryRecords,
-  onDelete,
-  t
-}: ActivityTabProps): JSX.Element {
-  const [selectedRecord, setSelectedRecord] = useState<TranscriptionRecord | null>(null)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [showOriginalInput, setShowOriginalInput] = useState(true)
-  const [showLLMResult, setShowLLMResult] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
+function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): JSX.Element {
+  const { t } = useTranslation()
+  const { confirm, dialog } = useConfirmDialog()
+  const { queryRecords, patchRecord, deleteRecord } = useActivityStore()
+  const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  // Current page from the database; null until the first query resolves
-  const [page, setPage] = useState<ActivityPage | null>(null)
-  const recordsPerPage = RECORDS_PER_PAGE
+  const [limit, setLimit] = useState(PAGE_SIZE)
+  const [items, setItems] = useState<TranscriptionRecord[] | null>(null)
+  const [matching, setMatching] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [audio, setAudio] = useState<Record<string, boolean>>({})
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [retry, setRetry] = useState<Record<string, RetryState>>({})
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioUrlRef = useRef<string | null>(null)
+  const checkedRef = useRef<Set<string>>(new Set())
 
-  // Debounce search so we don't query the database on every keystroke
   useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 200)
+    const timeout = setTimeout(() => setDebouncedSearch(search.trim()), 200)
     return () => clearTimeout(timeout)
-  }, [searchQuery])
+  }, [search])
 
-  // Reset to page 1 when the search changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [debouncedSearch])
+  useEffect(() => setLimit(PAGE_SIZE), [debouncedSearch])
 
-  // Query the current page (database-side paging + search)
   useEffect(() => {
     let cancelled = false
-    queryRecords({
-      offset: (currentPage - 1) * recordsPerPage,
-      limit: recordsPerPage,
-      search: debouncedSearch || undefined
-    })
-      .then((result) => {
+    queryRecords({ offset: 0, limit, search: debouncedSearch || undefined })
+      .then((page) => {
         if (cancelled) return
-        // Deleting the last record on a page: step back a page
-        if (result.records.length === 0 && result.total > 0 && currentPage > 1) {
-          setCurrentPage(Math.max(1, Math.ceil(result.total / recordsPerPage)))
-          return
-        }
-        setPage(result)
+        setItems(page.records)
+        setMatching(page.total)
       })
       .catch(() => {
-        if (!cancelled) setPage({ records: [], total: 0 })
+        if (!cancelled) {
+          setItems([])
+          setMatching(0)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingMore(false)
       })
     return () => {
       cancelled = true
     }
-  }, [queryRecords, currentPage, debouncedSearch, recordsPerPage, refreshToken])
+  }, [queryRecords, limit, debouncedSearch, refreshToken])
 
-  // Escape closes the detail dialog
+  // Which entries still have audio: one batch per newly loaded page
   useEffect(() => {
-    if (!selectedRecord) return
-    const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setSelectedRecord(null)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [selectedRecord])
-
-  // Reset collapse states when opening a new record
-  const handleSelectRecord = (record: TranscriptionRecord) => {
-    setSelectedRecord(record)
-    setShowOriginalInput(true)
-    setShowLLMResult(true)
-  }
-
-  const handleCopy = async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopiedId(id)
-      setTimeout(() => setCopiedId(null), 2000)
-    } catch {
-      // Clipboard API failed
-    }
-  }
-
-  // Calculate pagination (filtered total comes from the database)
-  const paginatedRecords = useMemo(() => page?.records ?? [], [page])
-  const filteredTotal = page?.total ?? 0
-  const totalPages = Math.ceil(filteredTotal / recordsPerPage)
-  const startIndex = (currentPage - 1) * recordsPerPage
-  const endIndex = startIndex + recordsPerPage
-
-  // Group records by date
-  const groupedRecords = useMemo(() => {
-    const groups: { date: string; records: TranscriptionRecord[] }[] = []
-    let currentDate = ''
-
-    paginatedRecords.forEach((record) => {
-      const dateStr = formatDate(record.timestamp)
-      if (dateStr !== currentDate) {
-        currentDate = dateStr
-        groups.push({ date: dateStr, records: [record] })
-      } else {
-        groups[groups.length - 1].records.push(record)
+    if (!items) return
+    const unchecked = items.filter((r) => !checkedRef.current.has(r.id)).map((r) => r.id)
+    if (unchecked.length === 0) return
+    unchecked.forEach((id) => checkedRef.current.add(id))
+    let cancelled = false
+    let done = false
+    Promise.all(unchecked.map(async (id) => [id, await hasRecording(id)] as const)).then(
+      (pairs) => {
+        done = true
+        if (!cancelled) setAudio((prev) => ({ ...prev, ...Object.fromEntries(pairs) }))
       }
-    })
+    )
+    return () => {
+      cancelled = true
+      // Unfinished checks are retried by the next run
+      if (!done) unchecked.forEach((id) => checkedRef.current.delete(id))
+    }
+  }, [items])
 
-    return groups
-  }, [paginatedRecords])
+  const stopPlayback = useCallback(() => {
+    audioRef.current?.pause()
+    audioRef.current = null
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
+    audioUrlRef.current = null
+    setPlayingId(null)
+  }, [])
+
+  useEffect(() => stopPlayback, [stopPlayback])
+
+  const togglePlay = async (id: string): Promise<void> => {
+    if (playingId === id) {
+      stopPlayback()
+      return
+    }
+    stopPlayback()
+    try {
+      const url = await getRecordingUrl(id)
+      if (!url) {
+        setAudio((prev) => ({ ...prev, [id]: false }))
+        return
+      }
+      const el = new Audio(url)
+      audioRef.current = el
+      audioUrlRef.current = url
+      el.onended = stopPlayback
+      el.onerror = stopPlayback
+      setPlayingId(id)
+      await el.play()
+    } catch {
+      stopPlayback()
+    }
+  }
+
+  const copy = async (record: TranscriptionRecord): Promise<void> => {
+    const text = primaryText(record)
+    try {
+      await window.tapwisper.clipboard.write(text)
+    } catch {
+      await navigator.clipboard?.writeText(text).catch(() => {})
+    }
+    setCopiedId(record.id)
+    setTimeout(() => setCopiedId((c) => (c === record.id ? null : c)), 1600)
+  }
+
+  const runRetry = async (record: TranscriptionRecord): Promise<void> => {
+    setRetry((prev) => ({ ...prev, [record.id]: { busy: true } }))
+    try {
+      const result = await retranscribeRecord(record.id, record.appName)
+      const patch: Partial<TranscriptionRecord> = {
+        transcription: result.transcription,
+        rawTranscription:
+          result.rawTranscription !== result.transcription ? result.rawTranscription : null,
+        wordCount: result.transcription.split(/\s+/).filter(Boolean).length
+      }
+      patchRecord(record.id, patch)
+      setItems((prev) => prev?.map((r) => (r.id === record.id ? { ...r, ...patch } : r)) ?? prev)
+      setRetry((prev) => {
+        const next = { ...prev }
+        delete next[record.id]
+        return next
+      })
+    } catch (err) {
+      if (err instanceof Error && err.message === 'recording-missing') {
+        setAudio((prev) => ({ ...prev, [record.id]: false }))
+      }
+      setRetry((prev) => ({
+        ...prev,
+        [record.id]: { busy: false, error: retryErrorMessage(t, err) }
+      }))
+    }
+  }
+
+  const remove = async (record: TranscriptionRecord): Promise<void> => {
+    const ok = await confirm({
+      title: t('home.deleteTitle', 'Delete this entry?'),
+      message: t(
+        'home.deleteMessage',
+        'The text and its saved audio will be removed from this device.'
+      )
+    })
+    if (!ok) return
+    if (playingId === record.id) stopPlayback()
+    deleteRecord(record.id)
+  }
+
+  const groups = useMemo(() => {
+    const out: { label: string; records: TranscriptionRecord[] }[] = []
+    for (const record of items ?? []) {
+      const label = formatDate(record.timestamp)
+      if (out.length === 0 || out[out.length - 1].label !== label)
+        out.push({ label, records: [record] })
+      else out[out.length - 1].records.push(record)
+    }
+    return out
+  }, [items])
+
+  const hintParts = t(
+    'home.emptyBody',
+    'Hold {{keys}} anywhere and say something. Your dictations will collect here, newest first.',
+    {
+      keys: SLOT
+    }
+  ).split(SLOT)
 
   return (
-    <>
-      {/* Search Bar */}
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-text-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('home.searchActivity', 'Search activity...')}
-            aria-label={t('home.searchActivity', 'Search activity...')}
-            className="w-full ps-10 pe-10 py-2.5 bg-theme-card rounded-xl border border-theme-border/30 text-sm text-theme-text placeholder-theme-text-muted outline-none focus:ring-2 focus:ring-sky-accent/30 transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              aria-label={t('home.clearSearch', 'Clear search')}
-              className="absolute end-3 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+    <section className="mt-12" aria-labelledby="history-title">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex items-baseline gap-3">
+          <h2 id="history-title" className="font-display text-[24px] leading-none text-ink">
+            {t('home.historyTitle', 'History')}
+          </h2>
+          {totalCount > 0 && (
+            <span className="text-[12px] text-ink-soft tabular">
+              {t('home.activityCount', '{{count}} records', { count: totalCount })}
+            </span>
           )}
         </div>
-        {debouncedSearch && page && (
-          <p className="text-xs text-theme-text-muted mt-2" aria-live="polite">
-            {t('home.resultCount', '{{count}} results', { count: filteredTotal })}
-          </p>
+        {totalCount > 0 && (
+          <div className="relative w-72 max-w-full">
+            <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('home.searchActivity', 'Search history…')}
+              aria-label={t('home.searchActivity', 'Search history…')}
+              className="field h-9 pe-9 ps-9"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label={t('home.clearSearch', 'Clear search')}
+                className="icon-btn absolute end-1 top-1/2 h-7 w-7 -translate-y-1/2"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Loading / Empty State */}
-      {!page ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-6 h-6 border-2 border-theme-border border-t-sky-accent rounded-full animate-spin" />
+      {debouncedSearch && items && (
+        <p className="mb-3 text-[12.5px] text-ink-muted" aria-live="polite">
+          {t('home.resultCount', '{{count}} results', { count: matching })}
+        </p>
+      )}
+
+      {!items ? (
+        <div className="flex justify-center py-12 text-ink-faint">
+          <Spinner className="h-5 w-5" />
         </div>
       ) : totalCount === 0 && !debouncedSearch ? (
-        <div
-          className="bg-theme-card rounded-3xl p-8 border border-theme-border/20 text-center"
-          style={{ animation: 'slide-up 0.4s ease-out backwards' }}
-        >
-          <div className="w-12 h-12 rounded-xl bg-theme-surface/50 flex items-center justify-center mx-auto mb-4">
-            <History className="w-6 h-6 text-theme-text-muted" />
-          </div>
-          <h3 className="text-sm font-semibold text-theme-text mb-1">
-            {t('home.noActivityTitle', 'No activity yet')}
-          </h3>
-          <p className="text-xs text-theme-text-muted max-w-[240px] mx-auto">
-            {t('home.noActivityDesc', 'Your transcriptions and AI actions will appear here')}
+        <div className="relative overflow-hidden rounded-2xl border border-dashed border-hairline-strong px-8 py-12 text-center">
+          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-signal-tint text-signal">
+            <HistoryIcon className="h-5 w-5" />
+          </span>
+          <p className="font-display mt-4 text-[22px] text-ink">
+            {t('home.emptyTitle', 'Your history starts with one sentence.')}
+          </p>
+          <p className="mx-auto mt-3 max-w-[460px] text-[13.5px] leading-[2] text-ink-muted text-balance">
+            {hintParts[0]}
+            <ShortcutKeys accelerator={shortcut} size="sm" className="-translate-y-px" />
+            {hintParts[1]}
           </p>
         </div>
-      ) : paginatedRecords.length === 0 ? (
-        <div className="bg-theme-card rounded-3xl p-8 border border-theme-border/20 text-center">
-          <div className="w-12 h-12 rounded-xl bg-theme-surface/50 flex items-center justify-center mx-auto mb-4">
-            <Search className="w-6 h-6 text-theme-text-muted" />
-          </div>
-          <h3 className="text-sm font-semibold text-theme-text mb-1">
+      ) : items.length === 0 ? (
+        <div className="rounded-2xl border border-hairline px-6 py-10 text-center">
+          <p className="text-[14px] font-medium text-ink">
             {t('home.noResults', 'No results found')}
-          </h3>
-          <p className="text-xs text-theme-text-muted max-w-[240px] mx-auto">
+          </p>
+          <p className="mt-1 text-[12.5px] text-ink-muted">
             {t('home.noResultsDesc', 'Try adjusting your search query')}
           </p>
         </div>
       ) : (
-        <>
-      <div className="space-y-4">
-        {groupedRecords.map((group, groupIdx) => (
-          <div
-            key={group.date}
-            style={{ animation: `slide-up 0.4s ease-out ${groupIdx * 0.05}s backwards` }}
-          >
-            {/* Date Header */}
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-xs font-semibold text-theme-text-secondary">
-                {group.date}
-              </span>
-              <div className="flex-1 h-px bg-theme-border/20" />
-            </div>
-
-            {/* Records */}
-            <div className="space-y-2">
-              {group.records.map((record) => {
-                const hasLLM = record.type === 'voice-with-llm' && record.llmResult
-
-                return (
-                  <div
+        <div className="space-y-8">
+          {groups.map((group) => (
+            <div key={group.label}>
+              <h3 className="section-label mb-2 flex items-center gap-3">
+                {group.label}
+                <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
+              </h3>
+              <ul className="-mx-3">
+                {group.records.map((record) => (
+                  <HistoryRow
                     key={record.id}
-                    role="button"
-                    tabIndex={0}
-                    className="bg-theme-card rounded-2xl border border-theme-border/20 transition-all hover:border-theme-border/40 cursor-pointer"
-                    onClick={() => handleSelectRecord(record)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        handleSelectRecord(record)
-                      }
-                    }}
-                  >
-                    {/* Main Row */}
-                    <div className="flex items-start gap-3 p-3">
-                      {/* Icon */}
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                          hasLLM
-                            ? 'bg-purple-500/10 text-purple-400'
-                            : 'bg-red-500/10 text-recording-red'
-                        }`}
-                      >
-                        {hasLLM ? (
-                          <Sparkles className="w-4 h-4" />
-                        ) : (
-                          <Mic className="w-4 h-4" />
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] text-theme-text-muted">
-                            {formatTime(record.timestamp)}
-                          </span>
-                          {record.durationSeconds > 0 && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-theme-surface/50 rounded text-theme-text-muted">
-                              {formatDuration(record.durationSeconds)}
-                            </span>
-                          )}
-                          {record.wordCount > 0 && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-theme-surface/50 rounded text-theme-text-muted">
-                              {t('home.wordCount', '{{count}} words', { count: record.wordCount })}
-                            </span>
-                          )}
-                          {hasLLM && record.llmAction && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/10 rounded text-purple-400 font-medium">
-                              {displayActionName(t, record.llmAction)}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Transcription Preview */}
-                        {record.transcription && (
-                          <p className="text-xs text-theme-text line-clamp-2">
-                            {record.transcription}
-                          </p>
-                        )}
-
-                        {/* LLM Input Preview (when no transcription) */}
-                        {!record.transcription && record.llmInput && (
-                          <p className="text-xs text-theme-text line-clamp-2">
-                            {record.llmInput}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+                    record={record}
+                    hasAudio={audio[record.id] === true}
+                    playing={playingId === record.id}
+                    copied={copiedId === record.id}
+                    retry={retry[record.id]}
+                    onPlay={() => togglePlay(record.id)}
+                    onCopy={() => copy(record)}
+                    onRetry={() => runRetry(record)}
+                    onDelete={() => remove(record)}
+                  />
+                ))}
+              </ul>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-theme-border/20">
-          <p className="text-xs text-theme-text-muted">
-            {t('home.showingRange', 'Showing {{start}}–{{end}} of {{total}}', {
-              start: startIndex + 1,
-              end: Math.min(endIndex, filteredTotal),
-              total: filteredTotal
-            })}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              aria-label={t('home.previousPage', 'Previous page')}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="w-4 h-4 rtl-flip" />
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
-                // Show first page, last page, current page, and pages around current
-                if (
-                  pageNum === 1 ||
-                  pageNum === totalPages ||
-                  (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-                ) {
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      aria-current={currentPage === pageNum ? 'page' : undefined}
-                      className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-medium transition-all ${
-                        currentPage === pageNum
-                          ? 'bg-sky-accent text-white'
-                          : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/50'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  )
-                } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                  return (
-                    <span key={pageNum} className="text-theme-text-muted px-1">
-                      ...
-                    </span>
-                  )
-                }
-                return null
-              })}
+          {items.length < matching && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={loadingMore}
+                onClick={() => {
+                  setLoadingMore(true)
+                  setLimit((l) => l + PAGE_SIZE)
+                }}
+              >
+                {loadingMore && <Spinner className="h-3.5 w-3.5" />}
+                {t('home.loadMore', 'Show older')}
+              </button>
             </div>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              aria-label={t('home.nextPage', 'Next page')}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-4 h-4 rtl-flip" />
-            </button>
-          </div>
+          )}
         </div>
       )}
-      </>
-      )}
-
-      {/* Detail Modal */}
-      {selectedRecord && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedRecord(null)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="activity-detail-title"
-            className="bg-theme-card rounded-3xl border border-theme-border/30 max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl animate-scale-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-theme-border/20 bg-theme-surface/30">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
-                    selectedRecord.type === 'voice-with-llm'
-                      ? 'bg-purple-500/15 text-purple-400'
-                      : 'bg-red-500/15 text-recording-red'
-                  }`}
-                >
-                  {selectedRecord.type === 'voice-with-llm' ? (
-                    <Sparkles className="w-5 h-5" />
-                  ) : (
-                    <Mic className="w-5 h-5" />
-                  )}
-                </div>
-                <div>
-                  <h3 id="activity-detail-title" className="text-sm font-semibold text-theme-text">
-                    {selectedRecord.llmAction
-                      ? displayActionName(t, selectedRecord.llmAction)
-                      : t('home.voiceNote', 'Voice Note')}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-theme-text-muted">
-                      {formatDate(selectedRecord.timestamp)} • {formatTime(selectedRecord.timestamp)}
-                    </span>
-                    {selectedRecord.durationSeconds > 0 && (
-                      <span className="text-xs text-theme-text-muted">
-                        • {formatDuration(selectedRecord.durationSeconds)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedRecord(null)}
-                aria-label={t('home.close', 'Close')}
-                title={t('home.close', 'Close')}
-                autoFocus
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-theme-text-muted hover:text-theme-text hover:bg-theme-surface transition-all"
-              >
-                <X className="w-4.5 h-4.5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="overflow-y-auto max-h-[calc(80vh-180px)] p-4 space-y-3">
-              {/* Voice Transcription */}
-              {selectedRecord.transcription && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Mic className="w-3.5 h-3.5 text-recording-red" />
-                    <span className="text-xs font-medium text-theme-text-secondary uppercase tracking-wide">
-                      {t('home.transcription', 'Transcription')}
-                    </span>
-                  </div>
-                  <div className="bg-theme-surface/30 rounded-xl p-3 border border-theme-border/20">
-                    <div className="text-sm text-theme-text leading-relaxed">
-                      {renderTextWithCodeBlocks(selectedRecord.transcription, t)}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Original Input (for LLM actions) - Collapsible */}
-              {selectedRecord.llmInput && (
-                <div className="border border-sky-accent/20 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => setShowOriginalInput(!showOriginalInput)}
-                    aria-expanded={showOriginalInput}
-                    className="w-full flex items-center justify-between p-3 bg-sky-accent/8 hover:bg-sky-accent/12 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Type className="w-3.5 h-3.5 text-sky-accent" />
-                      <span className="text-xs font-medium text-sky-accent uppercase tracking-wide">
-                        {t('home.originalInput', 'Original Text')}
-                      </span>
-                    </div>
-                    {showOriginalInput ? (
-                      <ChevronUp className="w-4 h-4 text-sky-accent" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-sky-accent" />
-                    )}
-                  </button>
-                  {showOriginalInput && (
-                    <div className="p-3 border-t border-sky-accent/20 bg-sky-accent/8">
-                      <div className="text-sm text-theme-text leading-relaxed">
-                        {renderTextWithCodeBlocks(selectedRecord.llmInput, t)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* LLM Result - Collapsible */}
-              {selectedRecord.llmResult && (
-                <div className="border border-purple-500/20 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => setShowLLMResult(!showLLMResult)}
-                    aria-expanded={showLLMResult}
-                    className="w-full flex items-center justify-between p-3 bg-purple-500/8 hover:bg-purple-500/12 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                      <span className="text-xs font-medium text-purple-400 uppercase tracking-wide">
-                        {t('home.llmResult', 'AI Result')}
-                      </span>
-                    </div>
-                    {showLLMResult ? (
-                      <ChevronUp className="w-4 h-4 text-purple-400" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-purple-400" />
-                    )}
-                  </button>
-                  {showLLMResult && (
-                    <div className="p-3 border-t border-purple-500/20 bg-purple-500/8">
-                      <div className="text-sm text-theme-text leading-relaxed">
-                        {renderTextWithCodeBlocks(selectedRecord.llmResult, t)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Footer Actions */}
-            <div className="flex items-center justify-between gap-2 p-4 border-t border-theme-border/20 bg-theme-surface/30">
-              <button
-                onClick={() => {
-                  handleCopy(
-                    selectedRecord.llmResult || selectedRecord.transcription || selectedRecord.llmInput || '',
-                    selectedRecord.id
-                  )
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm text-theme-text-secondary hover:text-theme-text bg-theme-card hover:bg-theme-surface rounded-xl transition-colors border border-theme-border/30"
-              >
-                <Copy className="w-4 h-4" />
-                {copiedId === selectedRecord.id ? t('home.copied', 'Copied!') : t('home.copy', 'Copy')}
-              </button>
-              <button
-                onClick={() => {
-                  onDelete(selectedRecord.id)
-                  setSelectedRecord(null)
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/15 rounded-xl transition-colors border border-red-500/20"
-              >
-                <Trash2 className="w-4 h-4" />
-                {t('home.delete', 'Delete')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+      {dialog}
+    </section>
   )
 }
 
-// ── Dashboard Tab Component ────────────────────────────────────────
+// ── Row ──────────────────────────────────────────────────────────
 
-interface DashboardTabProps {
-  statCards: {
-    label: string
-    value: string
-    subtext: string
-    icon: JSX.Element
-    color: string
-    gradient: string
-  }[]
-  hasAnyData: boolean
-  dailyStats: { voiceSeconds: number; timeSavedSeconds: number }[] | undefined
-  chartMax: number
-  todayIdx: number
-  recentActivity: ActivityEntry[] | undefined
-  /** Configured record shortcut accelerator, e.g. "Option+Space" */
-  recordShortcut: string
-  t: TFunction
+interface HistoryRowProps {
+  record: TranscriptionRecord
+  hasAudio: boolean
+  playing: boolean
+  copied: boolean
+  retry?: RetryState
+  onPlay: () => void
+  onCopy: () => void
+  onRetry: () => void
+  onDelete: () => void
 }
 
-function DashboardTab({
-  statCards,
-  hasAnyData,
-  dailyStats,
-  chartMax,
-  todayIdx,
-  recentActivity,
-  recordShortcut,
-  t
-}: DashboardTabProps): JSX.Element {
-  const { i18n } = useTranslation()
-  // Weekday names follow the UI language (Monday first, matching dailyStats)
-  const dayLabels = useMemo(() => weekdayLabelsMondayFirst(), [i18n.language])
-  const shortcutParts = formatShortcutParts(recordShortcut)
-  const recordKeys = joinShortcutParts(shortcutParts)
-  // Hold the shortcut and tap its main key again to open the pinned panel
-  const mainKey = shortcutParts[shortcutParts.length - 1] ?? ''
-  const pinnedKeys = IS_MAC ? `${recordKeys} ${mainKey}` : `${recordKeys}+${mainKey}`
+function HistoryRow({
+  record,
+  hasAudio,
+  playing,
+  copied,
+  retry,
+  onPlay,
+  onCopy,
+  onRetry,
+  onDelete
+}: HistoryRowProps): JSX.Element {
+  const { t } = useTranslation()
+  const [expanded, setExpanded] = useState(false)
+  const [showRaw, setShowRaw] = useState(false)
+  const failed = isFailed(record)
+  const isAi = record.type === 'voice-with-llm'
+  const text = primaryText(record)
+  const long = text.length > LONG_TEXT || text.split('\n').length > 4
+  const edited = !!record.rawTranscription && record.rawTranscription !== record.transcription
 
   return (
-    <>
-
-      {/* ── Stat Cards Grid ────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {statCards.map((card, i) => (
-          <div
-            key={card.label}
-            className={`
-              relative overflow-hidden rounded-3xl p-4 border border-theme-border/20
-              bg-gradient-to-br ${card.gradient}
-              bg-theme-card
-              transition-all duration-300 hover:border-theme-border/40 hover:shadow-sm
-              group
-            `}
-            style={{
-              // Single shorthand — a later `animation` would reset animationDelay
-              animation: `slide-up 0.4s ease-out ${i * 60}ms backwards`
-            }}
-          >
-            {/* Icon badge */}
-            <div className="flex items-center justify-between mb-3">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                style={{
-                  backgroundColor: `${card.color}15`,
-                  color: card.color
-                }}
-              >
-                {card.icon}
-              </div>
-              {hasAnyData && (
-                <ArrowUpRight
-                  className="w-3.5 h-3.5 text-theme-text-muted opacity-0 group-hover:opacity-100 transition-opacity"
-                />
-              )}
-            </div>
-
-            {/* Value */}
-            <p className="text-2xl font-bold text-theme-text tracking-tight leading-none mb-1">
-              {card.value}
-            </p>
-
-            {/* Label + subtext */}
-            <p className="text-xs font-medium text-theme-text-secondary mb-0.5">
-              {card.label}
-            </p>
-            <p className="text-[10px] text-theme-text-muted leading-tight">
-              {card.subtext}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Weekly Activity Chart ──────────────────────────── */}
-      <div
-        className="bg-theme-card rounded-3xl p-5 border border-theme-border/20 mb-5"
-        style={{ animation: 'slide-up 0.4s ease-out 0.25s backwards' }}
+    <li className="group relative flex gap-4 rounded-xl px-3 py-3 transition-colors duration-200 hover:bg-panel focus-within:bg-panel">
+      <time
+        dateTime={new Date(record.timestamp).toISOString()}
+        className="w-[60px] shrink-0 pt-[3px] text-[12px] text-ink-soft tabular"
       >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-sky-accent" />
-            <h2 className="text-sm font-semibold text-theme-text">
-              {t('home.thisWeek')}
-            </h2>
-          </div>
-          <div className="flex items-center gap-3 text-[10px] text-theme-text-muted">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-sky-accent inline-block" />
-              {t('home.voiceLabel', 'Voice')}
+        {formatTime(record.timestamp)}
+      </time>
+
+      <div className="min-w-0 flex-1">
+        {isAi && (
+          <p className="mb-1.5 flex min-w-0 items-center gap-2 text-[12px] text-ink-muted">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-signal-tint px-1.5 py-0.5 text-[11px] font-medium text-signal">
+              <Sparkles className="h-3 w-3" />
+              {record.llmAction ? displayActionName(t, record.llmAction) : t('home.aiAction', 'AI')}
             </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-green-accent inline-block" />
-              {t('home.timeSavedLabel', 'Time Saved')}
-            </span>
-          </div>
-        </div>
+            {record.transcription && (
+              <span className="truncate italic" dir="auto">
+                {t('common.quoted', '“{{text}}”', { text: record.transcription })}
+              </span>
+            )}
+          </p>
+        )}
 
-        {/* Chart */}
-        <div className="flex items-end gap-1.5 h-28">
-          {dayLabels.map((day, idx) => {
-            const stats = dailyStats?.[idx] || { voiceSeconds: 0, timeSavedSeconds: 0 }
-            const voicePct = (stats.voiceSeconds / chartMax) * 100
-            const savedPct = (stats.timeSavedSeconds / chartMax) * 100
-            const totalPct = Math.max(voicePct + savedPct, 0)
-            const isToday = idx === todayIdx
-
-            return (
-              <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group/bar">
-                <div className="w-full flex flex-col justify-end h-20 relative">
-                  {/* Background track */}
-                  <div className="absolute inset-0 bg-theme-surface/30 rounded-lg" />
-
-                  {/* Stacked bars */}
-                  <div
-                    className="relative w-full rounded-lg overflow-hidden transition-all duration-500 ease-out"
-                    style={{ height: `${Math.max(totalPct, hasAnyData ? 4 : 0)}%` }}
-                  >
-                    {/* Time saved portion (bottom) */}
-                    <div
-                      className="w-full bg-green-accent/60 transition-all duration-500"
-                      style={{ height: `${savedPct > 0 ? (savedPct / (totalPct || 1)) * 100 : 0}%` }}
-                    />
-                    {/* Voice portion (top) */}
-                    <div
-                      className="w-full bg-sky-accent transition-all duration-500"
-                      style={{ height: `${voicePct > 0 ? (voicePct / (totalPct || 1)) * 100 : 0}%` }}
-                    />
-                  </div>
-
-                  {/* Tooltip on hover */}
-                  {(stats.voiceSeconds > 0 || stats.timeSavedSeconds > 0) && (
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-opacity pointer-events-none z-10">
-                      <div className="bg-theme-text text-theme-bg text-[9px] font-medium px-2 py-1 rounded-md whitespace-nowrap">
-                        {t('home.voiceTooltip', '{{duration}} voice', {
-                          duration: formatDuration(stats.voiceSeconds)
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Day label */}
-                <span
-                  className={`text-[10px] leading-none transition-colors ${
-                    isToday
-                      ? 'text-sky-accent font-semibold'
-                      : 'text-theme-text-muted'
-                  }`}
-                >
-                  {day}
-                </span>
-
-                {/* Today indicator dot */}
-                {isToday && (
-                  <div className="w-1 h-1 rounded-full bg-sky-accent -mt-1" />
+        {failed ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="flex items-center gap-2 text-[14px] font-medium text-danger">
+              <AlertTriangle className="h-4 w-4" />
+              {t('home.failedTitle', 'Couldn’t transcribe')}
+            </p>
+            {hasAudio ? (
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={onRetry}
+                disabled={retry?.busy}
+              >
+                {retry?.busy ? (
+                  <Spinner className="h-3 w-3" />
+                ) : (
+                  <RotateCw className="h-3.5 w-3.5" />
                 )}
-              </div>
-            )
-          })}
-        </div>
+                {retry?.busy ? t('home.retrying', 'Transcribing…') : t('common.retry', 'Retry')}
+              </button>
+            ) : (
+              <span className="text-[12.5px] text-ink-muted">
+                {t('home.failedNoAudio', 'The audio wasn’t kept.')}
+              </span>
+            )}
+          </div>
+        ) : (
+          <p
+            dir="auto"
+            className={`whitespace-pre-wrap break-words text-left rtl:text-right text-[14.5px] leading-relaxed text-ink text-pretty ${
+              long && !expanded ? 'line-clamp-3' : ''
+            }`}
+          >
+            {text}
+          </p>
+        )}
 
-        {/* Empty state */}
-        {!hasAnyData && (
-          <div className="text-center mt-3">
-            <p className="text-xs text-theme-text-muted">
-              {t('home.chartEmpty', 'Start recording to see your weekly activity')}
+        {/* Meta */}
+        {(record.appName || edited || long || isAi) && !failed && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {record.appName && (
+              <span
+                className="chip"
+                title={t('home.appChip', 'Dictated into {{app}}', { app: record.appName })}
+              >
+                {record.appName}
+              </span>
+            )}
+            {edited && (
+              <button
+                type="button"
+                onClick={() => setShowRaw((v) => !v)}
+                aria-expanded={showRaw}
+                className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-ink-soft transition-colors duration-200 hover:bg-hover hover:text-ink"
+              >
+                <WandSparkles className="h-3 w-3 text-signal" />
+                {t('home.edited', 'Polished')}
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform duration-200 ${showRaw ? 'rotate-180' : ''}`}
+                />
+              </button>
+            )}
+            {isAi && record.llmInput && (
+              <button
+                type="button"
+                onClick={() => setShowRaw((v) => !v)}
+                aria-expanded={showRaw}
+                className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-ink-soft transition-colors duration-200 hover:bg-hover hover:text-ink"
+              >
+                {t('home.originalInput', 'Original text')}
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform duration-200 ${showRaw ? 'rotate-180' : ''}`}
+                />
+              </button>
+            )}
+            {long && (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+                className="inline-flex h-6 items-center rounded-md px-1.5 text-[11px] font-medium text-signal hover:bg-signal-tint"
+              >
+                {expanded ? t('home.showLess', 'Show less') : t('home.showMore', 'Show more')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {showRaw && (
+          <div className="mt-2 rounded-lg border border-hairline bg-sunken/60 px-3 py-2.5 dark:bg-sunken">
+            <p className="section-label mb-1">
+              {isAi
+                ? t('home.originalInput', 'Original text')
+                : t('home.rawTranscript', 'As heard')}
+            </p>
+            <p
+              dir="auto"
+              className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-muted"
+            >
+              {isAi ? record.llmInput : record.rawTranscription}
             </p>
           </div>
         )}
+
+        {retry?.error && (
+          <p role="alert" className="mt-2 text-[12.5px] text-danger">
+            {retry.error}
+          </p>
+        )}
       </div>
 
-      {/* ── Recent Activity ────────────────────────────────── */}
-      {recentActivity && recentActivity.length > 0 && (
-        <div
-          className="bg-theme-card rounded-3xl p-5 border border-theme-border/20 mb-5"
-          style={{ animation: 'slide-up 0.4s ease-out 0.35s backwards' }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <Timer className="w-4 h-4 text-theme-text-secondary" />
-            <h2 className="text-sm font-semibold text-theme-text">
-              {t('home.recentActivity', 'Recent Activity')}
-            </h2>
-          </div>
-
-          <div className="space-y-1">
-            {recentActivity.slice(0, 5).map((entry: ActivityEntry) => (
-              <div
-                key={entry.id}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-theme-surface/30 transition-colors"
-              >
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                    entry.type === 'voice'
-                      ? 'bg-red-500/10 text-recording-red'
-                      : 'bg-sky-accent/10 text-sky-accent'
-                  }`}
-                >
-                  {entry.type === 'voice' ? (
-                    <Mic className="w-3.5 h-3.5" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-theme-text truncate">
-                    {activityDescription(t, entry)}
-                  </p>
-                  <p className="text-[10px] text-theme-text-muted">{formatTimeAgo(entry.timestamp)}</p>
-                </div>
-
-                {activityValue(t, entry) && (
-                  <span className="text-[10px] font-medium text-theme-text-secondary bg-theme-surface/50 px-2 py-0.5 rounded-full shrink-0">
-                    {activityValue(t, entry)}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Quick Start (shown when no data, or always at bottom) ── */}
+      {/* Actions: visible on hover and keyboard focus */}
       <div
-        className={`rounded-3xl p-5 border border-theme-border/20 ${
-          hasAnyData ? 'bg-theme-card' : 'bg-gradient-to-br from-sky-accent/5 to-transparent bg-theme-card'
+        className={`flex shrink-0 items-start gap-0.5 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 ${
+          playing ? 'opacity-100' : 'opacity-0'
         }`}
-        style={{ animation: 'slide-up 0.4s ease-out 0.45s backwards' }}
       >
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles className={`w-4 h-4 ${hasAnyData ? 'text-theme-text-secondary' : 'text-sky-accent'}`} />
-          <h2 className="text-sm font-semibold text-theme-text">
-            {t('home.quickStart')}
-          </h2>
-        </div>
-
-        <div className="space-y-0.5">
-          {[
-            {
-              keys: recordKeys,
-              label: t('shortcuts.holdToRecord')
-            },
-            {
-              keys: pinnedKeys,
-              label: t('shortcuts.openPinnedPanel')
-            },
-            {
-              keys: 'Esc',
-              label: t('shortcuts.dismiss')
+        {hasAudio && (
+          <button
+            type="button"
+            className={`icon-btn ${playing ? '!text-signal' : ''}`}
+            onClick={onPlay}
+            aria-label={
+              playing ? t('home.pause', 'Stop playback') : t('home.play', 'Play recording')
             }
-          ].map((shortcut) => (
-            <div
-              key={shortcut.keys}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-theme-surface/30 transition-colors"
-            >
-              <kbd className="px-2 py-1 bg-theme-surface/60 rounded-lg text-[10px] text-theme-text-secondary font-mono min-w-[80px] text-center">
-                {shortcut.keys}
-              </kbd>
-              <span className="text-xs text-theme-text-secondary">{shortcut.label}</span>
-            </div>
-          ))}
-        </div>
+            title={playing ? t('home.pause', 'Stop playback') : t('home.play', 'Play recording')}
+          >
+            {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </button>
+        )}
+        {!failed && (
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onCopy}
+            aria-label={t('home.copy', 'Copy')}
+            title={copied ? t('home.copied', 'Copied!') : t('home.copy', 'Copy')}
+          >
+            {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+          </button>
+        )}
+        {hasAudio && !failed && (
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onRetry}
+            disabled={retry?.busy}
+            aria-label={t('home.retranscribe', 'Transcribe again')}
+            title={t('home.retranscribe', 'Transcribe again')}
+          >
+            {retry?.busy ? <Spinner className="h-3.5 w-3.5" /> : <RotateCw className="h-4 w-4" />}
+          </button>
+        )}
+        <button
+          type="button"
+          className="icon-btn hover:!text-danger"
+          onClick={onDelete}
+          aria-label={t('home.delete', 'Delete')}
+          title={t('home.delete', 'Delete')}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
       </div>
-    </>
+      {copied && (
+        <span role="status" className="sr-only">
+          {t('home.copied', 'Copied!')}
+        </span>
+      )}
+    </li>
   )
 }
