@@ -1206,9 +1206,9 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
           <Row
             title={t('settings.contactDesc', 'Questions, bugs or ideas')}
             control={
-              <a href="mailto:support@tapwisper.ai" className="btn-ghost btn-sm">
+              <a href="mailto:zeyadelosherey@gmail.com" className="btn-ghost btn-sm">
                 <Mail className="h-3.5 w-3.5" />
-                support@tapwisper.ai
+                zeyadelosherey@gmail.com
               </a>
             }
           />
