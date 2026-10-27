@@ -35,7 +35,8 @@ export async function summarizeMeeting(meetingId: string): Promise<Meeting | nul
     })
   } catch (err) {
     await window.tapwisper.meetings.update(meetingId, {
-      status: previousStatus === 'recording' || previousStatus === 'processing' ? 'done' : previousStatus
+      status:
+        previousStatus === 'recording' || previousStatus === 'processing' ? 'done' : previousStatus
     })
     throw err
   }

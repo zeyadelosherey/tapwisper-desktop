@@ -25,7 +25,10 @@ interface Rule {
 
 const RULES: Rule[] = [
   { app: 'Zoom', owner: /zoom/i, title: /zoom meeting|zoom webinar|^meeting$/i },
-  { app: 'Google Meet', title: /^meet\s*[-–—]\s*[a-z]{3}-[a-z]{4}-[a-z]{3}|google meet|meet\.google\.com/i },
+  {
+    app: 'Google Meet',
+    title: /^meet\s*[-–—]\s*[a-z]{3}-[a-z]{4}-[a-z]{3}|google meet|meet\.google\.com/i
+  },
   { app: 'Microsoft Teams', owner: /teams/i, title: /meeting|call|\| microsoft teams.*\(.*\)/i },
   { app: 'Slack huddle', owner: /slack/i, title: /huddle/i },
   { app: 'Webex', owner: /webex/i, title: /meeting|webex/i },

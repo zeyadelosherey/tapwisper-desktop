@@ -43,7 +43,14 @@ export interface MeetingSegment {
 export type MeetingUpdate = Partial<
   Pick<
     Meeting,
-    'title' | 'endedAt' | 'durationSeconds' | 'status' | 'appName' | 'notes' | 'summary' | 'speakerNames'
+    | 'title'
+    | 'endedAt'
+    | 'durationSeconds'
+    | 'status'
+    | 'appName'
+    | 'notes'
+    | 'summary'
+    | 'speakerNames'
   >
 >
 
@@ -94,7 +101,9 @@ function countWords(text: string): number {
   return text.split(/\s+/).filter(Boolean).length
 }
 
-export function createMeeting(meeting: Pick<Meeting, 'id' | 'startedAt'> & { appName?: string | null }): Meeting {
+export function createMeeting(
+  meeting: Pick<Meeting, 'id' | 'startedAt'> & { appName?: string | null }
+): Meeting {
   getDatabase()
     .prepare('INSERT INTO meetings (id, startedAt, appName, status) VALUES (?, ?, ?, ?)')
     .run(meeting.id, meeting.startedAt, meeting.appName ?? null, 'recording')
@@ -119,7 +128,9 @@ export function listMeetings(query: { search?: string; limit?: number; offset?: 
   const search = query.search?.trim()
   if (!search) {
     const meetings = (
-      db.prepare('SELECT * FROM meetings ORDER BY startedAt DESC LIMIT ? OFFSET ?').all(limit, offset) as MeetingRow[]
+      db
+        .prepare('SELECT * FROM meetings ORDER BY startedAt DESC LIMIT ? OFFSET ?')
+        .all(limit, offset) as MeetingRow[]
     ).map(fromRow)
     const total = (db.prepare('SELECT COUNT(*) AS n FROM meetings').get() as { n: number }).n
     return { meetings, total }
@@ -129,10 +140,14 @@ export function listMeetings(query: { search?: string; limit?: number; offset?: 
     OR EXISTS (SELECT 1 FROM meeting_segments s WHERE s.meetingId = m.id AND s.text LIKE @q ESCAPE '\\')`
   const meetings = (
     db
-      .prepare(`SELECT m.* FROM meetings m ${where} ORDER BY m.startedAt DESC LIMIT @limit OFFSET @offset`)
+      .prepare(
+        `SELECT m.* FROM meetings m ${where} ORDER BY m.startedAt DESC LIMIT @limit OFFSET @offset`
+      )
       .all({ q: like, limit, offset }) as MeetingRow[]
   ).map(fromRow)
-  const total = (db.prepare(`SELECT COUNT(*) AS n FROM meetings m ${where}`).get({ q: like }) as { n: number }).n
+  const total = (
+    db.prepare(`SELECT COUNT(*) AS n FROM meetings m ${where}`).get({ q: like }) as { n: number }
+  ).n
   return { meetings, total }
 }
 
@@ -169,7 +184,14 @@ export function addSegment(segment: MeetingSegment): void {
   db.transaction(() => {
     db.prepare(
       'INSERT OR REPLACE INTO meeting_segments (id, meetingId, source, startMs, endMs, text) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(segment.id, segment.meetingId, segment.source, segment.startMs, segment.endMs, segment.text)
+    ).run(
+      segment.id,
+      segment.meetingId,
+      segment.source,
+      segment.startMs,
+      segment.endMs,
+      segment.text
+    )
     db.prepare('UPDATE meetings SET wordCount = wordCount + ? WHERE id = ?').run(
       countWords(segment.text),
       segment.meetingId
@@ -186,6 +208,8 @@ export function getSegments(meetingId: string): MeetingSegment[] {
 /** Meetings left 'recording' by a crash or force-quit become 'interrupted' */
 export function recoverInterruptedMeetings(): void {
   getDatabase()
-    .prepare("UPDATE meetings SET status = 'interrupted', endedAt = COALESCE(endedAt, startedAt + CAST(durationSeconds * 1000 AS INTEGER)) WHERE status IN ('recording', 'processing')")
+    .prepare(
+      "UPDATE meetings SET status = 'interrupted', endedAt = COALESCE(endedAt, startedAt + CAST(durationSeconds * 1000 AS INTEGER)) WHERE status IN ('recording', 'processing')"
+    )
     .run()
 }

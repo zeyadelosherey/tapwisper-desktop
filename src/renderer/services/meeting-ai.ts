@@ -238,7 +238,8 @@ export function meetingToMarkdown(meeting: {
     `# ${meeting.title || meeting.labels.untitled}`,
     `${date} · ${minutes} min${meeting.appName ? ` · ${meeting.appName}` : ''}`
   ]
-  if (meeting.summary.trim()) parts.push(`## ${meeting.labels.summary}\n\n${meeting.summary.trim()}`)
+  if (meeting.summary.trim())
+    parts.push(`## ${meeting.labels.summary}\n\n${meeting.summary.trim()}`)
   if (meeting.notes.trim()) parts.push(`## ${meeting.labels.notes}\n\n${meeting.notes.trim()}`)
   const transcript = transcriptToText(meeting.segments, meeting.speakerNames)
   if (transcript) parts.push(`## ${meeting.labels.transcript}\n\n${transcript}`)
