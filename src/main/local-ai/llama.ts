@@ -31,7 +31,10 @@ export function llamaLaunch(o: RuntimeOptions): SidecarLaunch {
     args: (port) => [
       '-m',
       o.modelFile,
-      ...(o.mmprojFile ? ['--mmproj', o.mmprojFile] : []),
+      // The projector goes to the GPU unless told otherwise, even with -ngl 0
+      ...(o.mmprojFile
+        ? ['--mmproj', o.mmprojFile, ...(o.useGpu ? [] : ['--no-mmproj-offload'])]
+        : []),
       '--host',
       '127.0.0.1',
       '--port',
