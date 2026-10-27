@@ -28,7 +28,8 @@ export async function processWithClaude(
     },
     body: JSON.stringify({
       model: modelId,
-      max_tokens: 2048,
+      max_tokens: request.maxTokens ?? 2048,
+      ...(request.temperature !== undefined && { temperature: request.temperature }),
       ...(request.systemInstruction && { system: request.systemInstruction }),
       messages: [
         {

@@ -89,7 +89,9 @@ export async function smartFormat(
       processText({
         prompt: 'Clean up this dictated text.',
         text,
-        systemInstruction: systemPrompt(tone)
+        systemInstruction: systemPrompt(tone),
+        // Faithful rewriting, not creative writing
+        temperature: 0.2
       }),
       timeout
     ])

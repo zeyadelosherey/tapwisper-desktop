@@ -65,6 +65,14 @@ export interface AppConfig {
   /** Keep recent dictation audio so history entries can be replayed / re-transcribed */
   keepRecordings: boolean
 
+  // Notetaker (meeting notes)
+  /** Offer to take notes when a call app (Zoom, Meet, Teams…) is in the foreground */
+  recognizeMeetings: boolean
+  /** Record the meeting's audio (other participants), not only the microphone */
+  captureMeetingAudio: boolean
+  /** Generate the summary automatically when a meeting ends */
+  autoSummarizeMeetings: boolean
+
   // Smart Formatting (LLM clean-up pass after transcription)
   smartFormatting: boolean
   /** Tone per app category, used by Smart Formatting */
@@ -331,6 +339,10 @@ const defaultConfig: AppConfig = {
   keepMicWarm: false,
   microphoneDeviceId: '',
   keepRecordings: true,
+
+  recognizeMeetings: true,
+  captureMeetingAudio: true,
+  autoSummarizeMeetings: true,
 
   smartFormatting: false,
   writingStyles: { messages: 'casual', work: 'casual', email: 'formal', other: 'formal' },

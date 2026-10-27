@@ -38,6 +38,48 @@ export interface ActiveAppInfo {
   title?: string
 }
 
+// ── Notetaker (meeting notes) ─────────────────────────────────────
+
+export type MeetingStatus = 'recording' | 'processing' | 'done' | 'interrupted'
+/** 'you' = the user's microphone, 'others' = meeting (system) audio */
+export type SegmentSource = 'you' | 'others'
+
+export interface MeetingDTO {
+  id: string
+  title: string
+  startedAt: number
+  endedAt: number | null
+  durationSeconds: number
+  status: MeetingStatus
+  appName: string | null
+  notes: string
+  summary: string
+  speakerNames: Partial<Record<SegmentSource, string>>
+  wordCount: number
+}
+
+export interface MeetingSegmentDTO {
+  id: string
+  meetingId: string
+  source: SegmentSource
+  startMs: number
+  endMs: number
+  text: string
+}
+
+export type MeetingUpdateDTO = Partial<
+  Pick<
+    MeetingDTO,
+    'title' | 'endedAt' | 'durationSeconds' | 'status' | 'appName' | 'notes' | 'summary' | 'speakerNames'
+  >
+>
+
+export interface MeetingRecorderState {
+  meetingId: string | null
+  status: 'idle' | 'recording' | 'paused'
+  appName: string | null
+}
+
 export interface ActivityQueryParams {
   offset?: number
   limit?: number
@@ -201,6 +243,54 @@ const api = {
       ipcRenderer.invoke('recordings:has-many', ids),
     delete: (id: string): Promise<void> => ipcRenderer.invoke('recordings:delete', id),
     clear: (): Promise<void> => ipcRenderer.invoke('recordings:clear')
+  },
+
+  // ── Notetaker (meeting notes) ───────────────────────────────────
+  meetings: {
+    create: (meeting: { id: string; startedAt: number; appName?: string | null }): Promise<MeetingDTO> =>
+      ipcRenderer.invoke('meetings:create', meeting),
+    get: (id: string): Promise<MeetingDTO | null> => ipcRenderer.invoke('meetings:get', id),
+    /** Newest first; search covers title, notes, summary and transcript */
+    list: (query?: {
+      search?: string
+      limit?: number
+      offset?: number
+    }): Promise<{ meetings: MeetingDTO[]; total: number }> =>
+      ipcRenderer.invoke('meetings:list', query),
+    /** Broadcasts `meetings:changed` (the updated meeting) to every window */
+    update: (id: string, update: MeetingUpdateDTO): Promise<MeetingDTO | null> =>
+      ipcRenderer.invoke('meetings:update', id, update),
+    /** Broadcasts `meetings:changed` with `{ id, deleted: true }` */
+    delete: (id: string): Promise<void> => ipcRenderer.invoke('meetings:delete', id),
+    /** Broadcasts `meetings:segment` (the segment) to every window */
+    addSegment: (segment: MeetingSegmentDTO): Promise<void> =>
+      ipcRenderer.invoke('meetings:add-segment', segment),
+    segments: (meetingId: string): Promise<MeetingSegmentDTO[]> =>
+      ipcRenderer.invoke('meetings:segments', meetingId),
+    /** Reported by the notepad's recorder; broadcast as `meeting:state` */
+    setState: (state: MeetingRecorderState): Promise<void> =>
+      ipcRenderer.invoke('meetings:set-state', state),
+    getState: (): Promise<MeetingRecorderState> => ipcRenderer.invoke('meetings:get-state'),
+    /** Open the notepad and start recording (notepad receives `notepad:request` {start}) */
+    start: (appName?: string): Promise<void> => ipcRenderer.invoke('meetings:start', appName),
+    /** Ask the notepad to stop (notepad receives `notepad:stop`) */
+    stop: (): Promise<void> => ipcRenderer.invoke('meetings:stop'),
+    /** Show the notepad, optionally on a meeting (notepad receives `notepad:request` {meetingId}) */
+    openNotepad: (meetingId?: string): Promise<void> =>
+      ipcRenderer.invoke('meetings:open-notepad', meetingId),
+    hideNotepad: (): Promise<void> => ipcRenderer.invoke('meetings:hide-notepad'),
+    /** reason: 'macos-too-old' | 'permission-needed' | 'linux-use-monitor' */
+    systemAudioSupport: (): Promise<{ supported: boolean; reason?: string }> =>
+      ipcRenderer.invoke('meetings:system-audio-support'),
+    /** Save dialog → writes the Markdown file; resolves { saved: false } if cancelled */
+    exportMarkdown: (
+      suggestedName: string,
+      content: string
+    ): Promise<{ saved: boolean; filePath?: string }> =>
+      ipcRenderer.invoke('meetings:export-markdown', suggestedName, content),
+    /** Re-read the recognizeMeetings setting and start/stop detection */
+    applyDetectionSetting: (): Promise<void> =>
+      ipcRenderer.invoke('meetings:apply-detection-setting')
   },
 
   // ── Context ─────────────────────────────────────────────────────

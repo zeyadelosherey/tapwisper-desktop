@@ -10,6 +10,21 @@ import { ClipboardManager } from './clipboard'
 import { initDatabase, closeDatabase } from './database'
 import { runMigrations } from './migrate-data'
 import { cleanupAllAudio } from './audio'
+import {
+  registerNotetaker,
+  startMeetingNotes,
+  stopMeetingNotes,
+  openNotepad,
+  getMeetingState,
+  type MeetingState
+} from './notetaker'
+
+// macOS: system-audio loopback for meeting capture (ScreenCaptureKit).
+// Unknown feature names are ignored by Chromium, so this is safe everywhere.
+app.commandLine.appendSwitch(
+  'enable-features',
+  'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride'
+)
 
 // ── Single Instance Lock ──────────────────────────────────────────
 // Prevent multiple instances of the app from running simultaneously.
@@ -69,6 +84,18 @@ function createTray(): void {
   tray = new Tray(trayIcon)
   tray.setToolTip('TapWisper - Voice Dictation with AI')
 
+  updateTrayMenu(getMeetingState())
+
+  // Single click on tray icon opens the main window
+  tray.on('click', () => {
+    windowManager?.showMainWindow()
+  })
+}
+
+/** Rebuild the tray menu (it reflects whether a meeting is being recorded) */
+function updateTrayMenu(meeting: MeetingState): void {
+  if (!tray) return
+  const recording = meeting.status !== 'idle'
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Open TapWisper',
@@ -82,6 +109,22 @@ function createTray(): void {
         windowManager?.showPinnedPanel()
       }
     },
+    { type: 'separator' },
+    recording
+      ? {
+          label: meeting.status === 'paused' ? 'Meeting notes (paused)' : 'Meeting notes (recording)',
+          enabled: false
+        }
+      : {
+          label: 'Start Meeting Notes',
+          click: (): void => startMeetingNotes()
+        },
+    ...(recording
+      ? [
+          { label: 'Show Notepad', click: (): void => openNotepad(meeting.meetingId ?? undefined) },
+          { label: 'Stop Meeting Notes', click: (): void => stopMeetingNotes() }
+        ]
+      : []),
     { type: 'separator' },
     {
       label: 'Settings',
@@ -99,11 +142,9 @@ function createTray(): void {
   ])
 
   tray.setContextMenu(contextMenu)
-
-  // Single click on tray icon opens the main window
-  tray.on('click', () => {
-    windowManager?.showMainWindow()
-  })
+  tray.setToolTip(
+    recording ? 'TapWisper — recording meeting notes' : 'TapWisper - Voice Dictation with AI'
+  )
 }
 
 function initialize(): void {
@@ -128,6 +169,7 @@ function initialize(): void {
 
   // Register IPC handlers
   registerIpcHandlers(windowManager, clipboardManager)
+  registerNotetaker(windowManager, updateTrayMenu)
 
   // Register global shortcuts (deferred on macOS if accessibility isn't granted yet)
   try {
@@ -168,6 +210,12 @@ app.whenReady().then(() => {
       windowManager?.createAllWindows()
     }
   })
+})
+
+// Windows normally hide on close (the app lives in the tray); let them
+// close for real when the user quits, otherwise the quit is cancelled.
+app.on('before-quit', () => {
+  if (windowManager) windowManager.quitting = true
 })
 
 app.on('will-quit', () => {

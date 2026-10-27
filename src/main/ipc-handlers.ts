@@ -25,6 +25,7 @@ import {
   clearRecordings
 } from './recordings'
 import { getActiveApp } from './app-context'
+import { applyMeetingDetectionSetting } from './notetaker'
 import {
   executeWebSearch,
   executeTerminal,
@@ -277,6 +278,8 @@ export function registerIpcHandlers(
 
   ipcMain.handle('store:set', (_e: IpcMainInvokeEvent, key: string, value: unknown) => {
     setConfigValue(key, value)
+
+    if (key === 'recognizeMeetings') applyMeetingDetectionSetting()
 
     if (key === 'theme') {
       applyNativeTheme()

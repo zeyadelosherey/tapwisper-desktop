@@ -11,7 +11,13 @@ import path from 'path'
 import { is } from '@electron-toolkit/utils'
 import { getStore } from './store'
 
-export type WindowType = 'main' | 'recordingPill' | 'pinnedPanel' | 'commandPopup' | 'aiPanel'
+export type WindowType =
+  | 'main'
+  | 'recordingPill'
+  | 'pinnedPanel'
+  | 'commandPopup'
+  | 'aiPanel'
+  | 'notepad'
 
 type ThemePreference = 'system' | 'dark' | 'light'
 
@@ -96,6 +102,9 @@ function topCenteredBounds(workArea: Rectangle, size: Size): Rectangle {
     height: size.height
   }
 }
+
+/** Meeting notepad default size */
+const NOTEPAD_SIZE = { width: 400, height: 640 }
 
 function centeredBounds(workArea: Rectangle, size: Size): Rectangle {
   const width = Math.min(size.width, workArea.width)
@@ -195,7 +204,8 @@ export class WindowManager {
     })
 
     mainWindow.on('close', (e) => {
-      // Hide instead of close (keep in tray)
+      // Hide instead of close (keep in tray) — unless the app is quitting
+      if (this.quitting) return
       e.preventDefault()
       mainWindow.hide()
     })
@@ -330,6 +340,80 @@ export class WindowManager {
     this.windows.set('aiPanel', aiPanel)
     return aiPanel
   }
+
+  // ── Meeting notepad (Notetaker) ───────────────────────────────
+
+  /**
+   * Floating notepad shown during a meeting. It records in its own renderer,
+   * so closing it only hides it — recording continues until Stop is pressed.
+   */
+  private ensureNotepad(): BrowserWindow {
+    let notepad = this.windows.get('notepad')
+    if (notepad && !notepad.isDestroyed()) return notepad
+
+    const area = getCursorWorkArea()
+    const width = Math.min(NOTEPAD_SIZE.width, area.width)
+    const height = Math.min(NOTEPAD_SIZE.height, area.height - 32)
+    const colors = getThemeColors()
+    notepad = new BrowserWindow({
+      x: area.x + area.width - width - 16,
+      y: area.y + Math.round((area.height - height) / 2),
+      width,
+      height,
+      minWidth: 340,
+      minHeight: 420,
+      show: false,
+      title: 'TapWisper Notes',
+      alwaysOnTop: true,
+      resizable: true,
+      fullscreenable: false,
+      ...(process.platform === 'darwin'
+        ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 12, y: 13 } }
+        : { autoHideMenuBar: true }),
+      backgroundColor: colors.background,
+      webPreferences: {
+        ...windowWebPreferences(),
+        // Keep recording/transcribing while hidden or in the background
+        backgroundThrottling: false
+      }
+    })
+    // Float above full-screen meeting windows as well
+    notepad.setAlwaysOnTop(true, 'floating')
+    notepad.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+    notepad.on('close', (e) => {
+      if (this.quitting) return
+      e.preventDefault()
+      notepad?.hide()
+    })
+
+    this.loadWindow(notepad, 'notepad')
+    this.trackWindowReady(notepad, 'notepad')
+    this.windows.set('notepad', notepad)
+    return notepad
+  }
+
+  /** Show the notepad; `request` tells it what to do (open a meeting, start recording…) */
+  showNotepad(request?: { meetingId?: string; start?: boolean; appName?: string }): void {
+    const notepad = this.ensureNotepad()
+    const reveal = (): void => {
+      if (notepad.isDestroyed()) return
+      notepad.show()
+      notepad.focus()
+      if (request) notepad.webContents.send('notepad:request', request)
+    }
+    const ready = this.windowReady.get('notepad')
+    if (ready) ready.then(reveal)
+    else reveal()
+  }
+
+  hideNotepad(): void {
+    const notepad = this.windows.get('notepad')
+    if (notepad && !notepad.isDestroyed()) notepad.hide()
+  }
+
+  /** Set before app quit so windows that normally hide on close can close */
+  quitting = false
 
   // ── Click-through for transparent overlays ────────────────────
 
