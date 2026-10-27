@@ -24,7 +24,7 @@ export function WaveformBars({
   barCount = 7,
   barWidth = 3,
   maxHeight = 24,
-  color = '#F04545',
+  color = 'rgb(var(--signal))',
   animated: _animated = true,
   settled = false,
   className = ''

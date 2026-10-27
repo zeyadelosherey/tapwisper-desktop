@@ -76,7 +76,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgb(18_17_16/0.38)] p-4 backdrop-blur-[3px] animate-fade-in"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}
@@ -87,46 +87,37 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={message ? messageId : undefined}
         onKeyDown={handleKeyDown}
-        className="w-full max-w-sm bg-theme-card rounded-2xl border border-theme-border/50 shadow-2xl p-5 animate-scale-up"
+        className="shadow-pop w-full max-w-[400px] rounded-2xl border border-hairline bg-raised p-6 animate-scale-up"
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-4">
           {destructive && (
-            <div className="w-9 h-9 rounded-xl bg-recording-red/10 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-4 h-4 text-recording-red" aria-hidden="true" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger-tint">
+              <AlertTriangle className="h-[18px] w-[18px] text-danger" aria-hidden="true" />
             </div>
           )}
           <div className="flex-1 min-w-0 text-start">
-            <h2 id={titleId} className="text-sm font-semibold text-theme-text">
+            <h2 id={titleId} className="font-display text-[20px] leading-snug text-ink">
               {title}
             </h2>
             {message && (
               <p
                 id={messageId}
-                className="text-xs text-theme-text-secondary mt-1 leading-relaxed break-words"
+                className="mt-1.5 break-words text-[13px] leading-relaxed text-ink-muted"
               >
                 {message}
               </p>
             )}
           </div>
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button
-            ref={cancelRef}
-            type="button"
-            onClick={onCancel}
-            className="px-3 py-2 bg-theme-surface/50 hover:bg-theme-surface rounded-lg text-sm text-theme-text-secondary hover:text-theme-text transition-all outline-none focus-visible:ring-2 focus-visible:ring-sky-accent/60"
-          >
+        <div className="mt-6 flex justify-end gap-2">
+          <button ref={cancelRef} type="button" onClick={onCancel} className="btn-secondary">
             {cancelLabel ?? t('common.cancel', 'Cancel')}
           </button>
           <button
             ref={confirmRef}
             type="button"
             onClick={onConfirm}
-            className={
-              destructive
-                ? 'px-4 py-2 rounded-lg text-sm font-medium bg-recording-red text-white hover:bg-red-500 transition-all outline-none focus-visible:ring-2 focus-visible:ring-recording-red/60 focus-visible:ring-offset-2 focus-visible:ring-offset-theme-card'
-                : 'btn-primary outline-none focus-visible:ring-2 focus-visible:ring-sky-accent/60'
-            }
+            className={destructive ? 'btn-danger' : 'btn-primary'}
           >
             {confirmLabel ??
               (destructive ? t('common.delete', 'Delete') : t('common.confirm', 'Confirm'))}

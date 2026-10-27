@@ -2,40 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * TapWisper "Paper & Signal" design tokens.
+ *
+ * Colors are RGB channel triplets so Tailwind opacity modifiers work
+ * (e.g. bg-signal/10). Semantic tokens (canvas, raised, ink, signal…) are the
+ * source of truth; the older `theme-*` names used across the app are aliases.
+ */
 @layer base {
-  /* ── Light theme (default) ─────────────────────────────────── */
-  /* RGB channel values for Tailwind opacity modifier support */
   :root {
-    --color-theme-bg: 255 255 255;
-    --color-theme-surface: 240 240 242;
-    --color-theme-card: 247 247 248;
-    --color-theme-border: 230 230 234;
-    --color-theme-text: 26 26 26;
-    --color-theme-text-secondary: 26 26 26;
-    --tw-text-secondary-alpha: 0.6;
-    --color-theme-text-tertiary: 26 26 26;
-    --tw-text-tertiary-alpha: 0.4;
-    --color-theme-text-muted: 26 26 26;
-    --tw-text-muted-alpha: 0.25;
-    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
-    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+    /* Surfaces */
+    --canvas: 245 243 238; /* warm paper behind everything */
+    --raised: 255 255 255; /* the main sheet, dialogs */
+    --panel: 250 249 246; /* cards sitting on the sheet */
+    --sunken: 238 235 228; /* inputs, wells */
+    --hover: 238 235 228; /* hover wash for rows and ghost buttons */
+    --hairline: 227 222 213;
+    --hairline-strong: 210 204 193;
+
+    /* Ink */
+    --ink: 27 26 23;
+    --ink-muted: 110 105 95;
+    --ink-soft: 128 122 112;
+    --ink-faint: 163 158 147;
+
+    /* Accents */
+    --signal: 47 120 214;
+    --signal-strong: 33 98 182;
+    --signal-tint: 231 240 251;
+    --on-signal: 255 255 255;
+    --ember: 224 112 58;
+    --danger: 196 64 52;
+    --danger-tint: 251 236 233;
+    --success: 46 138 90;
+    --success-tint: 230 243 235;
+    --warning: 168 112 16;
+    --warning-tint: 250 241 222;
+
+    /* Overlays (recording pill, panels) are always dark ink capsules */
+    --capsule: 27 26 23;
+    --capsule-signal: 122 178 245;
+
+    /* Legacy aliases */
+    --color-theme-bg: var(--raised);
+    --color-theme-surface: var(--sunken);
+    --color-theme-card: var(--panel);
+    --color-theme-border: var(--hairline);
+    --color-theme-text: var(--ink);
+    --color-theme-text-secondary: var(--ink-muted);
+    --color-theme-text-tertiary: var(--ink-soft);
+    --color-theme-text-muted: var(--ink-faint);
+
+    --shadow-sheet: 0 1px 2px rgb(27 26 23 / 0.04), 0 12px 32px -18px rgb(27 26 23 / 0.18);
+    --shadow-pop: 0 2px 6px rgb(27 26 23 / 0.06), 0 24px 48px -20px rgb(27 26 23 / 0.28);
+    --scrollbar-thumb: rgb(27 26 23 / 0.14);
+    --scrollbar-thumb-hover: rgb(27 26 23 / 0.26);
+    color-scheme: light;
   }
 
-  /* ── Dark theme (true black) ─────────────────────────────── */
   .dark {
-    --color-theme-bg: 0 0 0;
-    --color-theme-surface: 32 32 32;
-    --color-theme-card: 14 14 14;
-    --color-theme-border: 38 38 38;
-    --color-theme-text: 255 255 255;
-    --color-theme-text-secondary: 255 255 255;
-    --tw-text-secondary-alpha: 0.6;
-    --color-theme-text-tertiary: 255 255 255;
-    --tw-text-tertiary-alpha: 0.4;
-    --color-theme-text-muted: 255 255 255;
-    --tw-text-muted-alpha: 0.25;
-    --scrollbar-thumb: rgba(255, 255, 255, 0.12);
-    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.22);
+    --canvas: 18 17 16;
+    --raised: 27 26 24;
+    --panel: 33 31 29;
+    --sunken: 13 12 11;
+    --hover: 40 38 35;
+    --hairline: 44 42 38;
+    --hairline-strong: 62 59 54;
+
+    --ink: 243 240 234;
+    --ink-muted: 168 162 150;
+    --ink-soft: 142 136 125;
+    --ink-faint: 111 106 97;
+
+    --signal: 106 165 238;
+    --signal-strong: 140 188 245;
+    --signal-tint: 22 38 58;
+    --on-signal: 9 22 40;
+    --ember: 240 136 84;
+    --danger: 239 112 99;
+    --danger-tint: 58 26 22;
+    --success: 98 196 142;
+    --success-tint: 20 44 32;
+    --warning: 228 176 72;
+    --warning-tint: 52 38 14;
+
+    --capsule: 22 21 19;
+
+    --color-theme-surface: var(--hover);
+
+    --shadow-sheet: 0 0 0 1px rgb(255 255 255 / 0.02), 0 16px 40px -20px rgb(0 0 0 / 0.7);
+    --shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.03), 0 28px 56px -20px rgb(0 0 0 / 0.75);
+    --scrollbar-thumb: rgb(255 255 255 / 0.12);
+    --scrollbar-thumb-hover: rgb(255 255 255 / 0.22);
+    color-scheme: dark;
   }
 
   /* Prevent text selection in overlay windows */
@@ -57,8 +116,8 @@
 
   /* Custom scrollbar */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
 
   ::-webkit-scrollbar-track {
@@ -67,26 +126,43 @@
 
   ::-webkit-scrollbar-thumb {
     background: var(--scrollbar-thumb);
-    border-radius: 3px;
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-thumb-hover);
+    background-clip: content-box;
   }
 
-  /* Body defaults */
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
   body {
     margin: 0;
     padding: 0;
     overflow: hidden;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background-color: rgb(var(--color-theme-bg));
-    color: rgb(var(--color-theme-text));
+    font-family:
+      'Inter Variable',
+      'IBM Plex Sans Arabic',
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    background-color: rgb(var(--canvas));
+    color: rgb(var(--ink));
   }
 
-  /* Arabic font for RTL */
-  [dir="rtl"] body {
-    font-family: 'SF Arabic', 'Geeza Pro', 'Arial', system-ui, sans-serif;
+  /* Arabic UI: IBM Plex Sans Arabic for Arabic script, Inter for Latin */
+  [dir='rtl'] body,
+  :lang(ar) {
+    font-family: 'IBM Plex Sans Arabic', 'Inter Variable', system-ui, sans-serif;
+    font-feature-settings: normal;
   }
 
   /* Transparent window backgrounds */
@@ -95,54 +171,259 @@
     background: transparent !important;
   }
 
+  ::selection {
+    background: rgb(var(--signal) / 0.22);
+  }
+
   /* Visible keyboard focus ring for every interactive element. Mouse clicks
      don't trigger :focus-visible, so this only shows for keyboard users. */
   :focus-visible {
-    outline: 2px solid rgb(126 182 224 / 0.9);
+    outline: 2px solid rgb(var(--signal));
     outline-offset: 2px;
   }
 
-  /* Text inputs already show their own focus styling */
   input:focus-visible,
-  textarea:focus-visible {
+  textarea:focus-visible,
+  select:focus-visible {
     outline-offset: 0;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--ink-faint));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer components {
-  /* Glass morphism effect for floating panels */
+  /* ── Typography ─────────────────────────────────────────────── */
+
+  /* Editorial display face: Fraunces, soft and slightly wonky */
+  .font-display {
+    font-family: 'Fraunces Variable', 'IBM Plex Sans Arabic', Georgia, serif;
+    font-optical-sizing: auto;
+    font-variation-settings:
+      'SOFT' 100,
+      'WONK' 1;
+    font-weight: 420;
+    letter-spacing: -0.015em;
+  }
+
+  .font-display em {
+    font-style: italic;
+    font-variation-settings:
+      'SOFT' 100,
+      'WONK' 1;
+  }
+
+  /* Fraunces has no Arabic: use Plex Arabic, which has no italic either */
+  [dir='rtl'] .font-display {
+    font-family: 'IBM Plex Sans Arabic', 'Fraunces Variable', serif;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  [dir='rtl'] .font-display em {
+    font-style: normal;
+    color: rgb(var(--signal));
+  }
+
+  .hero-title {
+    @apply font-display text-[42px] leading-[1.08] text-ink;
+  }
+
+  .page-title {
+    @apply font-display text-[28px] leading-tight text-ink;
+  }
+
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft;
+  }
+
+  [dir='rtl'] .section-label {
+    @apply tracking-normal text-xs;
+  }
+
+  /* ── Buttons ────────────────────────────────────────────────── */
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[10px] text-[13px] font-medium
+      whitespace-nowrap select-none transition-[background-color,color,box-shadow,border-color,transform] duration-200 ease-out
+      disabled:opacity-45 disabled:pointer-events-none active:translate-y-px;
+  }
+
+  .btn-sm {
+    @apply h-8 px-3 text-xs rounded-lg;
+  }
+
+  .btn-lg {
+    @apply h-11 px-6 text-sm rounded-xl;
+  }
+
+  /* Signal: the one loud button on a screen */
+  .btn-signal {
+    @apply btn bg-signal text-on-signal shadow-[0_1px_0_rgb(255_255_255/0.25)_inset,0_1px_2px_rgb(27_26_23/0.18)] hover:bg-signal-strong;
+  }
+
+  /* Ink: strong neutral primary */
+  .btn-primary {
+    @apply btn bg-ink text-raised hover:bg-ink/85;
+  }
+
+  .btn-secondary {
+    @apply btn bg-raised text-ink border border-hairline shadow-[0_1px_1px_rgb(27_26_23/0.04)] hover:border-hairline-strong hover:bg-panel;
+  }
+
+  .btn-ghost {
+    @apply btn text-ink-muted hover:text-ink hover:bg-hover;
+  }
+
+  .btn-danger {
+    @apply btn bg-danger text-white hover:bg-danger/90;
+  }
+
+  .dark .btn-danger {
+    @apply text-canvas;
+  }
+
+  .icon-btn {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-lg text-ink-soft
+      transition-colors duration-200 ease-out hover:text-ink hover:bg-hover disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  /* ── Fields ─────────────────────────────────────────────────── */
+
+  .field {
+    @apply w-full h-10 px-3 rounded-[10px] bg-raised border border-hairline text-sm text-ink
+      transition-[border-color,box-shadow] duration-200 ease-out
+      hover:border-hairline-strong focus:outline-none focus:border-signal focus:ring-4 focus:ring-signal/15;
+  }
+
+  .dark .field {
+    @apply bg-sunken;
+  }
+
+  textarea.field {
+    @apply h-auto py-2.5 leading-relaxed;
+  }
+
+  select.field {
+    @apply appearance-none pe-9 bg-no-repeat cursor-pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23807a70' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+  }
+
+  [dir='rtl'] select.field {
+    background-position: left 0.75rem center;
+  }
+
+  /* ── Surfaces ───────────────────────────────────────────────── */
+
+  .sheet {
+    @apply bg-raised border border-hairline;
+    box-shadow: var(--shadow-sheet);
+  }
+
+  .card {
+    @apply bg-raised border border-hairline rounded-2xl;
+  }
+
+  .well {
+    @apply bg-panel border border-hairline rounded-2xl;
+  }
+
+  .shadow-pop {
+    box-shadow: var(--shadow-pop);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-sunken text-ink-muted border border-hairline/70;
+  }
+
+  .dark .chip {
+    @apply bg-hover;
+  }
+
+  /* Status dot for live / recording state */
+  .ember-dot {
+    @apply inline-block w-2 h-2 rounded-full bg-ember;
+    box-shadow: 0 0 0 3px rgb(var(--ember) / 0.2);
+  }
+
+  /* ── Keycap ─────────────────────────────────────────────────── */
+
+  .keycap {
+    @apply relative inline-flex flex-col items-center justify-center rounded-lg border border-hairline-strong
+      bg-raised text-ink font-medium leading-none select-none
+      transition-[transform,box-shadow,background-color,color,border-color] duration-200 ease-out;
+    background-image: linear-gradient(to bottom, rgb(var(--raised)), rgb(var(--panel)));
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.9) inset,
+      0 2px 0 rgb(var(--hairline-strong)),
+      0 3px 8px -3px rgb(27 26 23 / 0.25);
+  }
+
+  .dark .keycap {
+    background-image: linear-gradient(to bottom, rgb(48 46 42), rgb(36 34 31));
+    border-color: rgb(70 67 61);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.08) inset,
+      0 2px 0 rgb(10 10 9),
+      0 4px 10px -3px rgb(0 0 0 / 0.6);
+  }
+
+  .keycap[data-pressed='true'] {
+    transform: translateY(2px);
+    border-color: rgb(var(--signal));
+    color: rgb(var(--signal));
+    background-image: linear-gradient(to bottom, rgb(var(--signal-tint)), rgb(var(--signal-tint)));
+    box-shadow:
+      0 0 0 1px rgb(var(--signal)) inset,
+      0 0 0 5px rgb(var(--signal) / 0.18),
+      0 0 22px rgb(var(--signal) / 0.35);
+  }
+
+  /* ── Overlay helpers (dark ink capsules, readable on any wallpaper) ── */
+
   .glass {
-    background-color: rgb(var(--color-theme-bg) / 0.9);
-    border: 1px solid rgb(var(--color-theme-border));
+    background-color: rgb(var(--raised) / 0.96);
+    border: 1px solid rgb(var(--hairline));
     @apply backdrop-blur-xl;
   }
 
   .glass-surface {
-    background-color: rgb(var(--color-theme-surface) / 0.8);
-    border: 1px solid rgb(var(--color-theme-border) / 0.5);
+    background-color: rgb(var(--sunken) / 0.8);
+    border: 1px solid rgb(var(--hairline) / 0.6);
     @apply backdrop-blur-md;
   }
 
-  /* Waveform bar base styles */
+  .capsule {
+    background-color: rgb(var(--capsule) / 0.96);
+    border: 1px solid rgb(255 255 255 / 0.08);
+    @apply backdrop-blur-xl;
+  }
+
   .waveform-bar {
     @apply rounded-full transition-all duration-75 ease-out;
   }
 
-  /* Mic button glow */
-  .mic-glow {
-    box-shadow: 0 0 20px rgba(126, 182, 224, 0.4), 0 0 60px rgba(126, 182, 224, 0.1);
-  }
-
-  .mic-glow-recording {
-    box-shadow: 0 0 20px rgba(240, 69, 69, 0.5), 0 0 60px rgba(240, 69, 69, 0.15);
-  }
-
-  /* Pill shadow */
   .pill-shadow {
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow:
+      0 0 0 0.5px rgb(0 0 0 / 0.35),
+      0 6px 20px rgb(0 0 0 / 0.32),
+      0 2px 6px rgb(0 0 0 / 0.22);
   }
 
-  /* Custom scrollbar for dark overlays (result panel) */
   .custom-scrollbar::-webkit-scrollbar {
     width: 4px;
   }
@@ -151,55 +432,54 @@
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.15);
+    border: 0;
     border-radius: 2px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.25);
   }
 
-  /* Panel shadow */
   .panel-shadow {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow:
+      0 0 0 0.5px rgb(0 0 0 / 0.2),
+      0 12px 32px rgb(0 0 0 / 0.28),
+      0 4px 12px rgb(0 0 0 / 0.16);
   }
 
-  /* Lighter shadow for floating popups. Kept within 32px of the card so it
-     fits inside the command popup window's transparent padding. */
+  /* Kept within 32px of the card so it fits inside the command popup
+     window's transparent padding. */
   .popup-shadow {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+    box-shadow:
+      0 0 0 0.5px rgb(0 0 0 / 0.12),
+      0 8px 24px rgb(0 0 0 / 0.22),
+      0 2px 8px rgb(0 0 0 / 0.1);
   }
 
-  /* Green accent for accepted changes */
   .diff-added {
     @apply underline decoration-green-accent decoration-2 underline-offset-2;
   }
 
-  /* Action pill button */
   .action-pill {
     @apply px-3 py-1.5 rounded-pill text-sm font-medium transition-all duration-150;
     @apply hover:scale-105 active:scale-95;
-  }
-
-  /* Primary button — near-black bg, white text (matches Wispr Flow "Add new" style) */
-  .btn-primary {
-    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all;
-    background-color: #000000;
-    color: #FFFFFF;
-  }
-  .btn-primary:hover {
-    background-color: #1A1A1A;
-  }
-  .dark .btn-primary {
-    background-color: #FFFFFF;
-    color: #000000;
-  }
-  .dark .btn-primary:hover {
-    background-color: #E5E5E5;
   }
 }
 
 @layer utilities {
   /* RTL support */
-  [dir="rtl"] .rtl-flip {
+  [dir='rtl'] .rtl-flip {
     transform: scaleX(-1);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
   }
 }

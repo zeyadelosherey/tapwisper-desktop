@@ -1,10 +1,11 @@
 /**
- * Shared color constants for action categories.
+ * Shared color constants for action categories. Mid-tones that read on both
+ * the paper UI and the dark overlay capsules.
  */
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  translate: '#7EB6E0',
-  rephrase: '#B07CD8',
-  format: '#E8A838',
-  grammar: '#4DC778'
+  translate: '#4A8FE0',
+  rephrase: '#9A72D6',
+  format: '#D08A2E',
+  grammar: '#3FA16E'
 }
