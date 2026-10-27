@@ -28,7 +28,7 @@ import * as db from './database'
 function migrateStats(): void {
   const legacy = legacyStore()
   const oldStats = legacy.get('stats') as LegacyRecord | undefined
-  
+
   if (!oldStats) {
     return
   }
@@ -48,7 +48,7 @@ function migrateStats(): void {
       dailyStats: JSON.stringify(oldStats.dailyStats || []),
       recentActivity: JSON.stringify(oldStats.recentActivity || [])
     })
-    
+
     // Remove old data to avoid re-migration
     legacy.delete('stats')
   } catch {
@@ -62,7 +62,7 @@ function migrateStats(): void {
 function migrateActivityRecords(): void {
   const legacy = legacyStore()
   const oldRecords = legacy.get('activityRecords')
-  
+
   if (!oldRecords || !Array.isArray(oldRecords)) {
     return
   }
@@ -85,7 +85,7 @@ function migrateActivityRecords(): void {
         // Skip records that fail (e.g. duplicate IDs)
       }
     }
-    
+
     // Remove old data to avoid re-migration
     legacy.delete('activityRecords')
   } catch {
@@ -129,10 +129,36 @@ function migrateSpeechSettings(): void {
       .split(/[\n,]+/)
       .map((t) => t.trim())
       .filter((t) => t && !known.has(t.toLowerCase()))
-      .map((term, i) => ({ id: `migrated-${Date.now()}-${i}`, term, aliases: [], createdAt: Date.now() }))
+      .map((term, i) => ({
+        id: `migrated-${Date.now()}-${i}`,
+        term,
+        aliases: [],
+        createdAt: Date.now()
+      }))
     if (added.length) store.set('dictionary', [...existing, ...added])
     legacy.delete('speechVocabulary')
   }
+}
+
+/**
+ * The record shortcut default changed from Option+Space to hold fn (macOS) /
+ * Ctrl+Win (Windows) / Right Ctrl (Linux). Move users still on the old
+ * default once; anyone who picked a shortcut keeps it.
+ */
+function migrateShortcutDefault(): void {
+  const store = getStore()
+  if (store.get('shortcutDefaultsMigrated')) return
+  const shortcuts = store.get('shortcuts')
+  if (shortcuts?.record === 'Option+Space') {
+    const record =
+      process.platform === 'darwin'
+        ? 'Fn'
+        : process.platform === 'win32'
+          ? 'Ctrl+Win'
+          : 'RightControl'
+    store.set('shortcuts', { ...shortcuts, record })
+  }
+  store.set('shortcutDefaultsMigrated', true)
 }
 
 /**
@@ -145,6 +171,7 @@ export function runMigrations(): void {
     migrateActivityRecords,
     migrateSonioxModel,
     migrateSpeechSettings,
+    migrateShortcutDefault,
     migrateApiKeysToSafeStorage
   ]) {
     try {

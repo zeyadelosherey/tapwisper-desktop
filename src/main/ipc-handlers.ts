@@ -11,7 +11,9 @@ import {
   cancelRecording,
   startShortcutsAfterPermission,
   setPostRecordingState,
-  isValidShortcut
+  isValidShortcut,
+  defaultRecordShortcut,
+  fnMonitorAvailable
 } from './shortcuts'
 import { checkPermissions, requestPermission } from './permissions'
 import type { PermissionType } from './permissions'
@@ -186,10 +188,13 @@ export function registerIpcHandlers(
     }
   })
 
-  ipcMain.handle('window:send', (_e: IpcMainInvokeEvent, type: string, channel: string, ...args: unknown[]) => {
-    if (!isWindowType(type)) return
-    windowManager.sendToWindow(type, channel, ...args)
-  })
+  ipcMain.handle(
+    'window:send',
+    (_e: IpcMainInvokeEvent, type: string, channel: string, ...args: unknown[]) => {
+      if (!isWindowType(type)) return
+      windowManager.sendToWindow(type, channel, ...args)
+    }
+  )
 
   // ── Overlay click-through ──────────────────────────────────────
   // Overlay renderers report when the cursor is over their visible card
@@ -252,7 +257,6 @@ export function registerIpcHandlers(
     await clipboardManager.insertText(text)
   })
 
-
   ipcMain.handle('clipboard:read', () => {
     return clipboardManager.readText()
   })
@@ -262,10 +266,13 @@ export function registerIpcHandlers(
   })
 
   // ── Audio ──────────────────────────────────────────────────────
-  ipcMain.handle('audio:encode-wav', async (_e: IpcMainInvokeEvent, samples: Float32Array, sampleRate: number) => {
-    const wavBuffer = encodeWav(samples, sampleRate)
-    return await saveTempAudio(wavBuffer)
-  })
+  ipcMain.handle(
+    'audio:encode-wav',
+    async (_e: IpcMainInvokeEvent, samples: Float32Array, sampleRate: number) => {
+      const wavBuffer = encodeWav(samples, sampleRate)
+      return await saveTempAudio(wavBuffer)
+    }
+  )
 
   ipcMain.handle('audio:cleanup', async (_e: IpcMainInvokeEvent, filepath: string) => {
     await cleanupAudioFile(filepath)
@@ -332,6 +339,8 @@ export function registerIpcHandlers(
     return { success: true }
   })
 
+  ipcMain.handle('shortcuts:fn-available', () => fnMonitorAvailable())
+
   ipcMain.handle('shortcuts:get', () => {
     const store = getStore()
     return store.get('shortcuts')
@@ -340,7 +349,7 @@ export function registerIpcHandlers(
   ipcMain.handle('shortcuts:reset', () => {
     const store = getStore()
     store.set('shortcuts', {
-      record: 'Option+Space'
+      record: defaultRecordShortcut()
     })
     reloadShortcuts()
     broadcastShortcuts()
@@ -402,7 +411,7 @@ export function registerIpcHandlers(
     return db.queryActivityRecords(params ?? {})
   })
 
-  ipcMain.handle('db:activity:add',(_e: IpcMainInvokeEvent, record: db.ActivityRecord) => {
+  ipcMain.handle('db:activity:add', (_e: IpcMainInvokeEvent, record: db.ActivityRecord) => {
     db.addActivityRecord(record)
   })
 
@@ -442,13 +451,19 @@ export function registerIpcHandlers(
   // ── Context: the app being dictated into ───────────────────────
   ipcMain.handle('context:active-app', () => getActiveApp())
 
-  ipcMain.handle('db:activity:get-by-date-range', (_e: IpcMainInvokeEvent, startDate: number, endDate: number) => {
-    return db.getActivityRecordsByDateRange(startDate, endDate)
-  })
+  ipcMain.handle(
+    'db:activity:get-by-date-range',
+    (_e: IpcMainInvokeEvent, startDate: number, endDate: number) => {
+      return db.getActivityRecordsByDateRange(startDate, endDate)
+    }
+  )
 
-  ipcMain.handle('db:activity:get-stats', (_e: IpcMainInvokeEvent, startDate: number, endDate: number) => {
-    return db.getActivityStats(startDate, endDate)
-  })
+  ipcMain.handle(
+    'db:activity:get-stats',
+    (_e: IpcMainInvokeEvent, startDate: number, endDate: number) => {
+      return db.getActivityStats(startDate, endDate)
+    }
+  )
 
   ipcMain.handle('db:cleanup-old-records', (_e: IpcMainInvokeEvent, keepCount?: number) => {
     db.cleanupOldRecords(keepCount)
@@ -459,9 +474,12 @@ export function registerIpcHandlers(
     return db.exportToJSON()
   })
 
-  ipcMain.handle('db:import-json', (_e: IpcMainInvokeEvent, data: Parameters<typeof db.importFromJSON>[0]) => {
-    db.importFromJSON(data)
-  })
+  ipcMain.handle(
+    'db:import-json',
+    (_e: IpcMainInvokeEvent, data: Parameters<typeof db.importFromJSON>[0]) => {
+      db.importFromJSON(data)
+    }
+  )
 
   // ── Trigger Actions ─────────────────────────────────────────────
   ipcMain.handle('trigger:web-search', async (_e: IpcMainInvokeEvent, params: WebSearchParams) => {
@@ -472,21 +490,30 @@ export function registerIpcHandlers(
     return await executeTerminal(params)
   })
 
-  ipcMain.handle('trigger:keyboard', async (_e: IpcMainInvokeEvent, params: { shortcut: string; delay?: number }) => {
-    return await executeKeyboard(params)
-  })
+  ipcMain.handle(
+    'trigger:keyboard',
+    async (_e: IpcMainInvokeEvent, params: { shortcut: string; delay?: number }) => {
+      return await executeKeyboard(params)
+    }
+  )
 
-  ipcMain.handle('trigger:apple-shortcut', async (_e: IpcMainInvokeEvent, params: { shortcutName: string; speechInput?: string }) => {
-    return await executeAppleShortcut(params)
-  })
+  ipcMain.handle(
+    'trigger:apple-shortcut',
+    async (_e: IpcMainInvokeEvent, params: { shortcutName: string; speechInput?: string }) => {
+      return await executeAppleShortcut(params)
+    }
+  )
 
   ipcMain.handle('trigger:window', async (_e: IpcMainInvokeEvent, params: WindowParams) => {
     return await executeWindow(params)
   })
 
-  ipcMain.handle('trigger:launch-app', async (_e: IpcMainInvokeEvent, params: { appPath: string; appName: string }) => {
-    return await executeLaunchApp(params)
-  })
+  ipcMain.handle(
+    'trigger:launch-app',
+    async (_e: IpcMainInvokeEvent, params: { appPath: string; appName: string }) => {
+      return await executeLaunchApp(params)
+    }
+  )
 
   ipcMain.handle('trigger:list-apps', async () => {
     return await listInstalledApps()

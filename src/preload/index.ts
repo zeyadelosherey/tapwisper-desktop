@@ -197,7 +197,9 @@ const api = {
     /** Rejects shortcuts main can't listen for (`error: 'unsupported-shortcut'`) */
     update: (shortcuts: { record?: string }): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('shortcuts:update', shortcuts),
-    reset: () => ipcRenderer.invoke('shortcuts:reset')
+    reset: () => ipcRenderer.invoke('shortcuts:reset'),
+    /** macOS: whether the fn/Globe helper is installed (else fn acts as Ctrl+Option) */
+    fnAvailable: (): Promise<boolean> => ipcRenderer.invoke('shortcuts:fn-available')
   },
 
   // ── App ────────────────────────────────────────────────────────

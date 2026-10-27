@@ -80,7 +80,10 @@ export interface AppConfig {
   // Smart Formatting (LLM clean-up pass after transcription)
   smartFormatting: boolean
   /** Tone per app category, used by Smart Formatting */
-  writingStyles: Record<'messages' | 'work' | 'email' | 'other', 'formal' | 'casual' | 'very-casual'>
+  writingStyles: Record<
+    'messages' | 'work' | 'email' | 'other',
+    'formal' | 'casual' | 'very-casual'
+  >
 
   /** @deprecated migrated to speechLanguages */
   speechLanguage?: string
@@ -91,6 +94,8 @@ export interface AppConfig {
   shortcuts: {
     record: string
   }
+  /** Set once the old Option+Space default has been moved to the platform default */
+  shortcutDefaultsMigrated?: boolean
 
   // Snippets
   snippets: SnippetEntry[]
@@ -354,7 +359,14 @@ const defaultConfig: AppConfig = {
   writingStyles: { messages: 'casual', work: 'casual', email: 'formal', other: 'formal' },
 
   shortcuts: {
-    record: 'Option+Space'
+    // Hold fn on macOS, Ctrl+Win on Windows (like Wispr Flow); Right Ctrl on
+    // Linux, where Super belongs to the desktop
+    record:
+      process.platform === 'darwin'
+        ? 'Fn'
+        : process.platform === 'win32'
+          ? 'Ctrl+Win'
+          : 'RightControl'
   },
 
   snippets: [],
