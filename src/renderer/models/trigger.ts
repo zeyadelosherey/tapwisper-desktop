@@ -115,6 +115,8 @@ export interface ActionTypeMeta {
   icon: string
   example: string
   defaultTriggerType: 'exact' | 'prefix'
+  /** Only implemented on macOS (AppleScript / Shortcuts app) */
+  macOnly?: boolean
 }
 
 export const ACTION_TYPE_META: ActionTypeMeta[] = [
@@ -156,7 +158,8 @@ export const ACTION_TYPE_META: ActionTypeMeta[] = [
     description: 'Run a specific Apple Shortcut',
     icon: 'smartphone',
     example: '"select a shortcut to run"',
-    defaultTriggerType: 'exact'
+    defaultTriggerType: 'exact',
+    macOnly: true
   },
   {
     id: 'window',
@@ -164,7 +167,8 @@ export const ACTION_TYPE_META: ActionTypeMeta[] = [
     description: 'Snap windows to halves, quarters, center, or fullscreen',
     icon: 'app-window',
     example: '"window top left"',
-    defaultTriggerType: 'exact'
+    defaultTriggerType: 'exact',
+    macOnly: true
   },
   {
     id: 'launch-app',
@@ -175,6 +179,14 @@ export const ACTION_TYPE_META: ActionTypeMeta[] = [
     defaultTriggerType: 'exact'
   }
 ]
+
+/**
+ * Action types that can be created on the given platform
+ * (`window.tapwisper.platform.os`). Mac-only types are hidden elsewhere.
+ */
+export function getAvailableActionTypes(platform: string): ActionTypeMeta[] {
+  return ACTION_TYPE_META.filter((meta) => !meta.macOnly || platform === 'darwin')
+}
 
 // ── Default Configs ─────────────────────────────────────────────
 
