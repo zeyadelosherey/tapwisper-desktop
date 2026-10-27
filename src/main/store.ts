@@ -95,6 +95,8 @@ export interface ActionCategory {
   isVisible: boolean
   order: number
   actions: ActionItem[]
+  /** Built-in actions the user hid; kept so they can be shown again */
+  hiddenActions?: ActionItem[]
 }
 
 export interface ActionItem {
