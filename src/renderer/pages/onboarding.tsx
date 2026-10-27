@@ -1,17 +1,40 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Mic, Accessibility, Monitor, CheckCircle2, AlertCircle, ArrowRight, Shield } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
+import {
+  Mic,
+  Accessibility,
+  Monitor,
+  Check,
+  ArrowLeft,
+  ArrowRight,
+  Globe,
+  Keyboard,
+  Languages,
+  CircleAlert
+} from 'lucide-react'
 import appLogo from '../assets/logo.png'
+import { updateDirection } from '../i18n'
+import {
+  UI_LANGUAGES,
+  SPEECH_LANGUAGES,
+  languageName,
+  normalizeSpeechLanguages
+} from '../constants/speech-languages'
+import { useRecordShortcut, useShortcutPressed } from '../hooks/use-record-shortcut'
+import { useMicrophones } from '../hooks/use-microphone'
+import { ShortcutKeys } from '../components/ui/keycap'
+import { WaveLine } from '../components/ui/wave'
+import { Spinner } from '../components/ui/primitives'
+import { MicrophonePicker } from '../components/microphone-picker'
+import { ShortcutPicker } from '../components/shortcut-picker'
+import { SpeechLanguagePicker } from '../components/speech-language-picker'
+import { IS_MAC, OS } from '../utils/shortcuts'
 
 // ── Types ────────────────────────────────────────────────────────
 
 type PermissionStatus = 'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'
-
-interface PermissionResult {
-  microphone: PermissionStatus
-  accessibility: PermissionStatus
-  screenRecording: PermissionStatus
-}
+type PermissionId = 'microphone' | 'accessibility' | 'screenRecording'
+type PermissionResult = Record<PermissionId, PermissionStatus>
 
 interface PlatformInfo {
   isMac: boolean
@@ -19,132 +42,110 @@ interface PlatformInfo {
   isLinux: boolean
 }
 
-interface PermissionCardData {
-  id: 'microphone' | 'accessibility' | 'screenRecording'
-  labelKey: string
-  descKey: string
-  icon: React.ReactNode
-  color: string
-  bgColor: string
-}
-
 interface OnboardingProps {
   onComplete: () => void
 }
 
-// ── Permission card definitions ──────────────────────────────────
+const STEPS = ['welcome', 'permissions', 'microphone', 'shortcut', 'languages', 'done'] as const
+type Step = (typeof STEPS)[number]
 
-const ALL_PERMISSIONS: PermissionCardData[] = [
+const STEP_LABEL_KEYS: Record<Step, string> = {
+  welcome: 'onboarding.stepWelcome',
+  permissions: 'onboarding.stepPermissions',
+  microphone: 'onboarding.stepMicrophone',
+  shortcut: 'onboarding.stepShortcut',
+  languages: 'onboarding.stepLanguages',
+  done: 'onboarding.stepDone'
+}
+
+const PERMISSIONS: { id: PermissionId; labelKey: string; descKey: string; icon: ReactNode }[] = [
   {
     id: 'microphone',
     labelKey: 'onboarding.microphone',
     descKey: 'onboarding.microphoneDesc',
-    icon: <Mic className="w-5 h-5" />,
-    color: '#F04545',
-    bgColor: 'rgba(240, 69, 69, 0.1)'
+    icon: <Mic className="h-[18px] w-[18px]" />
   },
   {
     id: 'accessibility',
     labelKey: 'onboarding.accessibility',
     descKey: 'onboarding.accessibilityDesc',
-    icon: <Accessibility className="w-5 h-5" />,
-    color: '#7EB6E0',
-    bgColor: 'rgba(126, 182, 224, 0.1)'
+    icon: <Accessibility className="h-[18px] w-[18px]" />
   },
   {
     id: 'screenRecording',
     labelKey: 'onboarding.screenRecording',
     descKey: 'onboarding.screenRecordingDesc',
-    icon: <Monitor className="w-5 h-5" />,
-    color: '#B07CD8',
-    bgColor: 'rgba(176, 124, 216, 0.1)'
+    icon: <Monitor className="h-[18px] w-[18px]" />
   }
 ]
 
-// ── Helpers ──────────────────────────────────────────────────────
-
-/**
- * Filter permissions relevant to the current platform.
- * macOS needs all three; Windows and Linux only need microphone.
- */
-function getRelevantPermissions(platform: PlatformInfo): PermissionCardData[] {
-  if (platform.isMac) return ALL_PERMISSIONS
-  return ALL_PERMISSIONS.filter((p) => p.id === 'microphone')
-}
-
-function isGranted(status: PermissionStatus): boolean {
-  return status === 'granted'
+/** macOS needs all three; Windows and Linux only need the microphone */
+function relevantPermissions(platform: PlatformInfo | null): typeof PERMISSIONS {
+  if (!platform) return []
+  return platform.isMac ? PERMISSIONS : PERMISSIONS.filter((p) => p.id === 'microphone')
 }
 
 // ── Component ────────────────────────────────────────────────────
 
 export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
-  const { t } = useTranslation()
-  const [permissions, setPermissions] = useState<PermissionResult | null>(null)
+  const { t, i18n } = useTranslation()
+  const [step, setStep] = useState<Step>('welcome')
   const [platform, setPlatform] = useState<PlatformInfo | null>(null)
-  const [requesting, setRequesting] = useState<string | null>(null)
+  const [permissions, setPermissions] = useState<PermissionResult | null>(null)
+  const [requesting, setRequesting] = useState<PermissionId | null>(null)
+  const [deviceId, setDeviceId] = useState('')
+  const [speechLanguages, setSpeechLanguages] = useState<string[]>([])
+  const [finishing, setFinishing] = useState(false)
+  const { shortcut, save: saveShortcut } = useRecordShortcut()
+  const contentRef = useRef<HTMLDivElement>(null)
 
-  // Fetch platform info once on mount
+  const stepIndex = STEPS.indexOf(step)
+
   useEffect(() => {
-    window.tapwisper.platform.info().then((info: PlatformInfo) => {
-      setPlatform(info)
-    })
+    window.tapwisper.platform
+      .info()
+      .then((info: PlatformInfo) => setPlatform(info))
+      .catch(() =>
+        setPlatform({ isMac: IS_MAC, isWindows: OS === 'win32', isLinux: OS === 'linux' })
+      )
+    Promise.all([
+      window.tapwisper.store.get('microphoneDeviceId'),
+      window.tapwisper.store.get('speechLanguages')
+    ])
+      .then(([mic, langs]) => {
+        if (typeof mic === 'string') setDeviceId(mic)
+        setSpeechLanguages(normalizeSpeechLanguages(langs))
+      })
+      .catch(() => {})
   }, [])
 
-  // Check permission statuses and poll every 2 seconds so the UI
-  // updates when the user toggles permissions in System Settings.
+  // ── Permissions ────────────────────────────────────────────────
+
   const checkStatuses = useCallback(async () => {
     try {
-      const result = (await window.tapwisper.permissions.check()) as PermissionResult
-      setPermissions(result)
-      return result
+      setPermissions((await window.tapwisper.permissions.check()) as PermissionResult)
     } catch {
-      // Permissions API unavailable — fallback to unknown
-      return null
+      // Permissions API unavailable
     }
   }, [])
 
-  // On first check, if all relevant permissions are already granted, skip onboarding entirely
+  // Poll while the permissions step is open so the UI follows System Settings
   useEffect(() => {
-    let cancelled = false
-
-    const initialCheck = async () => {
-      const result = await checkStatuses()
-      if (cancelled || !result || !platform) return
-
-      const relevant = getRelevantPermissions(platform)
-      const allAlreadyGranted = relevant.every((p) => isGranted(result[p.id]))
-      if (allAlreadyGranted) {
-        onComplete()
-      }
-    }
-
-    if (platform) {
-      initialCheck()
-    }
-
-    return () => {
-      cancelled = true
-    }
-  }, [checkStatuses, platform, onComplete])
-
-  // Poll every 2 seconds so the UI updates when the user toggles permissions in System Settings
-  useEffect(() => {
+    checkStatuses()
+    if (step !== 'permissions') return
     const interval = setInterval(checkStatuses, 2000)
     return () => clearInterval(interval)
-  }, [checkStatuses])
+  }, [checkStatuses, step])
 
-  // Handle requesting a single permission
-  const handleRequest = async (type: 'microphone' | 'accessibility' | 'screenRecording') => {
+  const handleRequest = async (type: PermissionId): Promise<void> => {
     setRequesting(type)
     try {
       const result = (await window.tapwisper.permissions.request(type)) as {
         status: PermissionStatus
         action: string
       }
-
       // On Windows/Linux, microphone may need getUserMedia from the renderer
-      if (result.action === 'use-renderer' && type === 'microphone') {
+      if (result?.action === 'use-renderer' && type === 'microphone') {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
           stream.getTracks().forEach((track) => track.stop())
@@ -152,189 +153,607 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
           // User denied in the browser-level prompt
         }
       }
-
-      // Re-check all statuses after the request
       await checkStatuses()
     } finally {
       setRequesting(null)
     }
   }
 
-  // Determine which permissions to show
-  const relevantPermissions = platform ? getRelevantPermissions(platform) : []
-
-  // Count how many are not yet granted
+  const relevant = relevantPermissions(platform)
   const pendingCount = permissions
-    ? relevantPermissions.filter((p) => !isGranted(permissions[p.id])).length
-    : relevantPermissions.length
+    ? relevant.filter((p) => permissions[p.id] !== 'granted').length
+    : relevant.length
+  const allGranted = permissions !== null && pendingCount === 0
 
-  const allGranted = pendingCount === 0 && permissions !== null
+  // ── Navigation ─────────────────────────────────────────────────
 
-  // Loading state while we fetch platform and permission info
-  if (!platform || !permissions) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-theme-bg">
-        <div className="w-6 h-6 border-2 border-theme-border border-t-sky-accent rounded-full animate-spin" />
-      </div>
-    )
+  const goTo = (next: Step): void => {
+    // Leaving the permissions step: start the global shortcut hook now so
+    // the shortcut test can light up (main re-checks accessibility itself).
+    if (step === 'permissions') void window.tapwisper.permissions.allGranted()
+    setStep(next)
+    contentRef.current?.scrollTo({ top: 0 })
+  }
+  const back = (): void => {
+    if (stepIndex > 0) goTo(STEPS[stepIndex - 1])
+  }
+  const next = (): void => {
+    if (stepIndex < STEPS.length - 1) goTo(STEPS[stepIndex + 1])
   }
 
+  const finish = async (): Promise<void> => {
+    setFinishing(true)
+    try {
+      await onComplete()
+    } finally {
+      setFinishing(false)
+    }
+  }
+
+  // ── Settings ───────────────────────────────────────────────────
+
+  const handleDeviceChange = (id: string): void => {
+    setDeviceId(id)
+    void window.tapwisper.store.set('microphoneDeviceId', id)
+  }
+
+  const handleLanguagesChange = (codes: string[]): void => {
+    setSpeechLanguages(codes)
+    void window.tapwisper.store.set('speechLanguages', codes)
+  }
+
+  const handleUiLanguage = (code: string): void => {
+    void window.tapwisper.store.set('language', code)
+    i18n.changeLanguage(code)
+    updateDirection(code)
+  }
+
+  // ── Render ─────────────────────────────────────────────────────
+
+  const brandBesideTrafficLights = IS_MAC && i18n.dir() === 'ltr'
+  const uiLanguage = UI_LANGUAGES.some((l) => l.code === i18n.language) ? i18n.language : 'en'
+
+  const continueDisabled = step === 'permissions' && !allGranted
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-theme-bg p-8">
-      <div className="w-full max-w-lg">
-        {/* ── Header ─────────────────────────────────────── */}
-        <div
-          className="flex flex-col items-center text-center mb-8"
-          style={{ animation: 'slide-up 0.4s ease-out backwards' }}
-        >
-          <div className="w-16 h-16 rounded-2xl overflow-hidden mb-4 shadow-lg shadow-sky-accent/10">
-            <img src={appLogo} alt="" className="w-full h-full object-contain" />
-          </div>
-          <h1 className="text-2xl font-bold text-theme-text tracking-tight mb-2">
-            {t('onboarding.title')}
-          </h1>
-          <p className="text-sm text-theme-text-secondary max-w-sm leading-relaxed">
-            {t('onboarding.subtitle')}
-          </p>
+    <div className="flex h-screen flex-col bg-canvas">
+      {/* Top bar: brand, language. Draggable on frameless windows. */}
+      <header
+        className={`drag-region flex h-14 shrink-0 items-center justify-between gap-4 ${
+          brandBesideTrafficLights ? 'ps-[84px]' : 'ps-5'
+        } ${OS === 'win32' ? 'pr-[150px] rtl:pl-5' : 'pe-4'}`}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <img src={appLogo} alt="" className="h-[22px] w-[22px] rounded-md object-contain" />
+          <span className="font-display text-[18px] leading-none text-ink">{t('app.name')}</span>
         </div>
+        <label className="no-drag relative flex items-center">
+          <span className="sr-only">{t('settings.language', 'Language')}</span>
+          <Globe className="pointer-events-none absolute start-3 h-3.5 w-3.5 text-ink-soft" />
+          <select
+            value={uiLanguage}
+            onChange={(e) => handleUiLanguage(e.target.value)}
+            className="field h-8 w-auto rounded-lg ps-8 text-[12.5px]"
+          >
+            {UI_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.nativeLabel}
+              </option>
+            ))}
+          </select>
+        </label>
+      </header>
 
-        {/* ── Permission Cards ───────────────────────────── */}
-        <div className="space-y-3 mb-8">
-          {relevantPermissions.map((perm, idx) => {
-            const status = permissions[perm.id]
-            const granted = isGranted(status)
-            const isRequesting = requesting === perm.id
+      <main className="sheet mx-3 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-sheet">
+        <Stepper current={stepIndex} />
 
-            return (
-              <div
-                key={perm.id}
-                className={`
-                  relative rounded-2xl border p-4 transition-all duration-300
-                  ${granted
-                    ? 'bg-theme-card border-green-500/20'
-                    : 'bg-theme-card border-theme-border/30 hover:border-theme-border/50'
-                  }
-                `}
-                style={{
-                  animation: `slide-up 0.4s ease-out ${(idx + 1) * 80}ms backwards`
-                }}
+        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div key={step} className="mx-auto w-full max-w-[680px] px-8 pb-12 pt-10 animate-rise">
+            {step === 'welcome' && <WelcomeStep shortcut={shortcut} />}
+
+            {step === 'permissions' && (
+              <StepIntro
+                title={t('onboarding.permissionsTitle', 'A few permissions')}
+                description={t(
+                  'onboarding.permissionsBody',
+                  'TapWisper listens only while you hold your key, and types into the app you are using. Your system asks you to confirm that once.'
+                )}
               >
-                <div className="flex items-start gap-4">
-                  {/* Icon */}
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: perm.bgColor, color: perm.color }}
-                  >
-                    {perm.icon}
+                {!platform || !permissions ? (
+                  <div className="flex justify-center py-10 text-ink-faint">
+                    <Spinner className="h-5 w-5" />
                   </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-semibold text-theme-text">
-                        {t(perm.labelKey)}
-                      </h3>
-                      {granted ? (
-                        <span className="flex items-center gap-1 text-[10px] font-medium text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
-                          <CheckCircle2 className="w-3 h-3" />
-                          {t('onboarding.granted')}
-                        </span>
+                ) : (
+                  <div className="space-y-3">
+                    {relevant.map((perm) => (
+                      <PermissionCard
+                        key={perm.id}
+                        icon={perm.icon}
+                        title={t(perm.labelKey)}
+                        description={t(perm.descKey)}
+                        granted={permissions[perm.id] === 'granted'}
+                        busy={requesting === perm.id}
+                        actionLabel={
+                          perm.id === 'microphone'
+                            ? t('onboarding.allow', 'Allow')
+                            : t('onboarding.openSettings', 'Open Settings')
+                        }
+                        onRequest={() => handleRequest(perm.id)}
+                      />
+                    ))}
+                    <p
+                      className="flex items-center gap-2 pt-2 text-[12.5px] text-ink-muted"
+                      aria-live="polite"
+                    >
+                      {allGranted ? (
+                        <>
+                          <Check className="h-4 w-4 text-success" />
+                          {t('onboarding.allGranted', 'All permissions granted')}
+                        </>
                       ) : (
-                        <span className="flex items-center gap-1 text-[10px] font-medium text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                          <AlertCircle className="w-3 h-3" />
-                          {t('onboarding.notGranted')}
-                        </span>
+                        t(
+                          'onboarding.permissionsRemainingCount',
+                          '{{count}} permissions remaining',
+                          {
+                            count: pendingCount
+                          }
+                        )
                       )}
-                    </div>
-                    <p className="text-xs text-theme-text-secondary leading-relaxed">
-                      {t(perm.descKey)}
                     </p>
                   </div>
+                )}
+              </StepIntro>
+            )}
 
-                  {/* Action Button */}
-                  {!granted && (
-                    <button
-                      onClick={() => handleRequest(perm.id)}
-                      disabled={isRequesting}
-                      className={`
-                        shrink-0 px-3.5 py-2 rounded-xl text-xs font-medium transition-all
-                        ${isRequesting
-                          ? 'bg-theme-surface text-theme-text-muted cursor-wait'
-                          : 'bg-sky-accent/10 text-sky-accent hover:bg-sky-accent/20 active:scale-95'
-                        }
-                      `}
-                    >
-                      {isRequesting
-                        ? '…'
-                        : perm.id === 'microphone'
-                          ? t('onboarding.grant')
-                          : t('onboarding.openSettings')
-                      }
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+            {step === 'microphone' && (
+              <MicrophoneStep
+                deviceId={deviceId}
+                onDeviceChange={handleDeviceChange}
+                onConfirm={next}
+              />
+            )}
 
-        {/* ── Status & Continue ───────────────────────────── */}
-        <div
-          className="flex flex-col items-center gap-4"
-          style={{
-            animation: `slide-up 0.4s ease-out ${(relevantPermissions.length + 1) * 80}ms backwards`
-          }}
-        >
-          {/* Status indicator */}
-          <div className="flex items-center gap-2 text-xs">
-            {allGranted ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                <span className="text-green-500 font-medium">
-                  {t('onboarding.allGranted')}
-                </span>
-              </>
-            ) : (
-              <>
-                <Shield className="w-4 h-4 text-theme-text-muted" />
-                <span className="text-theme-text-muted">
-                  {t('onboarding.permissionsRemainingCount', '{{count}} permissions remaining', {
-                    count: pendingCount
-                  })}
-                </span>
-              </>
+            {step === 'shortcut' && <ShortcutStep shortcut={shortcut} onSave={saveShortcut} />}
+
+            {step === 'languages' && (
+              <StepIntro
+                title={t('onboarding.languagesTitle', 'Which languages do you speak?')}
+                description={t(
+                  'onboarding.languagesBody',
+                  'Pick the languages you dictate in, or leave it on auto-detect. You can change this any time in Settings.'
+                )}
+              >
+                <SpeechLanguagePicker value={speechLanguages} onChange={handleLanguagesChange} />
+              </StepIntro>
+            )}
+
+            {step === 'done' && (
+              <DoneStep deviceId={deviceId} shortcut={shortcut} speechLanguages={speechLanguages} />
             )}
           </div>
+        </div>
 
-          {/* Continue button */}
-          <button
-            onClick={onComplete}
-            disabled={!allGranted}
-            className={`
-              w-full max-w-xs flex items-center justify-center gap-2 px-6 py-3 rounded-2xl
-              text-sm font-semibold transition-all duration-300
-              ${allGranted
-                ? 'bg-sky-accent text-white hover:bg-sky-accent/90 active:scale-[0.98] shadow-lg shadow-sky-accent/20'
-                : 'bg-theme-surface text-theme-text-muted cursor-not-allowed'
-              }
-            `}
-          >
-            {t('onboarding.continue')}
-            <ArrowRight className="w-4 h-4 rtl-flip" />
-          </button>
+        {/* Footer: Back / Skip / Continue */}
+        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-hairline px-6 py-4">
+          <div>
+            {stepIndex > 0 && (
+              <button type="button" className="btn-ghost" onClick={back}>
+                <ArrowLeft className="h-4 w-4 rtl-flip" />
+                {t('common.back', 'Back')}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {step === 'permissions' && !allGranted && (
+              <button type="button" className="btn-ghost" onClick={next}>
+                {t('onboarding.skipForNow', 'Skip for now')}
+              </button>
+            )}
+            {step === 'done' ? (
+              <button
+                type="button"
+                className="btn-signal btn-lg"
+                onClick={finish}
+                disabled={finishing}
+              >
+                {finishing && <Spinner className="h-3.5 w-3.5" />}
+                {t('onboarding.startDictating', 'Start dictating')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-signal btn-lg"
+                onClick={next}
+                disabled={continueDisabled}
+              >
+                {step === 'welcome'
+                  ? t('onboarding.getStarted', 'Get started')
+                  : t('onboarding.continue', 'Continue')}
+                <ArrowRight className="h-4 w-4 rtl-flip" />
+              </button>
+            )}
+          </div>
+        </footer>
+      </main>
+    </div>
+  )
+}
 
-          {/* Skip — lets users continue when a permission can't be detected */}
-          {!allGranted && (
-            <button
-              type="button"
-              onClick={onComplete}
-              className="text-xs text-theme-text-tertiary hover:text-theme-text underline underline-offset-2 transition-colors"
+// ── Stepper ──────────────────────────────────────────────────────
+
+function Stepper({ current }: { current: number }): JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <nav
+      aria-label={t('onboarding.progress', 'Setup progress')}
+      className="shrink-0 border-b border-hairline px-6 py-3.5"
+    >
+      <ol className="mx-auto flex max-w-[880px] items-center gap-2">
+        {STEPS.map((s, i) => {
+          const done = i < current
+          const active = i === current
+          return (
+            <li
+              key={s}
+              className={`flex items-center gap-2 ${i < STEPS.length - 1 ? 'min-w-0 flex-1' : 'shrink-0'}`}
+              aria-current={active ? 'step' : undefined}
             >
-              {t('onboarding.skipForNow', 'Skip for now')}
-            </button>
-          )}
+              <span
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold tabular transition-colors duration-200 ${
+                  active
+                    ? 'border-signal bg-signal text-on-signal'
+                    : done
+                      ? 'border-signal/40 bg-signal-tint text-signal'
+                      : 'border-hairline-strong text-ink-faint'
+                }`}
+              >
+                {done ? <Check className="h-3.5 w-3.5" strokeWidth={2.75} /> : i + 1}
+              </span>
+              <span
+                className={`shrink-0 whitespace-nowrap text-[12.5px] ${
+                  active ? 'font-medium text-ink' : done ? 'text-ink-muted' : 'text-ink-faint'
+                }`}
+              >
+                {t(STEP_LABEL_KEYS[s])}
+              </span>
+              {i < STEPS.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className={`mx-1 h-px min-w-[10px] flex-1 ${done ? 'bg-signal/40' : 'bg-hairline'}`}
+                />
+              )}
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
+
+// ── Steps ────────────────────────────────────────────────────────
+
+function StepIntro({
+  title,
+  description,
+  children
+}: {
+  title: ReactNode
+  description?: ReactNode
+  children?: ReactNode
+}): JSX.Element {
+  return (
+    <>
+      <h1 className="page-title text-[32px]">{title}</h1>
+      {description && (
+        <p className="mt-2.5 max-w-[560px] text-[14.5px] leading-relaxed text-ink-muted text-pretty">
+          {description}
+        </p>
+      )}
+      <div className="mt-8">{children}</div>
+    </>
+  )
+}
+
+function WelcomeStep({ shortcut }: { shortcut: string }): JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div className="pt-4">
+      <p className="section-label">{t('onboarding.welcomeEyebrow', 'Welcome to TapWisper')}</p>
+      <h1 className="hero-title mt-4 text-[44px] text-balance">
+        <Trans i18nKey="onboarding.welcomeTitle" components={{ em: <em /> }}>
+          Say it once. It&apos;s <em>written</em> everywhere.
+        </Trans>
+      </h1>
+      <p className="mt-4 max-w-[520px] text-[15px] leading-relaxed text-ink-muted text-pretty">
+        {t(
+          'onboarding.welcomeBody',
+          'Hold a key, talk naturally, let go — your words appear in whatever app you are typing in. Mixed languages included.'
+        )}
+      </p>
+
+      {/* Illustration: a key being held and text arriving on paper */}
+      <div className="relative mt-10 overflow-hidden rounded-2xl border border-hairline bg-panel px-7 py-7">
+        <div className="flex items-center gap-5">
+          <ShortcutKeys accelerator={shortcut} size="lg" pressed />
+          <WaveLine className="h-12 min-w-0 flex-1" />
+        </div>
+        <div className="mt-6 rounded-xl border border-hairline bg-raised px-5 py-4 shadow-[0_1px_2px_rgb(27_26_23/0.05)]">
+          <p className="text-[14px] leading-relaxed text-ink" dir="auto">
+            {t(
+              'onboarding.welcomeSample',
+              'Sounds great — let’s meet Thursday at 4 and go over the launch plan.'
+            )}
+            <span
+              aria-hidden="true"
+              className="ms-0.5 inline-block h-[1.1em] w-[2px] translate-y-[3px] bg-signal animate-live-pulse"
+            />
+          </p>
         </div>
       </div>
     </div>
   )
+}
+
+function PermissionCard({
+  icon,
+  title,
+  description,
+  granted,
+  busy,
+  actionLabel,
+  onRequest
+}: {
+  icon: ReactNode
+  title: string
+  description: string
+  granted: boolean
+  busy: boolean
+  actionLabel: string
+  onRequest: () => void
+}): JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div
+      className={`flex items-start gap-4 rounded-2xl border px-5 py-4 transition-colors duration-200 ${
+        granted ? 'border-success/30 bg-success-tint/40' : 'border-hairline bg-raised'
+      }`}
+    >
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+          granted ? 'bg-success-tint text-success' : 'bg-sunken text-ink-muted'
+        }`}
+      >
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[14px] font-medium text-ink">{title}</h3>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+              granted ? 'bg-success-tint text-success' : 'bg-warning-tint text-warning'
+            }`}
+          >
+            {granted ? (
+              <Check className="h-3 w-3" strokeWidth={3} />
+            ) : (
+              <CircleAlert className="h-3 w-3" />
+            )}
+            {granted
+              ? t('onboarding.granted', 'Granted')
+              : t('onboarding.notGranted', 'Not Granted')}
+          </span>
+        </div>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">{description}</p>
+      </div>
+      {!granted && (
+        <button
+          type="button"
+          onClick={onRequest}
+          disabled={busy}
+          className="btn-secondary btn-sm shrink-0 self-center"
+        >
+          {busy && <Spinner className="h-3 w-3" />}
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function MicrophoneStep({
+  deviceId,
+  onDeviceChange,
+  onConfirm
+}: {
+  deviceId: string
+  onDeviceChange: (id: string) => void
+  onConfirm: () => void
+}): JSX.Element {
+  const { t } = useTranslation()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const changeMicrophone = (): void => {
+    containerRef.current?.querySelector('select')?.focus()
+  }
+  return (
+    <StepIntro
+      title={t('onboarding.micTitle', 'Check your microphone')}
+      description={t(
+        'onboarding.micBody',
+        'Built-in and wired microphones are the most accurate. Say a few words and watch the bars.'
+      )}
+    >
+      <div ref={containerRef}>
+        <MicrophonePicker deviceId={deviceId} onChange={onDeviceChange} variant="large" active />
+      </div>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-hairline px-5 py-4">
+        <p className="font-display text-[18px] text-ink">
+          {t('onboarding.micQuestion', 'Do the bars move when you speak?')}
+        </p>
+        <div className="flex gap-2">
+          <button type="button" className="btn-secondary" onClick={changeMicrophone}>
+            {t('onboarding.micChange', 'Change microphone')}
+          </button>
+          <button type="button" className="btn-primary" onClick={onConfirm}>
+            {t('onboarding.micYes', 'Yes, they move')}
+          </button>
+        </div>
+      </div>
+    </StepIntro>
+  )
+}
+
+function ShortcutStep({
+  shortcut,
+  onSave
+}: {
+  shortcut: string
+  onSave: ReturnType<typeof useRecordShortcut>['save']
+}): JSX.Element {
+  const { t } = useTranslation()
+  const pressed = useShortcutPressed()
+  const [seenPress, setSeenPress] = useState(false)
+
+  useEffect(() => {
+    if (pressed) setSeenPress(true)
+  }, [pressed])
+
+  // A new shortcut needs a fresh test
+  useEffect(() => setSeenPress(false), [shortcut])
+
+  return (
+    <StepIntro
+      title={t('onboarding.shortcutTitle', 'Your dictation key')}
+      description={t(
+        'onboarding.shortcutBody',
+        'Hold it while you talk and let go to insert the text. Tap it once to keep listening hands-free.'
+      )}
+    >
+      <div className="flex flex-col items-center rounded-2xl border border-hairline bg-panel px-6 pb-7 pt-9">
+        <ShortcutKeys accelerator={shortcut} size="lg" pressed={pressed} />
+        <p className="mt-6 text-center text-[14px] text-ink" aria-live="polite">
+          {pressed ? (
+            <span className="inline-flex items-center gap-2 font-medium text-signal">
+              <span className="ember-dot" />
+              {t('onboarding.shortcutHeld', 'Listening — keep holding and speak')}
+            </span>
+          ) : seenPress ? (
+            <span className="inline-flex items-center gap-2 font-medium text-success">
+              <Check className="h-4 w-4" strokeWidth={2.75} />
+              {t('onboarding.shortcutWorks', 'It works. You’re ready to dictate.')}
+            </span>
+          ) : (
+            t('onboarding.shortcutTest', 'Hold it and speak — does the key light up?')
+          )}
+        </p>
+        {IS_MAC && !seenPress && (
+          <p className="mt-2 text-center text-[12px] text-ink-muted">
+            {t(
+              'onboarding.shortcutAccessibilityHint',
+              'Nothing happens? TapWisper needs Accessibility access to hear the key.'
+            )}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-8">
+        <h2 className="section-label mb-3 flex items-center gap-2">
+          <Keyboard className="h-3.5 w-3.5" />
+          {t('onboarding.shortcutChoose', 'Choose another key')}
+        </h2>
+        <ShortcutPicker value={shortcut} onSave={onSave} compact />
+      </div>
+    </StepIntro>
+  )
+}
+
+function DoneStep({
+  deviceId,
+  shortcut,
+  speechLanguages
+}: {
+  deviceId: string
+  shortcut: string
+  speechLanguages: string[]
+}): JSX.Element {
+  const { t, i18n } = useTranslation()
+  const languages =
+    speechLanguages.length === 0
+      ? t('settings.speechAutoDetect', 'Auto-detect')
+      : speechLanguages
+          .map((c) =>
+            languageName(
+              c,
+              i18n.language,
+              SPEECH_LANGUAGES.find((l) => l.code === c)?.nativeLabel ?? c
+            )
+          )
+          .join(' + ')
+
+  const rows: { icon: ReactNode; label: string; value: ReactNode }[] = [
+    {
+      icon: <Mic className="h-4 w-4" />,
+      label: t('mic.device', 'Microphone'),
+      value: <MicName deviceId={deviceId} />
+    },
+    {
+      icon: <Keyboard className="h-4 w-4" />,
+      label: t('onboarding.stepShortcut', 'Shortcut'),
+      value: <ShortcutKeys accelerator={shortcut} size="sm" />
+    },
+    {
+      icon: <Languages className="h-4 w-4" />,
+      label: t('onboarding.stepLanguages', 'Languages'),
+      value: languages
+    }
+  ]
+
+  return (
+    <div className="pt-4">
+      <p className="section-label">{t('onboarding.doneEyebrow', 'Setup complete')}</p>
+      <h1 className="hero-title mt-4 text-balance">
+        <Trans i18nKey="onboarding.doneTitle" components={{ em: <em /> }}>
+          You&apos;re all set. Now just <em>talk</em>.
+        </Trans>
+      </h1>
+      <p className="mt-4 max-w-[520px] text-[15px] leading-relaxed text-ink-muted">
+        {t(
+          'onboarding.doneBody',
+          'Click into any text field, hold your key and speak. Everything you dictate is kept in your history on this device.'
+        )}
+      </p>
+      <dl className="mt-8 divide-y divide-hairline rounded-2xl border border-hairline">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center gap-4 px-5 py-3.5">
+            <dt className="flex w-40 shrink-0 items-center gap-2.5 text-[13px] text-ink-muted">
+              <span className="text-ink-soft">{row.icon}</span>
+              {row.label}
+            </dt>
+            <dd className="min-w-0 truncate text-[13.5px] font-medium text-ink">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+/** Human name of the selected microphone ('' = system default) */
+function MicName({ deviceId }: { deviceId: string }): JSX.Element {
+  const { t } = useTranslation()
+  const fallback = t('mic.systemDefault', 'System default')
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+    return <>{fallback}</>
+  }
+  return <MicNameLookup deviceId={deviceId} fallback={fallback} />
+}
+
+function MicNameLookup({
+  deviceId,
+  fallback
+}: {
+  deviceId: string
+  fallback: string
+}): JSX.Element {
+  const { devices } = useMicrophones()
+  const label = devices.find((d) => d.deviceId === deviceId)?.label
+  return <>{label && label !== 'Microphone' ? label : fallback}</>
 }
