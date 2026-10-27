@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Plus, Check, Trash2 } from 'lucide-react'
+import { Search, Plus, Check, Trash2, Library } from 'lucide-react'
 import { CategoryIcon } from '../components/icon-map'
 import type { ActionCategory, ActionItem } from '../models/actions-config'
 import { BUILT_IN_CATEGORIES } from '../models/actions-config'
@@ -150,13 +150,26 @@ const SAMPLE_PROMPTS: PromptTemplate[] = [
   { id: 'p100', label: 'Recipe Converter', prompt: 'Convert this recipe to serve a different number of people and suggest ingredient substitutions if needed:', category: 'personal' }
 ]
 
+const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-sky-accent/60'
+
+/**
+ * Every read-modify-write of the `actions` store key goes through this queue
+ * so quick successive add/remove clicks cannot overwrite each other.
+ */
+let actionsWriteQueue: Promise<unknown> = Promise.resolve()
+function enqueueActionsWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = actionsWriteQueue.then(task, task)
+  actionsWriteQueue = run.catch(() => undefined)
+  return run
+}
+
 /**
  * Load the current actions from the store and extract the set of mini-app
  * prompt IDs that have already been added.
  */
 async function loadAddedPromptIds(): Promise<Set<string>> {
   const stored = await window.tapwisper.store.get('actions') as ActionCategory[] | undefined
-  if (!stored) return new Set()
+  if (!Array.isArray(stored)) return new Set()
 
   const miniApps = stored.find((c) => c.id === MINI_APPS_CATEGORY_ID)
   if (!miniApps) return new Set()
@@ -174,10 +187,15 @@ async function loadAddedPromptIds(): Promise<Set<string>> {
 /**
  * Add a prompt to the actions store under the "Mini Apps" category.
  */
-async function addPromptToActions(prompt: PromptTemplate): Promise<void> {
+function addPromptToActions(prompt: PromptTemplate): Promise<void> {
+  return enqueueActionsWrite(() => addPromptToActionsNow(prompt))
+}
+
+async function addPromptToActionsNow(prompt: PromptTemplate): Promise<void> {
   let categories = await window.tapwisper.store.get('actions') as ActionCategory[] | undefined
   if (!categories || !Array.isArray(categories) || categories.length === 0) {
-    categories = [...BUILT_IN_CATEGORIES]
+    // Same fallback the overlays use when nothing has been stored yet
+    categories = BUILT_IN_CATEGORIES.map((c) => ({ ...c, actions: [...c.actions] }))
   }
 
   let miniAppsCat = categories.find((c) => c.id === MINI_APPS_CATEGORY_ID)
@@ -189,7 +207,8 @@ async function addPromptToActions(prompt: PromptTemplate): Promise<void> {
       color: '#E86B6B',
       isBuiltIn: false,
       isVisible: true,
-      order: categories.length,
+      // Append after the last category even if `order` values have gaps
+      order: categories.reduce((max, c) => Math.max(max, c.order), -1) + 1,
       actions: []
     }
     categories.push(miniAppsCat)
@@ -213,9 +232,13 @@ async function addPromptToActions(prompt: PromptTemplate): Promise<void> {
 /**
  * Remove a prompt from the actions store.
  */
-async function removePromptFromActions(promptId: string): Promise<void> {
+function removePromptFromActions(promptId: string): Promise<void> {
+  return enqueueActionsWrite(() => removePromptFromActionsNow(promptId))
+}
+
+async function removePromptFromActionsNow(promptId: string): Promise<void> {
   const categories = await window.tapwisper.store.get('actions') as ActionCategory[] | undefined
-  if (!categories) return
+  if (!Array.isArray(categories)) return
 
   const miniAppsCat = categories.find((c) => c.id === MINI_APPS_CATEGORY_ID)
   if (!miniAppsCat) return
@@ -237,10 +260,29 @@ export function MiniAppStore(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [addedPrompts, setAddedPrompts] = useState<Set<string>>(new Set())
+  const [busyPrompts, setBusyPrompts] = useState<Set<string>>(new Set())
+  const [saveError, setSaveError] = useState(false)
 
-  // Load which prompts are already added on mount
+  // Load which prompts are already added; re-sync when the window regains focus
+  // so removals made on the Actions page are reflected here
   useEffect(() => {
-    loadAddedPromptIds().then(setAddedPrompts)
+    const sync = (): void => {
+      loadAddedPromptIds()
+        .then(setAddedPrompts)
+        .catch(() => undefined)
+    }
+    sync()
+    window.addEventListener('focus', sync)
+    return () => window.removeEventListener('focus', sync)
+  }, [])
+
+  const setBusy = useCallback((promptId: string, busy: boolean) => {
+    setBusyPrompts((prev) => {
+      const next = new Set(prev)
+      if (busy) next.add(promptId)
+      else next.delete(promptId)
+      return next
+    })
   }, [])
 
   const filteredPrompts = useMemo(() => {
@@ -257,19 +299,41 @@ export function MiniAppStore(): JSX.Element {
     return prompts
   }, [searchQuery, selectedCategory])
 
-  const handleAddPrompt = useCallback(async (prompt: PromptTemplate) => {
-    await addPromptToActions(prompt)
-    setAddedPrompts((prev) => new Set([...prev, prompt.id]))
-  }, [])
+  const handleAddPrompt = useCallback(
+    async (prompt: PromptTemplate) => {
+      setBusy(prompt.id, true)
+      setSaveError(false)
+      try {
+        await addPromptToActions(prompt)
+        setAddedPrompts((prev) => new Set([...prev, prompt.id]))
+      } catch {
+        setSaveError(true)
+      } finally {
+        setBusy(prompt.id, false)
+      }
+    },
+    [setBusy]
+  )
 
-  const handleRemovePrompt = useCallback(async (promptId: string) => {
-    await removePromptFromActions(promptId)
-    setAddedPrompts((prev) => {
-      const next = new Set(prev)
-      next.delete(promptId)
-      return next
-    })
-  }, [])
+  const handleRemovePrompt = useCallback(
+    async (promptId: string) => {
+      setBusy(promptId, true)
+      setSaveError(false)
+      try {
+        await removePromptFromActions(promptId)
+        setAddedPrompts((prev) => {
+          const next = new Set(prev)
+          next.delete(promptId)
+          return next
+        })
+      } catch {
+        setSaveError(true)
+      } finally {
+        setBusy(promptId, false)
+      }
+    },
+    [setBusy]
+  )
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -281,12 +345,36 @@ export function MiniAppStore(): JSX.Element {
         </p>
       </div>
 
+      {/* Honest description of where these templates come from */}
+      <div className="flex items-start gap-3 p-3 mb-6 rounded-xl bg-theme-surface/30 border border-theme-border/30">
+        <Library className="w-4 h-4 text-theme-text-secondary shrink-0 mt-0.5" aria-hidden="true" />
+        <div>
+          <h2 className="text-sm font-medium text-theme-text">
+            {t('miniApps.libraryTitle', 'Template library')}
+          </h2>
+          <p className="text-xs text-theme-text-muted mt-0.5">
+            {t(
+              'miniApps.libraryDescription',
+              '{{count}} prompt templates bundled with TapWisper. Added templates appear in the "Mini Apps" category on the Actions page, where you can edit, reorder or remove them.',
+              { count: SAMPLE_PROMPTS.length }
+            )}
+          </p>
+        </div>
+      </div>
+
+      {saveError && (
+        <p role="alert" className="text-xs text-recording-red mb-4">
+          {t('miniApps.saveFailed', 'Could not update your actions. Please try again.')}
+        </p>
+      )}
+
       {/* Search */}
       <div className="flex items-center gap-2 px-4 py-2.5 bg-theme-card rounded-xl border border-theme-border/50 mb-6">
         <Search className="w-4 h-4 text-theme-text-muted" />
         <input
           type="text"
           placeholder={t('miniApps.searchPrompts')}
+          aria-label={t('miniApps.searchPrompts')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="flex-1 bg-transparent text-sm text-theme-text placeholder-theme-text-muted outline-none"
@@ -297,7 +385,8 @@ export function MiniAppStore(): JSX.Element {
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
         <button
           onClick={() => setSelectedCategory(null)}
-          className={`action-pill shrink-0 ${
+          aria-pressed={!selectedCategory}
+          className={`action-pill shrink-0 ${FOCUS_RING} ${
             !selectedCategory
               ? 'bg-sky-accent/20 text-sky-accent'
               : 'bg-theme-card text-theme-text-secondary hover:text-theme-text'
@@ -309,7 +398,8 @@ export function MiniAppStore(): JSX.Element {
           <button
             key={cat.id}
             onClick={() => setSelectedCategory(cat.id)}
-            className={`action-pill shrink-0 flex items-center gap-1.5 ${
+            aria-pressed={selectedCategory === cat.id}
+            className={`action-pill shrink-0 flex items-center gap-1.5 ${FOCUS_RING} ${
               selectedCategory === cat.id
                 ? ''
                 : 'text-theme-text-secondary hover:text-theme-text'
@@ -331,6 +421,7 @@ export function MiniAppStore(): JSX.Element {
         {filteredPrompts.map((prompt) => {
           const cat = STORE_CATEGORIES.find((c) => c.id === prompt.category)
           const isAdded = addedPrompts.has(prompt.id)
+          const isBusy = busyPrompts.has(prompt.id)
 
           return (
             <div
@@ -360,8 +451,12 @@ export function MiniAppStore(): JSX.Element {
                   </div>
                   <button
                     onClick={() => handleRemovePrompt(prompt.id)}
-                    className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
-                    title="Remove from actions"
+                    disabled={isBusy}
+                    className={`flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all disabled:opacity-50 ${FOCUS_RING}`}
+                    title={t('miniApps.removeFromActions', 'Remove from actions')}
+                    aria-label={t('miniApps.removeTemplate', 'Remove {{name}} from actions', {
+                      name: prompt.label
+                    })}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -369,7 +464,11 @@ export function MiniAppStore(): JSX.Element {
               ) : (
                 <button
                   onClick={() => handleAddPrompt(prompt)}
-                  className="flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all bg-sky-accent/10 text-sky-accent hover:bg-sky-accent/20"
+                  disabled={isBusy}
+                  aria-label={t('miniApps.addTemplate', 'Add {{name}} to toolbar', {
+                    name: prompt.label
+                  })}
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all bg-sky-accent/10 text-sky-accent hover:bg-sky-accent/20 disabled:opacity-50 ${FOCUS_RING}`}
                 >
                   <Plus className="w-3 h-3" />
                   {t('miniApps.addToToolbar')}
