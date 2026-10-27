@@ -42,6 +42,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # whisper.cpp / llama.cpp servers for the Local engine (scripts/build-runtimes.mjs)
+      - name: Cache local AI runtimes
+        uses: actions/cache@v4
+        with:
+          path: |
+            resources/bin/whisper
+            resources/bin/llama
+          key: runtimes-${{ runner.os }}-arm64-${{ hashFiles('scripts/runtimes.json', 'scripts/build-runtimes.mjs') }}
+
+      - name: Build local AI runtimes
+        run: npm run build:runtimes
+
       - name: Build macOS arm64 app
         run: npx electron-vite build && npx electron-builder --mac --arm64
         env:
@@ -94,6 +106,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # whisper.cpp / llama.cpp servers for the Local engine (scripts/build-runtimes.mjs)
+      - name: Cache local AI runtimes
+        uses: actions/cache@v4
+        with:
+          path: |
+            resources/bin/whisper
+            resources/bin/llama
+          key: runtimes-${{ runner.os }}-x64-${{ hashFiles('scripts/runtimes.json', 'scripts/build-runtimes.mjs') }}
+
+      - name: Build local AI runtimes
+        run: npm run build:runtimes
+
       - name: Build macOS x64 app
         run: npx electron-vite build && npx electron-builder --mac --x64
         env:
@@ -137,6 +161,25 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The Vulkan backend lets llama-server use NVIDIA, AMD and Intel Arc GPUs
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+
+      # whisper.cpp / llama.cpp servers for the Local engine (scripts/build-runtimes.mjs)
+      - name: Cache local AI runtimes
+        uses: actions/cache@v4
+        with:
+          path: |
+            resources/bin/whisper
+            resources/bin/llama
+          key: runtimes-${{ runner.os }}-x64-${{ hashFiles('scripts/runtimes.json', 'scripts/build-runtimes.mjs') }}
+
+      - name: Build local AI runtimes
+        run: npm run build:runtimes -- --vulkan
 
       - name: Build Windows app
         run: npm run dist:win

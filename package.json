@@ -15,6 +15,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps && npm run build:fn-monitor",
+    "build:runtimes": "node scripts/build-runtimes.mjs",
     "build:fn-monitor": "node -e \"process.platform==='darwin'&&require('child_process').execFileSync('bash',['scripts/build-fn-monitor.sh'],{stdio:'inherit'})\"",
     "pack": "electron-builder --dir",
     "dist": "electron-vite build && electron-builder",

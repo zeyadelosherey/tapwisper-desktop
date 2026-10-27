@@ -1,0 +1,61 @@
+# Builds the bundled whisper.cpp / llama.cpp servers on every release platform and
+# runs real models through the app's own launch and request code.
+name: Local AI runtimes
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/build-runtimes.mjs'
+      - 'scripts/runtimes.json'
+      - 'scripts/check-model-urls.mjs'
+      - 'src/main/local-ai/**'
+      - 'src/shared/local-ai/**'
+      - '.github/workflows/local-runtimes.yml'
+  workflow_dispatch:
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check model download URLs
+        run: node scripts/check-model-urls.mjs
+
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Build local AI runtimes
+        run: npm run build:runtimes
+
+      - name: Download test models
+        shell: bash
+        run: |
+          mkdir -p .cache/models
+          curl -fsSL -o .cache/models/ggml-tiny.bin \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+          curl -fsSL -o .cache/models/qwen3-0.6b.gguf \
+            https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf
+
+      - name: Transcribe and chat with the bundled servers
+        shell: bash
+        env:
+          LOCAL_AI_SMOKE_WHISPER_MODEL: ${{ github.workspace }}/.cache/models/ggml-tiny.bin
+          LOCAL_AI_SMOKE_LLM_MODEL: ${{ github.workspace }}/.cache/models/qwen3-0.6b.gguf
+          LOCAL_AI_SMOKE_EXPECT_TEXT: '1'
+        run: npx vitest run src/main/local-ai/__tests__/runtimes.smoke.test.ts
