@@ -180,7 +180,8 @@ export function Triggers(): JSX.Element {
   }, [])
 
   const getActionLabel = (type: TriggerActionType): string => {
-    return ACTION_TYPE_META.find((m) => m.id === type)?.label || type
+    const meta = ACTION_TYPE_META.find((m) => m.id === type)
+    return meta ? t(`triggerTypes.${type}.label`, meta.label) : type
   }
 
   return (

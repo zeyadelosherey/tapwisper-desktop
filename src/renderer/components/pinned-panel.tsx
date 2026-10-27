@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { WaveformBars } from './waveform-bars'
 import { useAudio } from '../hooks/use-audio'
 import { transcribeAudio, processText } from '../services/ai-router'
@@ -8,6 +9,7 @@ import { useActivityStore } from '../store/activity'
 import type { Trigger } from '../models/trigger'
 import { matchTrigger } from '../services/trigger-matcher'
 import { executeTrigger } from '../services/trigger-executor'
+import i18n from '../i18n'
 
 type PanelState = 'idle' | 'recording' | 'transcribing'
 
@@ -62,13 +64,19 @@ function friendlyError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
   if (/No API key/i.test(raw)) return raw
   if (/\b401\b|\b403\b|invalid.*key|unauthori[sz]ed/i.test(raw)) {
-    return 'Your voice provider rejected the API key. Check it in Settings > AI Provider.'
+    return i18n.t(
+      'errors.voiceKeyRejected',
+      'Your voice provider rejected the API key. Check it in Settings > AI Provider.'
+    )
   }
   if (/\b429\b|rate limit|quota/i.test(raw)) {
-    return 'Voice provider rate limit or quota reached. Try again in a moment.'
+    return i18n.t(
+      'errors.voiceRateLimited',
+      'Voice provider rate limit or quota reached. Try again in a moment.'
+    )
   }
   if (/Failed to fetch|NetworkError|network/i.test(raw)) {
-    return 'Network error — check your internet connection.'
+    return i18n.t('errors.network', 'Network error — check your internet connection.')
   }
   return raw.length > 160 ? `${raw.slice(0, 157)}...` : raw
 }
@@ -77,6 +85,7 @@ function friendlyError(err: unknown): string {
 let showCounter = 0
 
 export function PinnedPanel(): JSX.Element {
+  const { t } = useTranslation()
   const [state, setState] = useState<PanelState>('idle')
   const [waveformData, setWaveformData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0])
   const isRecordingRef = useRef(false)
@@ -116,7 +125,12 @@ export function PinnedPanel(): JSX.Element {
         window.tapwisper.window.hide('pinnedPanel')
         setState('idle')
         if (stats.durationMs > 1000) {
-          showPillError('No speech detected. Check that the right microphone is selected.')
+          showPillError(
+            i18n.t(
+              'errors.noSpeech',
+              'No speech detected. Check that the right microphone is selected.'
+            )
+          )
         } else {
           window.tapwisper.recordingPill.hide()
         }
@@ -191,11 +205,19 @@ export function PinnedPanel(): JSX.Element {
                 const execResult = await executeTrigger(triggerMatch)
                 if (!execResult.success) {
                   showPillError(
-                    `"${triggerMatch.trigger.name}" failed: ${execResult.error || 'unknown error'}`
+                    i18n.t('errors.triggerFailed', '“{{name}}” failed: {{error}}', {
+                      name: triggerMatch.trigger.name,
+                      error: execResult.error || i18n.t('common.unknownError', 'Unknown error')
+                    })
                   )
                 }
               } catch (execErr) {
-                showPillError(`"${triggerMatch.trigger.name}" failed: ${friendlyError(execErr)}`)
+                showPillError(
+                  i18n.t('errors.triggerFailed', '“{{name}}” failed: {{error}}', {
+                    name: triggerMatch.trigger.name,
+                    error: friendlyError(execErr)
+                  })
+                )
               }
               return
             }
@@ -235,7 +257,8 @@ export function PinnedPanel(): JSX.Element {
             llmResult: aiResult.result || ''
           })
         } catch (err: unknown) {
-          const errorMsg = err instanceof Error ? err.message : 'AI processing failed'
+          const errorMsg =
+            err instanceof Error ? err.message : i18n.t('errors.aiFailed', 'AI processing failed')
           window.tapwisper.window.send('recordingPill', 'result-panel:error', errorMsg)
         }
       } else if (transcription) {
@@ -292,7 +315,11 @@ export function PinnedPanel(): JSX.Element {
       window.tapwisper.window.hide('pinnedPanel')
       // Tell main the recording is over so the next shortcut press starts fresh
       void window.tapwisper.recording.cancel()
-      showPillError(err instanceof Error ? err.message : 'Failed to start recording')
+      showPillError(
+        err instanceof Error
+          ? err.message
+          : i18n.t('errors.recordingStartFailed', 'Failed to start recording')
+      )
     }
   }, [startRecording])
 
@@ -405,6 +432,8 @@ export function PinnedPanel(): JSX.Element {
         {!isTranscribing ? (
           <button
             onClick={handleCancel}
+            aria-label={t('pinnedPanel.cancelRecording', 'Cancel recording')}
+            title={t('pinnedPanel.cancelRecording', 'Cancel recording')}
             className="no-drag w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer shrink-0"
           >
             <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -432,6 +461,8 @@ export function PinnedPanel(): JSX.Element {
         {state === 'recording' ? (
           <button
             onClick={handleStop}
+            aria-label={t('pinnedPanel.stopRecording', 'Stop recording')}
+            title={t('pinnedPanel.stopRecording', 'Stop recording')}
             className="no-drag w-8 h-8 rounded-full bg-recording-red hover:bg-red-500 flex items-center justify-center transition-all cursor-pointer shrink-0"
           >
             <div className="w-3 h-3 rounded-[2px] bg-white" />

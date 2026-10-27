@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import i18n from '../i18n'
 
 // Module-level constants to avoid repeated allocations
 const EMPTY_WAVEFORM: number[] = [0, 0, 0, 0, 0, 0, 0]
@@ -278,15 +279,25 @@ export function useAudio(): UseAudioReturn {
     } catch (error) {
       const name = error instanceof DOMException ? error.name : ''
       if (name === 'NotAllowedError' || name === 'SecurityError') {
-        throw new Error('Microphone access denied. Please allow microphone access.')
+        throw new Error(
+          i18n.t('errors.micDenied', 'Microphone access denied. Please allow microphone access.')
+        )
       }
       if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-        throw new Error('No microphone found. Please connect a microphone.')
+        throw new Error(
+          i18n.t('errors.micNotFound', 'No microphone found. Please connect a microphone.')
+        )
       }
       if (name === 'NotReadableError') {
-        throw new Error('The microphone is in use by another application.')
+        throw new Error(
+          i18n.t('errors.micInUse', 'The microphone is in use by another application.')
+        )
       }
-      throw new Error(error instanceof Error ? error.message : 'Failed to start recording')
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : i18n.t('errors.recordingStartFailed', 'Failed to start recording')
+      )
     }
   }, [updateWaveform, ensureWarmStream])
 

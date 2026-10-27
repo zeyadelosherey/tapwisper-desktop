@@ -265,7 +265,7 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
                       `}
                     >
                       {isRequesting
-                        ? '...'
+                        ? '…'
                         : perm.id === 'microphone'
                           ? t('onboarding.grant')
                           : t('onboarding.openSettings')
@@ -298,7 +298,9 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
               <>
                 <Shield className="w-4 h-4 text-theme-text-muted" />
                 <span className="text-theme-text-muted">
-                  {pendingCount} {t('onboarding.permissionsRemaining')}
+                  {t('onboarding.permissionsRemainingCount', '{{count}} permissions remaining', {
+                    count: pendingCount
+                  })}
                 </span>
               </>
             )}

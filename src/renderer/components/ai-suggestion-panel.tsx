@@ -14,6 +14,8 @@ import {
 } from '../models/actions-config'
 import { CATEGORY_COLORS } from '../constants/colors'
 import { useOverlayHitRegion } from '../hooks/use-overlay-hit-region'
+import { actionLabel as builtInActionLabel, displayActionName } from '../utils/action-labels'
+import i18n from '../i18n'
 
 type PanelMode = 'suggestion' | 'ask-question'
 
@@ -42,7 +44,9 @@ interface ConversationMessage {
 }
 
 function getErrorMessage(err: unknown): string {
-  return err instanceof Error && err.message ? err.message : String(err || 'Unknown error')
+  return err instanceof Error && err.message
+    ? err.message
+    : String(err || i18n.t('common.unknownError', 'Unknown error'))
 }
 
 /** Find an action prompt: the user's stored (possibly edited) actions win. */
@@ -328,7 +332,8 @@ export function AISuggestionPanel(): JSX.Element {
         text: originalText,
         systemInstruction: 'You are a helpful assistant. The user has shared some text and is asking a question about it. Answer their question based on the provided text context. Be concise and helpful.'
       })
-      const aiResponse = response.result || 'Sorry, I could not generate a response.'
+      const aiResponse =
+        response.result || t('aiPanel.noResponse', 'Sorry, I could not generate a response.')
       setConversation([...newConv, { role: 'ai', text: aiResponse }])
       setAnswer(aiResponse)
       addAIAction('ask-question', aiResponse.length)
@@ -355,6 +360,7 @@ export function AISuggestionPanel(): JSX.Element {
       cat.actions.map((action) => ({
         id: action.id,
         label: action.label,
+        displayLabel: builtInActionLabel(t, action),
         prompt: action.prompt,
         color: CATEGORY_COLORS[cat.id] || cat.color
       }))
@@ -414,13 +420,22 @@ export function AISuggestionPanel(): JSX.Element {
           <div className="drag-region no-select flex items-center gap-2 px-4 py-3 border-b border-theme-border/50">
             <Sparkles className="w-4 h-4 text-sky-accent no-drag" />
             <span className="flex-1 text-sm font-medium text-theme-text">
-              {mode === 'ask-question' ? t('actions.askQuestion') : actionName || 'AI Assistant'}
+              {mode === 'ask-question'
+                ? t('actions.askQuestion')
+                : actionName
+                  ? displayActionName(t, actionName)
+                  : t('aiPanel.assistant', 'AI Assistant')}
             </span>
             <div className="flex items-center gap-1.5 no-drag">
               <button
                 onClick={handleToggleExpand}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-theme-surface/50 text-theme-text-tertiary hover:text-sky-accent hover:bg-sky-accent/10 transition-all text-xs font-medium"
-                title={isExpanded ? t('aiPanel.collapse', 'Collapse panel') : t('aiPanel.expand', 'Expand panel')}
+                title={
+                  isExpanded
+                    ? t('aiPanel.collapsePanel', 'Collapse panel')
+                    : t('aiPanel.expandPanel', 'Expand panel')
+                }
+                aria-expanded={isExpanded}
               >
                 {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                 <span>{isExpanded ? t('aiPanel.collapse', 'Collapse') : t('aiPanel.expand', 'Expand')}</span>
@@ -456,7 +471,9 @@ export function AISuggestionPanel(): JSX.Element {
                     {actionName && (
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-accent/10 border border-sky-accent/20">
                         <Sparkles className="w-3 h-3 text-sky-accent/70" />
-                        <span className="text-[11px] font-medium text-sky-accent/70">{actionName}</span>
+                        <span className="text-[11px] font-medium text-sky-accent/70">
+                          {displayActionName(t, actionName)}
+                        </span>
                       </div>
                     )}
                     <div className="flex gap-1.5">
@@ -477,10 +494,14 @@ export function AISuggestionPanel(): JSX.Element {
                           <div className="flex items-center gap-1.5">
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-accent/10 border border-sky-accent/20">
                               <Sparkles className="w-3 h-3 text-sky-accent/70" />
-                              <span className="text-[11px] font-medium text-sky-accent/70">{actionName}</span>
+                              <span className="text-[11px] font-medium text-sky-accent/70">
+                                {displayActionName(t, actionName)}
+                              </span>
                             </div>
                             {resultHistory.length > 1 && (
-                              <span className="text-[10px] text-theme-text-muted">latest</span>
+                              <span className="text-[10px] text-theme-text-muted">
+                                {t('recordingPill.latest', 'latest')}
+                              </span>
                             )}
                           </div>
                         )}
@@ -496,7 +517,9 @@ export function AISuggestionPanel(): JSX.Element {
                       <div className="space-y-2 pt-1">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 border-t border-theme-border/30" />
-                          <span className="text-[10px] text-theme-text-muted uppercase tracking-wider">Previous versions</span>
+                          <span className="text-[10px] text-theme-text-muted uppercase tracking-wider">
+                            {t('aiPanel.previousVersions', 'Previous versions')}
+                          </span>
                           <div className="flex-1 border-t border-theme-border/30" />
                         </div>
 
@@ -505,15 +528,19 @@ export function AISuggestionPanel(): JSX.Element {
                             <div className="flex items-center gap-1.5 mb-1">
                               <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-theme-surface/40">
                                 <Sparkles className="w-2.5 h-2.5 text-theme-text-tertiary" />
-                                <span className="text-[10px] font-medium text-theme-text-tertiary">{entry.actionName}</span>
+                                <span className="text-[10px] font-medium text-theme-text-tertiary">
+                                  {displayActionName(t, entry.actionName)}
+                                </span>
                               </div>
                               <button
                                 onClick={() => handleRevert(idx)}
                                 className="no-drag opacity-0 group-hover:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-accent/10 text-sky-accent hover:bg-sky-accent/20 transition-all"
-                                title="Revert to this version"
+                                title={t('aiPanel.revertToVersion', 'Revert to this version')}
                               >
                                 <RotateCcw className="w-2.5 h-2.5" />
-                                <span className="text-[10px] font-medium">Revert</span>
+                                <span className="text-[10px] font-medium">
+                                  {t('recordingPill.revert', 'Revert')}
+                                </span>
                               </button>
                             </div>
                             <div className="text-xs text-theme-text-secondary leading-relaxed p-2.5 bg-theme-surface/20 rounded-lg line-clamp-3 opacity-60">
@@ -544,7 +571,7 @@ export function AISuggestionPanel(): JSX.Element {
                     {showHint && hasResult && resultHistory.length <= 1 && (
                       <div className="flex items-center justify-between px-3 py-2 bg-sky-accent/10 rounded-lg">
                         <p className="text-xs text-sky-accent/70">
-                          {t('aiPanel.revertHint', 'Click the ✨ button to apply more actions')}
+                          {t('aiPanel.moreActionsHint', 'Click the ✨ button to apply more actions')}
                         </p>
                         <button
                           onClick={() => setShowHint(false)}
@@ -681,7 +708,7 @@ export function AISuggestionPanel(): JSX.Element {
             {/* Sidebar header */}
             <div className="no-select px-3 py-2.5 border-b border-theme-border/50">
               <p className="text-xs font-semibold text-theme-text-secondary uppercase tracking-wider">
-                Actions
+                {t('nav.actions', 'Actions')}
               </p>
             </div>
 
@@ -700,7 +727,7 @@ export function AISuggestionPanel(): JSX.Element {
                       color: action.color
                     }}
                   >
-                    {action.label}
+                    {action.displayLabel}
                   </button>
                 ))}
               </div>

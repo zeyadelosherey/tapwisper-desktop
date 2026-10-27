@@ -17,9 +17,57 @@ import {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-import { formatDuration, formatTimeAgo, formatDate, formatTime } from '../utils/formatting'
+import {
+  formatCompactNumber,
+  formatDuration,
+  formatTimeAgo,
+  formatDate,
+  formatTime,
+  weekdayLabelsMondayFirst
+} from '../utils/formatting'
+import { displayActionName } from '../utils/action-labels'
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const LEGACY_VOICE_DESCRIPTION = /^Transcribed (\d+) words$/
+const LEGACY_AI_DESCRIPTION = /^AI Action: (.+)$/
+const LEGACY_SECONDS_VALUE = /^(\d+)s$/
+const LEGACY_CHARS_VALUE = /^(\d+) chars$/
+
+/** Action names stored as ids (e.g. "miniapp-p1") get a readable fallback */
+function activityActionName(t: TFunction, action: string): string {
+  const name = displayActionName(t, action)
+  if (name !== action || !/^[a-z0-9]+(-[a-z0-9]+)+$/.test(action)) return name
+  return action.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+}
+
+/**
+ * Text for a dashboard activity entry. Entries carry structured fields;
+ * older stored entries only have English text, which is parsed when possible.
+ */
+function activityDescription(t: TFunction, entry: ActivityEntry): string {
+  if (entry.type === 'voice') {
+    const legacy = LEGACY_VOICE_DESCRIPTION.exec(entry.description)
+    const words = entry.words ?? (legacy ? Number(legacy[1]) : undefined)
+    return words === undefined
+      ? entry.description
+      : t('home.activityTranscribed', 'Transcribed {{count}} words', { count: words })
+  }
+  const action = entry.action ?? LEGACY_AI_DESCRIPTION.exec(entry.description)?.[1]
+  return action === undefined
+    ? entry.description
+    : t('home.activityAiAction', 'AI action: {{action}}', {
+        action: activityActionName(t, action)
+      })
+}
+
+function activityValue(t: TFunction, entry: ActivityEntry): string | undefined {
+  const legacySeconds = entry.value ? LEGACY_SECONDS_VALUE.exec(entry.value) : null
+  const seconds = entry.seconds ?? (legacySeconds ? Number(legacySeconds[1]) : undefined)
+  if (seconds !== undefined) return formatDuration(seconds)
+  const legacyChars = entry.value ? LEGACY_CHARS_VALUE.exec(entry.value) : null
+  const chars = entry.chars ?? (legacyChars ? Number(legacyChars[1]) : undefined)
+  if (chars !== undefined) return t('home.charsCount', '{{count}} chars', { count: chars })
+  return entry.value
+}
 
 type HomeTab = 'dashboard' | 'activity'
 
@@ -73,7 +121,7 @@ function joinShortcutParts(parts: string[]): string {
 // ── Component ────────────────────────────────────────────────────
 
 export function Home(): JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<HomeTab>('dashboard')
 
   const {
@@ -141,7 +189,7 @@ export function Home(): JSX.Element {
   const statCards = useMemo(() => [
     {
       label: t('home.timeSaved'),
-      value: timeSavedMinutes > 0 ? `${timeSavedMinutes}m` : '0m',
+      value: formatDuration(timeSavedMinutes * 60),
       subtext: t('home.timeSavedSub', 'vs. manual typing'),
       icon: <Clock className="w-5 h-5" />,
       color: '#4DC778',
@@ -151,7 +199,7 @@ export function Home(): JSX.Element {
       label: t('home.voiceInput'),
       value: formatDuration(voiceSeconds),
       subtext: wordsPerMinute > 0
-        ? `${wordsPerMinute} ${t('home.wpm', 'WPM')}`
+        ? t('home.wpmValue', '{{value}} WPM', { value: wordsPerMinute })
         : t('home.noRecordings', 'No recordings yet'),
       icon: <Mic className="w-5 h-5" />,
       color: '#F04545',
@@ -159,9 +207,11 @@ export function Home(): JSX.Element {
     },
     {
       label: t('home.aiActions'),
-      value: aiActions.toString(),
+      value: formatCompactNumber(aiActions),
       subtext: outputChars > 0
-        ? `${(outputChars / 1000).toFixed(1)}k ${t('home.charsGenerated', 'chars generated')}`
+        ? t('home.charsGeneratedValue', '{{value}} chars generated', {
+            value: formatCompactNumber(outputChars)
+          })
         : t('home.noActions', 'No actions yet'),
       icon: <Zap className="w-5 h-5" />,
       color: '#7EB6E0',
@@ -169,15 +219,23 @@ export function Home(): JSX.Element {
     },
     {
       label: t('home.wordsTyped'),
-      value: wordCount > 999
-        ? `${(wordCount / 1000).toFixed(1)}k`
-        : wordCount.toString(),
+      value: formatCompactNumber(wordCount),
       subtext: t('home.wordsTypedSub', 'transcribed by voice'),
       icon: <Type className="w-5 h-5" />,
       color: '#B07CD8',
       gradient: 'from-purple-500/10 to-violet-500/5'
     }
-  ], [t, timeSavedMinutes, voiceSeconds, wordsPerMinute, aiActions, outputChars, wordCount])
+    // i18n.language: number/duration formatting follows the UI language
+  ], [
+    t,
+    i18n.language,
+    timeSavedMinutes,
+    voiceSeconds,
+    wordsPerMinute,
+    aiActions,
+    outputChars,
+    wordCount
+  ])
 
   if (!isLoaded || !activityLoaded) {
     return (
@@ -206,7 +264,9 @@ export function Home(): JSX.Element {
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-accent/10">
               <TrendingUp className="w-3.5 h-3.5 text-green-accent" />
               <span className="text-xs font-medium text-green-accent">
-                {timeSavedMinutes}m {t('home.saved', 'saved')}
+                {t('home.timeSavedBadge', '{{time}} saved', {
+                  time: formatDuration(timeSavedMinutes * 60)
+                })}
               </span>
             </div>
           )}
@@ -243,7 +303,7 @@ export function Home(): JSX.Element {
           {activityTotal > 0 && (
             <span
               className="ms-1 min-w-5 h-5 px-1 flex items-center justify-center text-[10px] font-semibold bg-sky-accent/15 text-sky-accent rounded-full"
-              aria-label={`${activityTotal}`}
+              aria-label={t('home.activityCount', '{{count}} records', { count: activityTotal })}
             >
               {activityTotal > 99 ? '99+' : activityTotal}
             </span>
@@ -288,7 +348,7 @@ interface ActivityTabProps {
 }
 
 // Helper to render text with code blocks
-function renderTextWithCodeBlocks(text: string): JSX.Element {
+function renderTextWithCodeBlocks(text: string, t: TFunction): JSX.Element {
   // Match code blocks: ```language\ncode\n``` or ```\ncode\n```
   const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
   const parts: JSX.Element[] = []
@@ -320,10 +380,10 @@ function renderTextWithCodeBlocks(text: string): JSX.Element {
             onClick={() => navigator.clipboard.writeText(code)}
             className="text-[10px] text-theme-text-muted hover:text-theme-text transition-colors"
           >
-            Copy
+            {t('home.copy', 'Copy')}
           </button>
         </div>
-        <pre className="p-3 bg-theme-surface/30 overflow-x-auto">
+        <pre className="p-3 bg-theme-surface/30 overflow-x-auto" dir="ltr">
           <code className="text-xs text-theme-text font-mono">{code}</code>
         </pre>
       </div>
@@ -476,7 +536,7 @@ function ActivityTab({
         </div>
         {debouncedSearch && page && (
           <p className="text-xs text-theme-text-muted mt-2" aria-live="polite">
-            {filteredTotal} {filteredTotal === 1 ? t('home.result', 'result') : t('home.results', 'results')}
+            {t('home.resultCount', '{{count}} results', { count: filteredTotal })}
           </p>
         )}
       </div>
@@ -578,12 +638,12 @@ function ActivityTab({
                           )}
                           {record.wordCount > 0 && (
                             <span className="text-[10px] px-1.5 py-0.5 bg-theme-surface/50 rounded text-theme-text-muted">
-                              {record.wordCount} words
+                              {t('home.wordCount', '{{count}} words', { count: record.wordCount })}
                             </span>
                           )}
                           {hasLLM && record.llmAction && (
                             <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/10 rounded text-purple-400 font-medium">
-                              {record.llmAction}
+                              {displayActionName(t, record.llmAction)}
                             </span>
                           )}
                         </div>
@@ -615,7 +675,11 @@ function ActivityTab({
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-theme-border/20">
           <p className="text-xs text-theme-text-muted">
-            {t('home.showing', 'Showing')} {startIndex + 1}-{Math.min(endIndex, filteredTotal)} {t('home.of', 'of')} {filteredTotal}
+            {t('home.showingRange', 'Showing {{start}}–{{end}} of {{total}}', {
+              start: startIndex + 1,
+              end: Math.min(endIndex, filteredTotal),
+              total: filteredTotal
+            })}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -703,7 +767,9 @@ function ActivityTab({
                 </div>
                 <div>
                   <h3 id="activity-detail-title" className="text-sm font-semibold text-theme-text">
-                    {selectedRecord.llmAction || t('home.voiceNote', 'Voice Note')}
+                    {selectedRecord.llmAction
+                      ? displayActionName(t, selectedRecord.llmAction)
+                      : t('home.voiceNote', 'Voice Note')}
                   </h3>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-theme-text-muted">
@@ -741,7 +807,7 @@ function ActivityTab({
                   </div>
                   <div className="bg-theme-surface/30 rounded-xl p-3 border border-theme-border/20">
                     <div className="text-sm text-theme-text leading-relaxed">
-                      {renderTextWithCodeBlocks(selectedRecord.transcription)}
+                      {renderTextWithCodeBlocks(selectedRecord.transcription, t)}
                     </div>
                   </div>
                 </div>
@@ -770,7 +836,7 @@ function ActivityTab({
                   {showOriginalInput && (
                     <div className="p-3 border-t border-sky-accent/20 bg-sky-accent/8">
                       <div className="text-sm text-theme-text leading-relaxed">
-                        {renderTextWithCodeBlocks(selectedRecord.llmInput)}
+                        {renderTextWithCodeBlocks(selectedRecord.llmInput, t)}
                       </div>
                     </div>
                   )}
@@ -800,7 +866,7 @@ function ActivityTab({
                   {showLLMResult && (
                     <div className="p-3 border-t border-purple-500/20 bg-purple-500/8">
                       <div className="text-sm text-theme-text leading-relaxed">
-                        {renderTextWithCodeBlocks(selectedRecord.llmResult)}
+                        {renderTextWithCodeBlocks(selectedRecord.llmResult, t)}
                       </div>
                     </div>
                   )}
@@ -871,6 +937,9 @@ function DashboardTab({
   recordShortcut,
   t
 }: DashboardTabProps): JSX.Element {
+  const { i18n } = useTranslation()
+  // Weekday names follow the UI language (Monday first, matching dailyStats)
+  const dayLabels = useMemo(() => weekdayLabelsMondayFirst(), [i18n.language])
   const shortcutParts = formatShortcutParts(recordShortcut)
   const recordKeys = joinShortcutParts(shortcutParts)
   // Hold the shortcut and tap its main key again to open the pinned panel
@@ -957,7 +1026,7 @@ function DashboardTab({
 
         {/* Chart */}
         <div className="flex items-end gap-1.5 h-28">
-          {DAY_LABELS.map((day, idx) => {
+          {dayLabels.map((day, idx) => {
             const stats = dailyStats?.[idx] || { voiceSeconds: 0, timeSavedSeconds: 0 }
             const voicePct = (stats.voiceSeconds / chartMax) * 100
             const savedPct = (stats.timeSavedSeconds / chartMax) * 100
@@ -965,7 +1034,7 @@ function DashboardTab({
             const isToday = idx === todayIdx
 
             return (
-              <div key={day} className="flex-1 flex flex-col items-center gap-1.5 group/bar">
+              <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group/bar">
                 <div className="w-full flex flex-col justify-end h-20 relative">
                   {/* Background track */}
                   <div className="absolute inset-0 bg-theme-surface/30 rounded-lg" />
@@ -991,7 +1060,9 @@ function DashboardTab({
                   {(stats.voiceSeconds > 0 || stats.timeSavedSeconds > 0) && (
                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-opacity pointer-events-none z-10">
                       <div className="bg-theme-text text-theme-bg text-[9px] font-medium px-2 py-1 rounded-md whitespace-nowrap">
-                        {formatDuration(stats.voiceSeconds)} voice
+                        {t('home.voiceTooltip', '{{duration}} voice', {
+                          duration: formatDuration(stats.voiceSeconds)
+                        })}
                       </div>
                     </div>
                   )}
@@ -1061,13 +1132,15 @@ function DashboardTab({
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-theme-text truncate">{entry.description}</p>
+                  <p className="text-xs text-theme-text truncate">
+                    {activityDescription(t, entry)}
+                  </p>
                   <p className="text-[10px] text-theme-text-muted">{formatTimeAgo(entry.timestamp)}</p>
                 </div>
 
-                {entry.value && (
+                {activityValue(t, entry) && (
                   <span className="text-[10px] font-medium text-theme-text-secondary bg-theme-surface/50 px-2 py-0.5 rounded-full shrink-0">
-                    {entry.value}
+                    {activityValue(t, entry)}
                   </span>
                 )}
               </div>

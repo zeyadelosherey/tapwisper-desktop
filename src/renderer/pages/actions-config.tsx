@@ -17,6 +17,7 @@ import { useConfirmDialog } from '../components/confirm-dialog'
 import type { ConfirmDialogOptions } from '../components/confirm-dialog'
 import type { ActionCategory, ActionItem } from '../models/actions-config'
 import { BUILT_IN_CATEGORIES } from '../models/actions-config'
+import { actionLabel, categoryLabel } from '../utils/action-labels'
 
 const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-sky-accent/60'
 const ICON_BUTTON = `w-8 h-8 rounded-lg flex items-center justify-center text-theme-text-tertiary transition-all disabled:opacity-30 disabled:pointer-events-none ${FOCUS_RING}`
@@ -463,7 +464,7 @@ export function ActionsConfig(): JSX.Element {
         message: t(
           'actions.deleteCategoryMessage',
           'The category "{{name}}" and all of its actions will be permanently removed.',
-          { name: category.label }
+          { name: categoryLabel(t, category) }
         )
       })
       if (!ok) return
@@ -474,9 +475,7 @@ export function ActionsConfig(): JSX.Element {
   )
 
   const actionCountLabel = (count: number): string =>
-    `${count} ${
-      count !== 1 ? t('actions.actionPlural', 'actions') : t('actions.actionSingular', 'action')
-    }`
+    t('actions.actionCount', '{{count}} actions', { count })
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -506,7 +505,7 @@ export function ActionsConfig(): JSX.Element {
                 }}
               >
                 <CategoryIcon name={category.icon} className="w-3.5 h-3.5" />
-                {category.label}
+                {categoryLabel(t, category)}
               </span>
             ))}
         </div>
@@ -551,7 +550,7 @@ export function ActionsConfig(): JSX.Element {
                       onClick={() => moveCategory(index, -1)}
                       disabled={index === 0}
                       aria-label={t('actions.moveCategoryUp', 'Move {{name}} up', {
-                        name: category.label
+                        name: categoryLabel(t, category)
                       })}
                       title={t('common.moveUp', 'Move up')}
                       className={SMALL_ARROW_BUTTON}
@@ -562,7 +561,7 @@ export function ActionsConfig(): JSX.Element {
                       onClick={() => moveCategory(index, 1)}
                       disabled={index === sortedCategories.length - 1}
                       aria-label={t('actions.moveCategoryDown', 'Move {{name}} down', {
-                        name: category.label
+                        name: categoryLabel(t, category)
                       })}
                       title={t('common.moveDown', 'Move down')}
                       className={SMALL_ARROW_BUTTON}
@@ -577,7 +576,9 @@ export function ActionsConfig(): JSX.Element {
                     <CategoryIcon name={category.icon} className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-theme-text truncate">{category.label}</p>
+                    <p className="text-sm font-medium text-theme-text truncate">
+                      {categoryLabel(t, category)}
+                    </p>
                     <p className="text-xs text-theme-text-tertiary">
                       {actionCountLabel(category.actions.length)}
                       {hiddenCount > 0 &&
@@ -590,7 +591,7 @@ export function ActionsConfig(): JSX.Element {
                       aria-expanded={isExpanded}
                       aria-controls={`actions-${category.id}`}
                       aria-label={t('actions.manageActions', 'Show actions in {{name}}', {
-                        name: category.label
+                        name: categoryLabel(t, category)
                       })}
                       title={t('actions.manageActionsShort', 'Show actions')}
                       className={`${ICON_BUTTON} hover:text-theme-text`}
@@ -605,10 +606,10 @@ export function ActionsConfig(): JSX.Element {
                     aria-label={
                       category.isVisible
                         ? t('actions.hideCategory', 'Hide {{name}} from toolbar', {
-                            name: category.label
+                            name: categoryLabel(t, category)
                           })
                         : t('actions.showCategory', 'Show {{name}} in toolbar', {
-                            name: category.label
+                            name: categoryLabel(t, category)
                           })
                     }
                     className={`${ICON_BUTTON} hover:text-theme-text`}
@@ -627,7 +628,7 @@ export function ActionsConfig(): JSX.Element {
                           setEditor(category.id)
                         }}
                         aria-label={t('actions.editCategoryNamed', 'Edit {{name}}', {
-                          name: category.label
+                          name: categoryLabel(t, category)
                         })}
                         title={t('common.edit', 'Edit')}
                         className={`${ICON_BUTTON} hover:text-sky-accent`}
@@ -637,7 +638,7 @@ export function ActionsConfig(): JSX.Element {
                       <button
                         onClick={() => handleDeleteCategory(category)}
                         aria-label={t('actions.deleteCategoryNamed', 'Delete {{name}}', {
-                          name: category.label
+                          name: categoryLabel(t, category)
                         })}
                         title={t('common.delete', 'Delete')}
                         className={`${ICON_BUTTON} hover:text-recording-red`}
@@ -659,7 +660,9 @@ export function ActionsConfig(): JSX.Element {
                           className="flex items-center gap-3 px-3 py-2 rounded-lg bg-theme-surface/30"
                         >
                           <div className={`flex-1 min-w-0 ${isHidden ? 'opacity-50' : ''}`}>
-                            <p className="text-sm text-theme-text truncate">{action.label}</p>
+                            <p className="text-sm text-theme-text truncate">
+                              {actionLabel(t, action)}
+                            </p>
                             <p className="text-xs text-theme-text-muted truncate">
                               {action.prompt}
                             </p>
@@ -668,8 +671,12 @@ export function ActionsConfig(): JSX.Element {
                             onClick={() => toggleActionHidden(category.id, action.id)}
                             aria-label={
                               isHidden
-                                ? t('actions.showAction', 'Show {{name}}', { name: action.label })
-                                : t('actions.hideAction', 'Hide {{name}}', { name: action.label })
+                                ? t('actions.showAction', 'Show {{name}}', {
+                                    name: actionLabel(t, action)
+                                  })
+                                : t('actions.hideAction', 'Hide {{name}}', {
+                                    name: actionLabel(t, action)
+                                  })
                             }
                             className={`${ICON_BUTTON} hover:text-theme-text`}
                           >

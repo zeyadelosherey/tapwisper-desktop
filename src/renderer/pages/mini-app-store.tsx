@@ -411,7 +411,7 @@ export function MiniAppStore(): JSX.Element {
             }}
           >
             <CategoryIcon name={cat.icon} className="w-3.5 h-3.5" />
-            {cat.label}
+            {t(`miniApps.categories.${cat.id}`, cat.label)}
           </button>
         ))}
       </div>

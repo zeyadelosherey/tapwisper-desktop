@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { processText, type AIResponse } from '../services/ai-router'
 import { useStatsStore } from '../store/stats'
 import { useActivityStore } from '../store/activity'
+import i18n from '../i18n'
 
 interface UseAIActionReturn {
   isProcessing: boolean
@@ -45,7 +46,8 @@ export function useAIAction(): UseAIActionReturn {
 
         return response
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'An error occurred'
+        const message =
+          err instanceof Error ? err.message : i18n.t('common.unknownError', 'Unknown error')
         setError(message)
         setIsProcessing(false)
         return null

@@ -4,6 +4,7 @@ import { Sparkles, Search, MessageCircle, ChevronRight, X } from 'lucide-react'
 import { BUILT_IN_CATEGORIES, type ActionCategory, type ActionItem } from '../models/actions-config'
 import { CATEGORY_COLORS } from '../constants/colors'
 import { CategoryIcon } from './icon-map'
+import { actionLabel, categoryLabel } from '../utils/action-labels'
 
 export function CommandPopup(): JSX.Element {
   const { t } = useTranslation()
@@ -76,15 +77,18 @@ export function CommandPopup(): JSX.Element {
   const filteredCategories = useMemo(() => {
     if (!searchQuery) return visibleCategories
     const q = searchQuery.toLowerCase()
+    // Match both the displayed (translated) name and the stored English one
+    const matches = (stored: string, shown: string): boolean =>
+      stored.toLowerCase().includes(q) || shown.toLowerCase().includes(q)
     return visibleCategories
       .map((cat) => ({
         ...cat,
-        actions: cat.label.toLowerCase().includes(q)
+        actions: matches(cat.label, categoryLabel(t, cat))
           ? cat.actions
-          : cat.actions.filter((a) => a.label.toLowerCase().includes(q))
+          : cat.actions.filter((a) => matches(a.label, actionLabel(t, a)))
       }))
       .filter((cat) => cat.actions.length > 0)
-  }, [searchQuery, visibleCategories])
+  }, [searchQuery, visibleCategories, t])
 
   const handleAction = useCallback(
     (action: ActionItem) => {
@@ -194,7 +198,7 @@ export function CommandPopup(): JSX.Element {
                     </span>
                   </div>
                   <span className="flex-1 text-sm font-medium text-theme-text">
-                    {category.label}
+                    {categoryLabel(t, category)}
                   </span>
                   <ChevronRight
                     className={`w-4 h-4 text-theme-text-muted shrink-0 transition-transform duration-200 ${
@@ -211,7 +215,7 @@ export function CommandPopup(): JSX.Element {
                         onClick={() => handleAction(action)}
                         className="no-drag w-full text-start px-3 py-2 rounded-lg text-sm text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/40 transition-all"
                       >
-                        {action.label}
+                        {actionLabel(t, action)}
                       </button>
                     ))}
                   </div>

@@ -36,7 +36,11 @@ export function formatLocaleDate(
   }
 }
 
-export function groupNotesByDate(notes: Note[], locale?: string): NoteGroup[] {
+export function groupNotesByDate(
+  notes: Note[],
+  locale?: string,
+  labels: { today: string; yesterday: string } = { today: 'Today', yesterday: 'Yesterday' }
+): NoteGroup[] {
   const groups = new Map<string, Note[]>()
 
   for (const note of notes) {
@@ -55,9 +59,9 @@ export function groupNotesByDate(notes: Note[], locale?: string): NoteGroup[] {
       date,
       label:
         date === today
-          ? 'Today'
+          ? labels.today
           : date === yesterday
-            ? 'Yesterday'
+            ? labels.yesterday
             : formatLocaleDate(new Date(date), locale, {
                 month: 'long',
                 day: 'numeric'

@@ -7,6 +7,7 @@ import { transcribeWithSoniox } from './soniox'
 
 export type { LLMProvider, VoiceProvider } from '../constants/providers'
 import type { LLMProvider, VoiceProvider } from '../constants/providers'
+import i18n from '../i18n'
 
 export interface AIRequest {
   prompt: string
@@ -46,7 +47,13 @@ export async function processText(request: AIRequest): Promise<AIResponse> {
   const model = request.modelOverride || config.models?.[provider] || ''
 
   if (!apiKey) {
-    throw new Error(`No API key configured for ${provider}. Please add your API key in Settings > AI Provider.`)
+    throw new Error(
+      i18n.t(
+        'errors.noApiKey',
+        'No API key configured for {{provider}}. Please add your API key in Settings > AI Provider.',
+        { provider }
+      )
+    )
   }
 
   switch (provider) {
@@ -125,7 +132,13 @@ export async function transcribeAudio(
   const voiceModel = config.voiceModels?.[provider]
 
   if (!apiKey) {
-    throw new Error(`No API key configured for ${provider}. Please add your API key in Settings > AI Provider.`)
+    throw new Error(
+      i18n.t(
+        'errors.noApiKey',
+        'No API key configured for {{provider}}. Please add your API key in Settings > AI Provider.',
+        { provider }
+      )
+    )
   }
 
   const speechLanguage = languageOverride || config.speechLanguage || 'auto'

@@ -1,5 +1,6 @@
 import { type JSX, useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   Globe, Shield, Info, Monitor, Moon, Sun, Keyboard, RotateCcw,
   Eye, EyeOff, Check, AlertCircle, Cpu, Settings2, Mic, Search, X, Mail
@@ -15,32 +16,36 @@ import sonioxLogo from '../assets/soniox.png'
 
 // ── Constants ────────────────────────────────────────────────────
 
-/** Languages offered for speech recognition (ISO-639-1). 'auto' lets the model detect. */
-const SPEECH_LANGUAGES: { code: string; label: string }[] = [
-  { code: 'auto', label: 'Auto-detect' },
-  { code: 'en', label: 'English' },
-  { code: 'ar', label: 'العربية (Arabic)' },
-  { code: 'de', label: 'Deutsch (German)' },
-  { code: 'es', label: 'Español (Spanish)' },
-  { code: 'fr', label: 'Français (French)' },
-  { code: 'it', label: 'Italiano (Italian)' },
-  { code: 'pt', label: 'Português (Portuguese)' },
-  { code: 'nl', label: 'Nederlands (Dutch)' },
-  { code: 'tr', label: 'Türkçe (Turkish)' },
-  { code: 'ru', label: 'Русский (Russian)' },
-  { code: 'uk', label: 'Українська (Ukrainian)' },
-  { code: 'pl', label: 'Polski (Polish)' },
-  { code: 'sv', label: 'Svenska (Swedish)' },
-  { code: 'fa', label: 'فارسی (Persian)' },
-  { code: 'ur', label: 'اردو (Urdu)' },
-  { code: 'hi', label: 'हिन्दी (Hindi)' },
-  { code: 'zh', label: '中文 (Chinese)' },
-  { code: 'ja', label: '日本語 (Japanese)' },
-  { code: 'ko', label: '한국어 (Korean)' },
-  { code: 'id', label: 'Bahasa Indonesia' },
-  { code: 'vi', label: 'Tiếng Việt (Vietnamese)' }
+/**
+ * Languages offered for speech recognition (ISO-639-1), by native name.
+ * 'auto' lets the model detect.
+ */
+const SPEECH_LANGUAGES: { code: string; nativeLabel: string }[] = [
+  { code: 'auto', nativeLabel: '' },
+  { code: 'en', nativeLabel: 'English' },
+  { code: 'ar', nativeLabel: 'العربية' },
+  { code: 'de', nativeLabel: 'Deutsch' },
+  { code: 'es', nativeLabel: 'Español' },
+  { code: 'fr', nativeLabel: 'Français' },
+  { code: 'it', nativeLabel: 'Italiano' },
+  { code: 'pt', nativeLabel: 'Português' },
+  { code: 'nl', nativeLabel: 'Nederlands' },
+  { code: 'tr', nativeLabel: 'Türkçe' },
+  { code: 'ru', nativeLabel: 'Русский' },
+  { code: 'uk', nativeLabel: 'Українська' },
+  { code: 'pl', nativeLabel: 'Polski' },
+  { code: 'sv', nativeLabel: 'Svenska' },
+  { code: 'fa', nativeLabel: 'فارسی' },
+  { code: 'ur', nativeLabel: 'اردو' },
+  { code: 'hi', nativeLabel: 'हिन्दी' },
+  { code: 'zh', nativeLabel: '中文' },
+  { code: 'ja', nativeLabel: '日本語' },
+  { code: 'ko', nativeLabel: '한국어' },
+  { code: 'id', nativeLabel: 'Bahasa Indonesia' },
+  { code: 'vi', nativeLabel: 'Tiếng Việt' }
 ]
 
+/** App UI languages. `label` is the English name, used if Intl.DisplayNames is unavailable. */
 const LANGUAGES = [
   { code: 'en', label: 'English', nativeLabel: 'English' },
   { code: 'ar', label: 'Arabic', nativeLabel: 'العربية' },
@@ -49,6 +54,26 @@ const LANGUAGES = [
   { code: 'fr', label: 'French', nativeLabel: 'Français' },
   { code: 'de', label: 'German', nativeLabel: 'Deutsch' }
 ]
+
+/** Name of a language in the current UI language (e.g. "Arabisch" when the UI is German) */
+function languageName(code: string, uiLanguage: string, fallback: string): string {
+  try {
+    return new Intl.DisplayNames([uiLanguage], { type: 'language' }).of(code) || fallback
+  } catch {
+    return fallback
+  }
+}
+
+/** Speech language option: native name, plus its name in the UI language when different */
+function speechLanguageLabel(
+  lang: { code: string; nativeLabel: string },
+  uiLanguage: string
+): string {
+  const localized = languageName(lang.code, uiLanguage, lang.nativeLabel)
+  return localized.toLocaleLowerCase() === lang.nativeLabel.toLocaleLowerCase()
+    ? lang.nativeLabel
+    : `${lang.nativeLabel} (${localized})`
+}
 
 type Theme = 'system' | 'dark' | 'light'
 type SettingsTab = 'general' | 'ai-provider' | 'shortcuts' | 'about'
@@ -232,17 +257,94 @@ const DEFAULT_VOICE_MODELS: Record<VoiceProvider, string> = {
   soniox: 'stt-async-v4'
 }
 
-const LLM_API_KEY_LABELS: Record<LLMProvider, string> = {
-  gemini: 'Google Gemini API Key',
-  together: 'Together AI API Key',
-  openai: 'OpenAI API Key',
-  claude: 'Anthropic API Key'
+/** Provider names shown in the "<provider> API Key" label */
+const LLM_API_KEY_PROVIDERS: Record<LLMProvider, string> = {
+  gemini: 'Google Gemini',
+  together: 'Together AI',
+  openai: 'OpenAI',
+  claude: 'Anthropic'
 }
 
-const VOICE_API_KEY_LABELS: Record<VoiceProvider, string> = {
-  whisper: 'Together AI API Key',
-  'openai-whisper': 'OpenAI API Key',
-  soniox: 'Soniox API Key'
+const VOICE_API_KEY_PROVIDERS: Record<VoiceProvider, string> = {
+  whisper: 'Together AI',
+  'openai-whisper': 'OpenAI',
+  soniox: 'Soniox'
+}
+
+/** Translation keys for the fixed model descriptions above (model names are never translated) */
+const MODEL_DESCRIPTION_KEYS: Record<string, string> = {
+  'Fast & efficient': 'fastEfficient',
+  'Advanced reasoning': 'advancedReasoning',
+  'Next-gen speed': 'nextGenSpeed',
+  'Next-gen quality': 'nextGenQuality',
+  'Fast open-source': 'fastOpenSource',
+  'Reasoning model': 'reasoningModel',
+  'Open-source GPT': 'openSourceGpt',
+  'Lightweight open GPT': 'lightweightOpenGpt',
+  'Coding specialist': 'codingSpecialist',
+  'Next-gen coding': 'nextGenCoding',
+  'Large multilingual': 'largeMultilingual',
+  'Efficient MoE': 'efficientMoe',
+  'Reasoning MoE': 'reasoningMoe',
+  'Deep reasoning': 'deepReasoning',
+  'Balanced performance': 'balancedPerformance',
+  'Lightweight Google': 'lightweightGoogle',
+  'Fast & light': 'fastLight',
+  'Compact multilingual': 'compactMultilingual',
+  'Ultra-light': 'ultraLight',
+  'Flagship model': 'flagshipModel',
+  'Ultra-fast': 'ultraFast',
+  'Next-gen compact': 'nextGenCompact',
+  'Most capable': 'mostCapable',
+  'Latest flagship': 'latestFlagship',
+  'Best balance': 'bestBalance',
+  'Best accuracy': 'bestAccuracy',
+  'Fast multilingual STT': 'fastMultilingualStt',
+  'Reliable, multilingual': 'reliableMultilingual',
+  'Highest quality': 'highestQuality',
+  'Fast & affordable': 'fastAffordable',
+  'Multilingual, high accuracy': 'multilingualHighAccuracy'
+}
+
+function modelDescription(t: TFunction, description: string): string {
+  const key = MODEL_DESCRIPTION_KEYS[description]
+  if (key) return t(`modelDescriptions.${key}`, description)
+  let m = /^(\S+) context$/.exec(description)
+  if (m) return t('modelDescriptions.context', '{{size}} context', { size: m[1] })
+  m = /^(\S+) context, (\d+) experts$/.exec(description)
+  if (m) {
+    return t('modelDescriptions.contextExperts', '{{size}} context, {{experts}} experts', {
+      size: m[1],
+      experts: m[2]
+    })
+  }
+  m = /^(\S+) params, (\S+) context$/.exec(description)
+  if (m) {
+    return t('modelDescriptions.paramsContext', '{{params}} params, {{size}} context', {
+      params: m[1],
+      size: m[2]
+    })
+  }
+  m = /^Reasoning, (\S+) context$/.exec(description)
+  if (m) {
+    return t('modelDescriptions.reasoningContext', 'Reasoning, {{size}} context', { size: m[1] })
+  }
+  return description
+}
+
+/** Model search matches the id, the name and the description in either language */
+function modelMatches(
+  t: TFunction,
+  model: { id: string; label: string; description: string },
+  query: string
+): boolean {
+  const q = query.toLowerCase()
+  return (
+    model.label.toLowerCase().includes(q) ||
+    model.description.toLowerCase().includes(q) ||
+    modelDescription(t, model.description).toLowerCase().includes(q) ||
+    model.id.toLowerCase().includes(q)
+  )
 }
 
 /** Which API key ID to use for a voice provider (whisper shares together's key, openai-whisper shares openai's key) */
@@ -462,11 +564,31 @@ function ShortcutRecorder({
 
 // ── Tab Definitions ─────────────────────────────────────────────
 
-const TABS: { id: SettingsTab; labelKey: string; icon: React.ReactNode }[] = [
-  { id: 'general', labelKey: 'settings.tabGeneral', icon: <Settings2 className="w-4 h-4" /> },
-  { id: 'ai-provider', labelKey: 'settings.tabAIProvider', icon: <Cpu className="w-4 h-4" /> },
-  { id: 'shortcuts', labelKey: 'settings.tabShortcuts', icon: <Keyboard className="w-4 h-4" /> },
-  { id: 'about', labelKey: 'settings.tabAbout', icon: <Info className="w-4 h-4" /> }
+const TABS: { id: SettingsTab; labelKey: string; fallback: string; icon: React.ReactNode }[] = [
+  {
+    id: 'general',
+    labelKey: 'settings.tabGeneral',
+    fallback: 'General',
+    icon: <Settings2 className="w-4 h-4" />
+  },
+  {
+    id: 'ai-provider',
+    labelKey: 'settings.tabAIProvider',
+    fallback: 'AI Provider',
+    icon: <Cpu className="w-4 h-4" />
+  },
+  {
+    id: 'shortcuts',
+    labelKey: 'settings.tabShortcuts',
+    fallback: 'Shortcuts',
+    icon: <Keyboard className="w-4 h-4" />
+  },
+  {
+    id: 'about',
+    labelKey: 'settings.tabAbout',
+    fallback: 'About',
+    icon: <Info className="w-4 h-4" />
+  }
 ]
 
 // ── API key status + test ───────────────────────────────────────
@@ -764,7 +886,9 @@ export function Settings(): JSX.Element {
               `}
             >
               <div className="text-start">
-                <p className="text-sm text-theme-text">{lang.label}</p>
+                <p className="text-sm text-theme-text">
+                  {languageName(lang.code, i18n.language, lang.label)}
+                </p>
                 <p className="text-xs text-theme-text-tertiary">{lang.nativeLabel}</p>
               </div>
               {language === lang.code && <div className="w-2 h-2 rounded-full bg-sky-accent" />}
@@ -800,7 +924,9 @@ export function Settings(): JSX.Element {
             >
               {SPEECH_LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
-                  {l.code === 'auto' ? t('settings.speechAutoDetect', 'Auto-detect') : l.label}
+                  {l.code === 'auto'
+                    ? t('settings.speechAutoDetect', 'Auto-detect')
+                    : speechLanguageLabel(l, i18n.language)}
                 </option>
               ))}
             </select>
@@ -950,9 +1076,12 @@ export function Settings(): JSX.Element {
 
     // Determine which API key fields to show based on selected sub-tab
     const activeApiKeyId = providerSubTab === 'ai' ? selectedLLM : VOICE_API_KEY_ID[selectedVoice]
-    const activeApiKeyLabel = providerSubTab === 'ai'
-      ? LLM_API_KEY_LABELS[selectedLLM]
-      : VOICE_API_KEY_LABELS[selectedVoice]
+    const activeApiKeyLabel = t('settings.providerApiKey', '{{provider}} API Key', {
+      provider:
+        providerSubTab === 'ai'
+          ? LLM_API_KEY_PROVIDERS[selectedLLM]
+          : VOICE_API_KEY_PROVIDERS[selectedVoice]
+    })
 
     return (
       <>
@@ -1052,6 +1181,7 @@ export function Settings(): JSX.Element {
                   {modelSearch && (
                     <button
                       onClick={() => setModelSearch('')}
+                      aria-label={t('home.clearSearch', 'Clear search')}
                       className="absolute end-3 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text transition-colors"
                     >
                       <X className="w-4 h-4" />
@@ -1061,11 +1191,7 @@ export function Settings(): JSX.Element {
               )}
               <div className="bg-theme-card rounded-xl border border-theme-border/50 overflow-hidden divide-y divide-theme-border/30 max-h-80 overflow-y-auto">
                 {PROVIDER_MODELS[selectedLLM]
-                  .filter((model) => {
-                    if (!modelSearch) return true
-                    const q = modelSearch.toLowerCase()
-                    return model.label.toLowerCase().includes(q) || model.description.toLowerCase().includes(q) || model.id.toLowerCase().includes(q)
-                  })
+                  .filter((model) => !modelSearch || modelMatches(t, model, modelSearch))
                   .map((model) => {
                   const isSelected = (models[selectedLLM] || DEFAULT_MODELS[selectedLLM]) === model.id
                   return (
@@ -1087,15 +1213,16 @@ export function Settings(): JSX.Element {
                         <p className={`text-sm font-medium ${isSelected ? 'text-sky-accent' : 'text-theme-text'}`}>
                           {model.label}
                         </p>
-                        <p className="text-xs text-theme-text-tertiary">{model.description}</p>
+                        <p className="text-xs text-theme-text-tertiary">
+                          {modelDescription(t, model.description)}
+                        </p>
                       </div>
                     </button>
                   )
                 })}
-                {modelSearch && PROVIDER_MODELS[selectedLLM].filter((m) => {
-                  const q = modelSearch.toLowerCase()
-                  return m.label.toLowerCase().includes(q) || m.description.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
-                }).length === 0 && (
+                {modelSearch &&
+                  PROVIDER_MODELS[selectedLLM].filter((m) => modelMatches(t, m, modelSearch))
+                    .length === 0 && (
                   <div className="px-4 py-6 text-center text-sm text-theme-text-muted">
                     {t('settings.noModelsFound', 'No models found')}
                   </div>
@@ -1115,11 +1242,19 @@ export function Settings(): JSX.Element {
                     type={visibleKeys[activeApiKeyId] ? 'text' : 'password'}
                     value={apiKeys[activeApiKeyId] || ''}
                     onChange={(e) => handleKeyChange(activeApiKeyId, e.target.value)}
-                    placeholder={`Enter your API key`}
+                    placeholder={t('settings.apiKeyPlaceholder', 'Enter your API key')}
+                    aria-label={activeApiKeyLabel}
+                    dir="ltr"
                     className="flex-1 bg-theme-surface/50 rounded-lg px-3 py-2 text-sm text-theme-text placeholder-theme-text-muted outline-none focus:ring-1 focus:ring-sky-accent/30 font-mono"
                   />
                   <button
                     onClick={() => toggleKeyVisibility(activeApiKeyId)}
+                    aria-label={
+                      visibleKeys[activeApiKeyId]
+                        ? t('settings.hideApiKey', 'Hide API key')
+                        : t('settings.showApiKey', 'Show API key')
+                    }
+                    aria-pressed={!!visibleKeys[activeApiKeyId]}
                     className="w-9 h-9 rounded-lg bg-theme-surface/30 flex items-center justify-center text-theme-text-tertiary hover:text-theme-text transition-all"
                   >
                     {visibleKeys[activeApiKeyId] ? (
@@ -1190,7 +1325,12 @@ export function Settings(): JSX.Element {
                         <span className={`text-sm font-medium ${isSelected ? 'text-sky-accent' : 'text-theme-text'}`}>
                           {provider.shortLabel}
                         </span>
-                        <p className="text-[10px] text-theme-text-tertiary mt-0.5">{provider.description}</p>
+                        <p className="text-[10px] text-theme-text-tertiary mt-0.5">
+                          {t(
+                            `settings.voiceProviderDescriptions.${provider.id}`,
+                            provider.description
+                          )}
+                        </p>
                       </div>
                     </button>
                   )
@@ -1216,6 +1356,7 @@ export function Settings(): JSX.Element {
                   {voiceModelSearch && (
                     <button
                       onClick={() => setVoiceModelSearch('')}
+                      aria-label={t('home.clearSearch', 'Clear search')}
                       className="absolute end-3 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text transition-colors"
                     >
                       <X className="w-4 h-4" />
@@ -1225,11 +1366,7 @@ export function Settings(): JSX.Element {
               )}
               <div className="bg-theme-card rounded-xl border border-theme-border/50 overflow-hidden divide-y divide-theme-border/30 max-h-80 overflow-y-auto">
                 {VOICE_PROVIDER_MODELS[selectedVoice]
-                  .filter((model) => {
-                    if (!voiceModelSearch) return true
-                    const q = voiceModelSearch.toLowerCase()
-                    return model.label.toLowerCase().includes(q) || model.description.toLowerCase().includes(q) || model.id.toLowerCase().includes(q)
-                  })
+                  .filter((model) => !voiceModelSearch || modelMatches(t, model, voiceModelSearch))
                   .map((model) => {
                   const isSelected = (voiceModels[selectedVoice] || DEFAULT_VOICE_MODELS[selectedVoice]) === model.id
                   return (
@@ -1251,15 +1388,17 @@ export function Settings(): JSX.Element {
                         <p className={`text-sm font-medium ${isSelected ? 'text-sky-accent' : 'text-theme-text'}`}>
                           {model.label}
                         </p>
-                        <p className="text-xs text-theme-text-tertiary">{model.description}</p>
+                        <p className="text-xs text-theme-text-tertiary">
+                          {modelDescription(t, model.description)}
+                        </p>
                       </div>
                     </button>
                   )
                 })}
-                {voiceModelSearch && VOICE_PROVIDER_MODELS[selectedVoice].filter((m) => {
-                  const q = voiceModelSearch.toLowerCase()
-                  return m.label.toLowerCase().includes(q) || m.description.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
-                }).length === 0 && (
+                {voiceModelSearch &&
+                  VOICE_PROVIDER_MODELS[selectedVoice].filter((m) =>
+                    modelMatches(t, m, voiceModelSearch)
+                  ).length === 0 && (
                   <div className="px-4 py-6 text-center text-sm text-theme-text-muted">
                     {t('settings.noModelsFound', 'No models found')}
                   </div>
@@ -1279,11 +1418,19 @@ export function Settings(): JSX.Element {
                     type={visibleKeys[activeApiKeyId] ? 'text' : 'password'}
                     value={apiKeys[activeApiKeyId] || ''}
                     onChange={(e) => handleKeyChange(activeApiKeyId, e.target.value)}
-                    placeholder={`Enter your API key`}
+                    placeholder={t('settings.apiKeyPlaceholder', 'Enter your API key')}
+                    aria-label={activeApiKeyLabel}
+                    dir="ltr"
                     className="flex-1 bg-theme-surface/50 rounded-lg px-3 py-2 text-sm text-theme-text placeholder-theme-text-muted outline-none focus:ring-1 focus:ring-sky-accent/30 font-mono"
                   />
                   <button
                     onClick={() => toggleKeyVisibility(activeApiKeyId)}
+                    aria-label={
+                      visibleKeys[activeApiKeyId]
+                        ? t('settings.hideApiKey', 'Hide API key')
+                        : t('settings.showApiKey', 'Show API key')
+                    }
+                    aria-pressed={!!visibleKeys[activeApiKeyId]}
                     className="w-9 h-9 rounded-lg bg-theme-surface/30 flex items-center justify-center text-theme-text-tertiary hover:text-theme-text transition-all"
                   >
                     {visibleKeys[activeApiKeyId] ? (
@@ -1375,8 +1522,16 @@ export function Settings(): JSX.Element {
             </div>
           </div>
           <div className="space-y-1 text-xs text-theme-text-muted">
-            <p>Platform: {platformInfo?.platform || 'Loading...'}</p>
-            <p>Electron: {platformInfo?.version || 'Loading...'}</p>
+            <p>
+              {t('settings.platformInfo', 'Platform: {{value}}', {
+                value: platformInfo?.platform || t('common.loading', 'Loading...')
+              })}
+            </p>
+            <p>
+              {t('settings.electronInfo', 'Electron: {{value}}', {
+                value: platformInfo?.version || t('common.loading', 'Loading...')
+              })}
+            </p>
           </div>
         </div>
       </section>
@@ -1450,7 +1605,7 @@ export function Settings(): JSX.Element {
             `}
           >
             {tab.icon}
-            <span className="hidden sm:inline">{t(tab.labelKey, tab.id === 'general' ? 'General' : tab.id === 'ai-provider' ? 'AI Provider' : tab.id === 'shortcuts' ? 'Shortcuts' : 'About')}</span>
+            <span className="hidden sm:inline">{t(tab.labelKey, tab.fallback)}</span>
           </button>
         ))}
       </div>

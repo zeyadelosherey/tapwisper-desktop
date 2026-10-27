@@ -11,6 +11,7 @@ import type {
 } from '../models/trigger'
 import { buildSearchUrl } from '../models/trigger'
 import { processText } from './ai-router'
+import i18n from '../i18n'
 
 export interface ExecutionResult {
   success: boolean
@@ -47,13 +48,16 @@ export async function executeTrigger(match: TriggerMatch): Promise<ExecutionResu
     }
   } catch (err: any) {
     console.error('[TriggerExecutor] Execution failed:', err)
-    return { success: false, error: err.message || 'Trigger execution failed' }
+    return {
+      success: false,
+      error: err.message || i18n.t('errors.triggerExecutionFailed', 'Trigger execution failed')
+    }
   }
 }
 
 async function executeWebSearch(config: WebSearchConfig, speechInput: string): Promise<ExecutionResult> {
   if (!speechInput) {
-    return { success: false, error: 'No search query provided' }
+    return { success: false, error: i18n.t('errors.noSearchQuery', 'No search query provided') }
   }
 
   const url = buildSearchUrl(config, speechInput)
@@ -63,7 +67,7 @@ async function executeWebSearch(config: WebSearchConfig, speechInput: string): P
 
 async function executeAIChat(config: AIChatConfig, speechInput: string): Promise<ExecutionResult> {
   if (!speechInput) {
-    return { success: false, error: 'No input provided for AI' }
+    return { success: false, error: i18n.t('errors.noAiInput', 'No input provided for AI') }
   }
 
   // Always show loading state so the user sees feedback while AI is processing
@@ -108,7 +112,11 @@ async function executeAIChat(config: AIChatConfig, speechInput: string): Promise
     }
   } catch (err: any) {
     // Show error in the pill for all modes since we always show the loading state
-    window.tapwisper.window.send('recordingPill', 'result-panel:error', err.message || 'AI processing failed')
+    window.tapwisper.window.send(
+      'recordingPill',
+      'result-panel:error',
+      err.message || i18n.t('errors.aiFailed', 'AI processing failed')
+    )
     return { success: false, error: err.message }
   }
 }

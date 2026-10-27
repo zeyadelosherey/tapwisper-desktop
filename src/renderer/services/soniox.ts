@@ -1,5 +1,6 @@
 import type { TranscriptionResponse, TranscriptionOptions } from './ai-router'
 import { audioFileName } from './whisper'
+import i18n from '../i18n'
 
 const API_BASE = 'https://api.soniox.com/v1'
 const DEFAULT_MODEL = 'stt-async-v4'
@@ -69,7 +70,9 @@ export async function transcribeWithSoniox(
       if (status.status === 'error') {
         throw new Error(`Soniox transcription error: ${status.error_message || 'unknown error'}`)
       }
-      if (Date.now() > deadline) throw new Error('Soniox transcription timed out')
+      if (Date.now() > deadline) {
+        throw new Error(i18n.t('errors.sonioxTimeout', 'Soniox transcription timed out'))
+      }
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
       status = await sonioxFetch<SonioxTranscription>(apiKey, `/transcriptions/${created.id}`)
     }

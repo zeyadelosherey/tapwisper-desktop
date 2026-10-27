@@ -50,9 +50,18 @@ interface UsageStats {
 export interface ActivityEntry {
   id: string
   type: 'voice' | 'ai'
+  /** English summary kept for older readers; the UI renders from the fields below */
   description: string
   timestamp: number // Date.now()
-  value?: string // e.g. "45s", "Rephrase"
+  value?: string // e.g. "45s", "120 chars"
+  /** Voice: words transcribed */
+  words?: number
+  /** Voice: recording length in seconds */
+  seconds?: number
+  /** AI: action id or stored action name */
+  action?: string
+  /** AI: characters generated */
+  chars?: number
 }
 
 interface StatsState extends UsageStats {
@@ -188,7 +197,9 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       type: 'voice',
       description: `Transcribed ${words} words`,
       timestamp: Date.now(),
-      value: `${Math.round(seconds)}s`
+      value: `${Math.round(seconds)}s`,
+      words,
+      seconds: Math.round(seconds)
     }
     const recentActivity = [activity, ...state.recentActivity].slice(0, 20)
 
@@ -245,7 +256,9 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       type: 'ai',
       description: `AI Action: ${prettyCategory}`,
       timestamp: Date.now(),
-      value: `${outputChars} chars`
+      value: `${outputChars} chars`,
+      action: category,
+      chars: outputChars
     }
     const recentActivity = [activity, ...state.recentActivity].slice(0, 20)
 

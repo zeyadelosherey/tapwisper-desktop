@@ -404,7 +404,17 @@ export interface WeeklyStatsFromActivity {
   aiTimeSavedSeconds: number
   weekStartDate: string
   dailyStats: Array<{ voiceSeconds: number; aiActions: number; wordCount: number; timeSavedSeconds: number }>
-  recentActivity: Array<{ id: string; type: 'voice' | 'ai'; description: string; timestamp: number; value?: string }>
+  recentActivity: Array<{
+    id: string
+    type: 'voice' | 'ai'
+    description: string
+    timestamp: number
+    value?: string
+    words?: number
+    seconds?: number
+    action?: string
+    chars?: number
+  }>
 }
 
 /**
@@ -475,7 +485,9 @@ export function getWeeklyStatsFromActivity(): WeeklyStatsFromActivity {
         type: 'ai',
         description: `AI Action: ${(r.llmAction || 'general').replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}`,
         timestamp: r.timestamp,
-        value: `${r.llmResult.length} chars`
+        value: `${r.llmResult.length} chars`,
+        action: r.llmAction || 'general',
+        chars: r.llmResult.length
       })
     } else {
       const typingSeconds = words > 0 ? (words / TYPING_WPM) * 60 : 0
@@ -490,7 +502,9 @@ export function getWeeklyStatsFromActivity(): WeeklyStatsFromActivity {
         type: 'voice',
         description: `Transcribed ${words} words`,
         timestamp: r.timestamp,
-        value: `${Math.round(secs)}s`
+        value: `${Math.round(secs)}s`,
+        words,
+        seconds: Math.round(secs)
       })
     }
   }
