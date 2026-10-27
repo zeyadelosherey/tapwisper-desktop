@@ -3,7 +3,7 @@
  * Migrates data from electron-store to SQLite database
  */
 
-import { getStore } from './store'
+import { getStore, migrateApiKeysToSafeStorage } from './store'
 import * as db from './database'
 
 /**
@@ -93,11 +93,17 @@ function migrateSonioxModel(): void {
  * Run all migrations
  */
 export function runMigrations(): void {
-  try {
-    migrateStats()
-    migrateActivityRecords()
-    migrateSonioxModel()
-  } catch {
-    // Migration failure is non-fatal — app continues with empty database
+  // Each migration is independent — one failing must not skip the others
+  for (const migrate of [
+    migrateStats,
+    migrateActivityRecords,
+    migrateSonioxModel,
+    migrateApiKeysToSafeStorage
+  ]) {
+    try {
+      migrate()
+    } catch {
+      // Migration failure is non-fatal — app continues with current data
+    }
   }
 }

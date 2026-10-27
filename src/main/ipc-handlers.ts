@@ -4,7 +4,7 @@ import os from 'os'
 import path from 'path'
 import { WindowManager, applyNativeTheme, type WindowType } from './windows'
 import { ClipboardManager } from './clipboard'
-import { getStore } from './store'
+import { getStore, getConfigValue, setConfigValue, getAllConfig } from './store'
 import { encodeWav, saveTempAudio, cleanupAudioFile } from './audio'
 import { reloadShortcuts, cancelRecording, startShortcutsAfterPermission, setPostRecordingState } from './shortcuts'
 import { checkPermissions, requestPermission } from './permissions'
@@ -249,13 +249,11 @@ export function registerIpcHandlers(
 
   // ── Store (Config) ─────────────────────────────────────────────
   ipcMain.handle('store:get', (_e: IpcMainInvokeEvent, key: string) => {
-    const store = getStore()
-    return store.get(key)
+    return getConfigValue(key)
   })
 
   ipcMain.handle('store:set', (_e: IpcMainInvokeEvent, key: string, value: unknown) => {
-    const store = getStore()
-    store.set(key, value)
+    setConfigValue(key, value)
 
     if (key === 'theme') {
       applyNativeTheme()
@@ -267,8 +265,7 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle('store:getAll', () => {
-    const store = getStore()
-    return store.store
+    return getAllConfig()
   })
 
   ipcMain.handle('store:reset', () => {

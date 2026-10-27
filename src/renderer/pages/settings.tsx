@@ -5,6 +5,7 @@ import {
   Eye, EyeOff, Check, AlertCircle, Cpu, Settings2, Mic, Search, X, Mail
 } from 'lucide-react'
 import { updateDirection } from '../i18n'
+import { testApiKey, type KeyProvider, type KeyTestResult } from '../services/key-test'
 import appLogo from '../assets/logo.png'
 import geminiLogo from '../assets/google.png'
 import openaiLogo from '../assets/openai.png'
@@ -468,6 +469,45 @@ const TABS: { id: SettingsTab; labelKey: string; icon: React.ReactNode }[] = [
   { id: 'about', labelKey: 'settings.tabAbout', icon: <Info className="w-4 h-4" /> }
 ]
 
+// ── API key status + test ───────────────────────────────────────
+
+function ApiKeyStatus({ provider, apiKey }: { provider: KeyProvider; apiKey: string }): JSX.Element {
+  const { t } = useTranslation()
+  const [testing, setTesting] = useState(false)
+  const [result, setResult] = useState<KeyTestResult | null>(null)
+
+  // A different key or provider invalidates the previous result
+  useEffect(() => setResult(null), [provider, apiKey])
+
+  const runTest = async (): Promise<void> => {
+    setTesting(true)
+    setResult(await testApiKey(provider, apiKey))
+    setTesting(false)
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2 flex-wrap">
+      <Check className="w-3 h-3 text-green-accent" />
+      <span className="text-xs text-green-accent/70">{t('settings.keySaved', 'Key saved')}</span>
+      <button
+        onClick={runTest}
+        disabled={testing}
+        className="text-xs px-2 py-0.5 rounded-md border border-theme-border/50 text-theme-text-secondary hover:text-theme-text hover:border-theme-border disabled:opacity-50"
+      >
+        {testing ? t('settings.testingKey', 'Testing…') : t('settings.testKey', 'Test key')}
+      </button>
+      {result && (
+        <span
+          role="status"
+          className={`text-xs ${result.ok ? 'text-green-accent' : 'text-red-400'}`}
+        >
+          {result.message}
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ── Main Settings Component ─────────────────────────────────────
 
 export function Settings(): JSX.Element {
@@ -481,6 +521,14 @@ export function Settings(): JSX.Element {
   const [speechLanguage, setSpeechLanguage] = useState('auto')
   const [speechVocabulary, setSpeechVocabulary] = useState('')
   const [keepMicWarm, setKeepMicWarm] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    window.tapwisper.app
+      .getVersion()
+      .then(setAppVersion)
+      .catch(() => {})
+  }, [])
 
   // AI Provider tab state
   const [providerSubTab, setProviderSubTab] = useState<ProviderSubTab>('ai')
@@ -641,11 +689,32 @@ export function Settings(): JSX.Element {
     window.tapwisper.store.set('voiceModels', updated)
   }, [voiceModels])
 
-  const handleKeyChange = useCallback((provider: string, value: string) => {
-    const updated = { ...apiKeys, [provider]: value }
-    setApiKeys(updated)
-    window.tapwisper.store.set('apiKeys', updated)
-  }, [apiKeys])
+  // Persist API keys debounced: every write re-encrypts the whole key set
+  const pendingKeysRef = useRef<Record<string, string> | null>(null)
+  const keySaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flushApiKeys = useCallback(() => {
+    if (keySaveTimerRef.current) clearTimeout(keySaveTimerRef.current)
+    keySaveTimerRef.current = null
+    if (!pendingKeysRef.current) return
+    // Pasted keys often carry stray whitespace/newlines, which providers reject with 401
+    const trimmed = Object.fromEntries(
+      Object.entries(pendingKeysRef.current).map(([k, v]) => [k, v.trim()])
+    )
+    pendingKeysRef.current = null
+    window.tapwisper.store.set('apiKeys', trimmed)
+  }, [])
+  useEffect(() => flushApiKeys, [flushApiKeys])
+
+  const handleKeyChange = useCallback(
+    (provider: string, value: string) => {
+      const updated = { ...apiKeys, [provider]: value }
+      setApiKeys(updated)
+      pendingKeysRef.current = updated
+      if (keySaveTimerRef.current) clearTimeout(keySaveTimerRef.current)
+      keySaveTimerRef.current = setTimeout(flushApiKeys, 400)
+    },
+    [apiKeys, flushApiKeys]
+  )
 
   const toggleKeyVisibility = useCallback((provider: string) => {
     setVisibleKeys((prev) => ({ ...prev, [provider]: !prev[provider] }))
@@ -1061,10 +1130,7 @@ export function Settings(): JSX.Element {
                   </button>
                 </div>
                 {apiKeys[activeApiKeyId] && (
-                  <div className="flex items-center gap-1 mt-2">
-                    <Check className="w-3 h-3 text-green-accent" />
-                    <span className="text-xs text-green-accent/70">{t('settings.keySaved', 'Key saved')}</span>
-                  </div>
+                  <ApiKeyStatus provider={activeApiKeyId as KeyProvider} apiKey={apiKeys[activeApiKeyId]} />
                 )}
               </div>
 
@@ -1228,10 +1294,7 @@ export function Settings(): JSX.Element {
                   </button>
                 </div>
                 {apiKeys[activeApiKeyId] && (
-                  <div className="flex items-center gap-1 mt-2">
-                    <Check className="w-3 h-3 text-green-accent" />
-                    <span className="text-xs text-green-accent/70">{t('settings.keySaved', 'Key saved')}</span>
-                  </div>
+                  <ApiKeyStatus provider={activeApiKeyId as KeyProvider} apiKey={apiKeys[activeApiKeyId]} />
                 )}
                 {selectedVoice === 'whisper' && (
                   <p className="text-[10px] text-theme-text-muted mt-2 italic">
@@ -1306,7 +1369,9 @@ export function Settings(): JSX.Element {
             </div>
             <div>
               <p className="text-sm font-medium text-theme-text">TapWisper Desktop</p>
-              <p className="text-xs text-theme-text-tertiary">Version 1.0.0</p>
+              <p className="text-xs text-theme-text-tertiary">
+                {t('settings.version', 'Version')} {appVersion}
+              </p>
             </div>
           </div>
           <div className="space-y-1 text-xs text-theme-text-muted">
