@@ -6,7 +6,8 @@
 
 <p align="center">
   <strong>Open-source, system-wide voice dictation with AI.</strong><br/>
-  Bring your own API key, or run open-source models on your computer. Download, configure, and start using it in seconds.
+  Bring your own API key, or run open-source models offline on your computer — GPU-accelerated and fully private.<br/>
+  Download, configure, and start using it in seconds.
 </p>
 
 <p align="center">
@@ -30,8 +31,22 @@
 </p>
 
 <p align="center">
-  <em>Supports Google Gemini · OpenAI · Claude · Together AI · Soniox</em>
+  <em>Supports Google Gemini · OpenAI · Claude · Together AI · Soniox · Local models · Self-hosted</em>
 </p>
+
+---
+
+## 🆕 What's New in v1.2.0
+
+| | Feature | What it means for you |
+|:-:|---------|-----------------------|
+| 💻 | **Local models** | Dictation and AI run on your computer with open-source models: 18 speech models (Whisper, NVIDIA Parakeet, Qwen3-ASR, Voxtral) and 24 language models (Qwen, Gemma, Llama, Phi, Mistral, gpt-oss and more). No API key, no internet, nothing leaves your computer |
+| 🚀 | **GPU acceleration** | Metal on Apple Silicon, Vulkan on Windows and Linux (NVIDIA, AMD, Intel Arc), with automatic fallback to the CPU |
+| 🖧 | **Self-hosted servers** | Point TapWisper at your own Ollama, LM Studio, vLLM, LocalAI or speaches server |
+| 🎯 | **Smart model picker** | Every model is rated for your computer's memory and GPU; downloads resume and are checked against their published checksum |
+| 🌍 | **Works everywhere** | Model folders with non-English names (like `C:\Users\محمد`) work on Windows; the app explains clearly when a device can't run local models |
+
+Choose an engine in **Settings → Speech-to-Text** and **Settings → Language Models**. Details: [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
 
 ---
 
@@ -53,15 +68,15 @@
 
 <p align="center">
   <a href="https://github.com/zeyadelosherey/tapwisper-desktop/releases/latest">
-    <img src="https://img.shields.io/badge/🔽_Download_Latest-v1.1.0-00C853?style=for-the-badge&logoColor=white" alt="Download Latest" />
+    <img src="https://img.shields.io/badge/🔽_Download_Latest-v1.2.0-00C853?style=for-the-badge&logoColor=white" alt="Download Latest" />
   </a>
 </p>
 
 | Platform | Download | Architecture |
 |:--------:|:--------:|:------------:|
-| 🍎 macOS | <a href="https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.1.0/tapwisper-desktop-1.1.0-arm64.dmg"><img src="https://img.shields.io/badge/Download-.dmg_(Apple_Silicon)-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS ARM64" /></a> | Apple Silicon (M1/M2/M3/M4) |
-| 🍎 macOS | <a href="https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.1.0/tapwisper-desktop-1.1.0-x64.dmg"><img src="https://img.shields.io/badge/Download-.dmg_(Intel)-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS x64" /></a> | Intel |
-| 🪟 Windows | <a href="https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.1.0/tapwisper-desktop-1.1.0-setup.exe"><img src="https://img.shields.io/badge/Download-.exe_(x64)-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows x64" /></a> | x64 |
+| 🍎 macOS | <a href="https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.2.0/tapwisper-desktop-1.2.0-arm64.dmg"><img src="https://img.shields.io/badge/Download-.dmg_(Apple_Silicon)-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS ARM64" /></a> | Apple Silicon (M1/M2/M3/M4) |
+| 🍎 macOS | <a href="https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.2.0/tapwisper-desktop-1.2.0-x64.dmg"><img src="https://img.shields.io/badge/Download-.dmg_(Intel)-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS x64" /></a> | Intel |
+| 🪟 Windows | <a href="https://github.com/zeyadelosherey/tapwisper-desktop/releases/download/v1.2.0/tapwisper-desktop-1.2.0-setup.exe"><img src="https://img.shields.io/badge/Download-.exe_(x64)-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows x64" /></a> | x64 |
 
 <p align="center">
   📦 Browse all versions on the <a href="https://github.com/zeyadelosherey/tapwisper-desktop/releases">Releases page</a>
