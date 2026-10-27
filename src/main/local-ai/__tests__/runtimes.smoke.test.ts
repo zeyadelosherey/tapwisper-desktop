@@ -32,6 +32,7 @@ const { SidecarServer } = await import('../sidecar')
 const { whisperLaunch, whisperTranscribe } = await import('../whisper')
 const { llamaChat, llamaLaunch, llamaTranscribe } = await import('../llama')
 const { parakeetTranscribe } = await import('../parakeet')
+const { defaultThreads } = await import('../hardware')
 const { downloadModel, modelFiles } = await import('../model-store')
 const { getModel } = await import('../../../shared/local-ai/catalog')
 type RuntimeOptions = import('../sidecar').RuntimeOptions
@@ -89,7 +90,8 @@ function options(bin: string, files: { model: string; mmproj?: string }): Runtim
     modelId: path.basename(modelFile),
     modelBytes: readFileSync(modelFile).length,
     useGpu,
-    threads: 4,
+    // What the app uses; more threads than cores (macOS runners have 3) is very slow
+    threads: defaultThreads(),
     idleUnloadMs: 0
   }
 }
