@@ -170,47 +170,51 @@ export function Home(): JSX.Element {
   }
 
   return (
-    <Page>
-      {/* ── Hero ─────────────────────────────────────────── */}
-      <section className="animate-rise">
-        <h1 className="hero-title max-w-[620px] text-[26px] text-balance">
-          <Trans i18nKey="home.hero" components={{ em: <em /> }}>
-            Say it, and it&apos;s <em>on the page</em>.
-          </Trans>
-        </h1>
-        <p className="mt-1 text-[13px] leading-[1.9] text-ink-muted">
-          {hintParts[0]}
-          <ShortcutKeys accelerator={shortcut} size="sm" className="-translate-y-px" />
-          {hintParts[1]}
-        </p>
-        {stats.length > 0 && (
-          <ul
-            aria-label={t('home.statsLabel', 'Your stats')}
-            className="mt-2 flex flex-wrap items-center gap-y-1 text-[12.5px] text-ink-soft tabular"
-          >
-            {stats.map((s, i) => (
-              <li key={s.key} title={s.title} className="flex items-center">
-                {i > 0 && (
-                  <span aria-hidden="true" className="px-2 text-ink-faint">
-                    ·
-                  </span>
-                )}
-                {s.text}
-              </li>
-            ))}
-          </ul>
-        )}
+    <>
+      {/* ── Hero (full-bleed grainy band) ───────────────────── */}
+      <section className="grain-hero">
+        <div className="mx-auto w-full max-w-[860px] px-6 pb-7 pt-8 animate-rise">
+          <h1 className="hero-title max-w-[620px] text-[26px] text-balance">
+            <Trans i18nKey="home.hero" components={{ em: <em /> }}>
+              Say it, and it&apos;s <em>on the page</em>.
+            </Trans>
+          </h1>
+          <p className="mt-1 text-[13px] leading-[1.9] text-ink-muted">
+            {hintParts[0]}
+            <ShortcutKeys accelerator={shortcut} size="sm" className="-translate-y-px" />
+            {hintParts[1]}
+          </p>
+          {stats.length > 0 && (
+            <ul
+              aria-label={t('home.statsLabel', 'Your stats')}
+              className="mt-2 flex flex-wrap items-center gap-y-1 text-[12.5px] text-ink-soft tabular"
+            >
+              {stats.map((s, i) => (
+                <li key={s.key} title={s.title} className="flex items-center">
+                  {i > 0 && (
+                    <span aria-hidden="true" className="px-2 text-ink-faint">
+                      ·
+                    </span>
+                  )}
+                  {s.text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
 
-      {/* ── History ──────────────────────────────────────── */}
-      {!isLoaded ? (
-        <div className="flex justify-center py-16 text-ink-faint">
-          <Spinner className="h-5 w-5" />
-        </div>
-      ) : (
-        <HistoryList totalCount={totalCount} refreshToken={`${totalCount}-${latestId}`} />
-      )}
-    </Page>
+      <Page className="!pt-0">
+        {/* ── History ──────────────────────────────────────── */}
+        {!isLoaded ? (
+          <div className="flex justify-center py-16 text-ink-faint">
+            <Spinner className="h-5 w-5" />
+          </div>
+        ) : (
+          <HistoryList totalCount={totalCount} refreshToken={`${totalCount}-${latestId}`} />
+        )}
+      </Page>
+    </>
   )
 }
 
@@ -403,7 +407,7 @@ function HistoryList({ totalCount, refreshToken }: HistoryListProps): JSX.Elemen
   }
 
   return (
-    <section className="mt-7" aria-labelledby="history-title">
+    <section aria-labelledby="history-title">
       <div className="mb-1 flex min-h-8 items-center justify-between gap-3">
         <h2 id="history-title" className="font-display text-[17px] leading-none text-ink">
           {t('home.historyTitle', 'History')}

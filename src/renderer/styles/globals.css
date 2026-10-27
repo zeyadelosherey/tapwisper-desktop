@@ -57,6 +57,12 @@
     --shadow-pop: 0 2px 6px rgb(27 26 23 / 0.06), 0 24px 48px -20px rgb(27 26 23 / 0.28);
     --scrollbar-thumb: rgb(27 26 23 / 0.14);
     --scrollbar-thumb-hover: rgb(27 26 23 / 0.26);
+
+    /* Grainy accent wash (.grain-hero) */
+    --grain-blue: 47 120 214;
+    --grain-blue-alpha: 0.4;
+    --grain-ember-alpha: 0.13;
+    --grain-opacity: 0.12;
     color-scheme: light;
   }
 
@@ -94,6 +100,12 @@
     --shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.03), 0 28px 56px -20px rgb(0 0 0 / 0.75);
     --scrollbar-thumb: rgb(255 255 255 / 0.12);
     --scrollbar-thumb-hover: rgb(255 255 255 / 0.22);
+
+    /* Deeper blue in the dark so the wash doesn't glow */
+    --grain-blue: 36 84 160;
+    --grain-blue-alpha: 0.42;
+    --grain-ember-alpha: 0.08;
+    --grain-opacity: 0.18;
     color-scheme: dark;
   }
 
@@ -349,6 +361,65 @@
 
   .dark .chip {
     @apply bg-hover;
+  }
+
+  /* Grainy accent band: Signal wash in the start corner, a faint Ember glow in
+     the end corner, fading to the surface (--grain-base) by the bottom. The
+     grain is one small static noise tile, rasterized once and repeated. */
+  .grain-hero {
+    --grain-base: var(--raised);
+    position: relative;
+    isolation: isolate;
+    background-color: rgb(var(--grain-base));
+    background-image:
+      linear-gradient(to bottom, rgb(var(--grain-base) / 0) 35%, rgb(var(--grain-base)) 100%),
+      radial-gradient(
+        110% 130% at 0% 0%,
+        rgb(var(--grain-blue) / var(--grain-blue-alpha)) 0%,
+        rgb(var(--grain-blue) / calc(var(--grain-blue-alpha) * 0.35)) 40%,
+        rgb(var(--grain-blue) / 0) 72%
+      ),
+      radial-gradient(
+        70% 110% at 100% 0%,
+        rgb(var(--ember) / var(--grain-ember-alpha)) 0%,
+        rgb(var(--ember) / 0) 70%
+      );
+  }
+
+  [dir='rtl'] .grain-hero {
+    background-image:
+      linear-gradient(to bottom, rgb(var(--grain-base) / 0) 35%, rgb(var(--grain-base)) 100%),
+      radial-gradient(
+        110% 130% at 100% 0%,
+        rgb(var(--grain-blue) / var(--grain-blue-alpha)) 0%,
+        rgb(var(--grain-blue) / calc(var(--grain-blue-alpha) * 0.35)) 40%,
+        rgb(var(--grain-blue) / 0) 72%
+      ),
+      radial-gradient(
+        70% 110% at 0% 0%,
+        rgb(var(--ember) / var(--grain-ember-alpha)) 0%,
+        rgb(var(--ember) / 0) 70%
+      );
+  }
+
+  .grain-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: var(--grain-opacity);
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2.4' intercept='-0.7'/%3E%3CfeFuncG type='linear' slope='2.4' intercept='-0.7'/%3E%3CfeFuncB type='linear' slope='2.4' intercept='-0.7'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
+  }
+
+  /* On the warm canvas (e.g. onboarding) */
+  .grain-hero-canvas {
+    --grain-base: var(--canvas);
   }
 
   /* Status dot for live / recording state */
