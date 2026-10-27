@@ -802,12 +802,10 @@
   },
   "meetings": {
     "title": "Reuniones",
-    "subtitle": "Notas, transcripciones y resúmenes de tus llamadas, grabados en este ordenador, sin bots en la reunión.",
     "resultCount": "{{count}} resultados",
-    "count": "{{count}} reuniones",
     "search": "Buscar títulos, notas, transcripciones…",
     "emptyTitle": "Aún no hay reuniones",
-    "emptyBody": "Inicia las notas cuando empiece una llamada. TapWisper te escucha a ti y a la reunión, escribe una transcripción en directo y la resume cuando te detienes.",
+    "emptyBody": "Empieza las notas cuando comience una llamada: obtendrás transcripción y resumen.",
     "words": "{{count}} palabras",
     "statusInterrupted": "Interrumpida",
     "notFound": "Esta reunión ya no está disponible.",
@@ -825,9 +823,6 @@
     "showNotepad": "Mostrar bloc",
     "detected": "Llamada de {{app}} detectada",
     "detectedAsk": "¿tomar notas?",
-    "count_one": "{{count}} reunión",
-    "count_many": "{{count}} reuniones",
-    "count_other": "{{count}} reuniones",
     "resultCount_one": "{{count}} resultado",
     "resultCount_many": "{{count}} resultados",
     "resultCount_other": "{{count}} resultados",
@@ -869,7 +864,7 @@
     "readyMeetingUnsupported": "No disponible: solo micrófono",
     "readyMeetingOff": "Desactivado en Ajustes",
     "startTitle": "Tomar notas de reunión",
-    "startBody": "Graba tu micrófono y el audio de la reunión en este ordenador, sin que ningún bot se una a la llamada. Obtienes una transcripción en directo y un resumen al terminar.",
+    "startBody": "Ningún bot se une a la llamada. Transcripción en vivo y resumen al terminar.",
     "sourceMic": "Tu micrófono",
     "readyMicDenied": "Bloqueado: permítelo en los ajustes del sistema",
     "sourceMeeting": "Audio de la reunión",
@@ -883,8 +878,6 @@
     "editingSummary": "Editando el resumen",
     "aiSummary": "Resumen con IA",
     "copySummary": "Copiar resumen",
-    "copied": "Copiado",
-    "copy": "Copiar",
     "editSummary": "Editar resumen",
     "regenerate": "Regenerar",
     "markdownHint": "Markdown: ## título, - viñeta, - [ ] tarea",
@@ -927,6 +920,7 @@
     "showEarlier_one": "Mostrar 1 intervención anterior",
     "showEarlier_many": "Mostrar anteriores ({{count}})",
     "showEarlier_other": "Mostrar anteriores ({{count}})",
-    "errorStillRecording": "Esta reunión aún se está grabando: el resumen se crea cuando la detengas."
+    "errorStillRecording": "Esta reunión aún se está grabando: el resumen se crea cuando la detengas.",
+    "audioSources": "Fuentes de audio"
   }
 }

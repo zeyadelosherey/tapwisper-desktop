@@ -2,16 +2,12 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AppWindow,
+  Check,
   ChevronLeft,
   Download,
-  NotebookPen,
-  ScrollText,
-  Search,
   Sparkles,
   Trash2,
-  TriangleAlert,
-  Users,
-  X
+  TriangleAlert
 } from 'lucide-react'
 import type { Meeting, SegmentSource } from '../models/meeting'
 import { meetingToMarkdown } from '../services/meeting-ai'
@@ -20,6 +16,7 @@ import { useMeeting } from '../hooks/use-meeting'
 import { useMeetingAssistant } from '../hooks/use-meeting-assistant'
 import { useConfirmDialog } from '../components/confirm-dialog'
 import { Page, PageHeader, Spinner } from '../components/ui/primitives'
+import { ExpandingSearch } from '../components/ui/expanding-search'
 import { MeetingTabs, type MeetingTab } from '../components/meeting/meeting-tabs'
 import { SummaryPanel } from '../components/meeting/summary-panel'
 import { TranscriptView } from '../components/meeting/transcript-view'
@@ -117,47 +114,28 @@ function MeetingList({ onOpen }: { onOpen: (id: string) => void }): JSX.Element 
     <Page>
       <PageHeader
         title={t('meetings.title', 'Meetings')}
-        description={t(
-          'meetings.subtitle',
-          'Notes, transcripts and summaries of your calls — recorded on this computer, no bot in the meeting.'
-        )}
         actions={
-          <button type="button" className="btn-signal" onClick={startNotes}>
-            <span className="h-2 w-2 rounded-full bg-on-signal" aria-hidden="true" />
-            {t('notepad.startNotes', 'Start notes')}
-          </button>
+          <>
+            {everHad && (
+              <ExpandingSearch
+                value={search}
+                onChange={setSearch}
+                label={t('meetings.search', 'Search titles, notes, transcripts…')}
+                className="w-64"
+              />
+            )}
+            <button type="button" className="btn-signal" onClick={startNotes}>
+              <span className="h-2 w-2 rounded-full bg-on-signal" aria-hidden="true" />
+              {t('notepad.startNotes', 'Start notes')}
+            </button>
+          </>
         }
       />
 
-      {everHad && (
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[12px] text-ink-soft tabular" aria-live="polite">
-            {query
-              ? t('meetings.resultCount', '{{count}} results', { count: data?.total ?? 0 })
-              : t('meetings.count', '{{count}} meetings', { count: data?.total ?? 0 })}
-          </p>
-          <div className="relative w-64 max-w-full">
-            <Search className="pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('meetings.search', 'Search titles, notes, transcripts…')}
-              aria-label={t('meetings.search', 'Search titles, notes, transcripts…')}
-              className="field h-8 pe-8 ps-8"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label={t('home.clearSearch', 'Clear search')}
-                className="icon-btn absolute end-0.5 top-1/2 h-7 w-7 -translate-y-1/2"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
+      {query && data && (
+        <p className="mb-2 text-[12px] text-ink-soft" aria-live="polite">
+          {t('meetings.resultCount', '{{count}} results', { count: data.total })}
+        </p>
       )}
 
       {data === null || everHad === null ? (
@@ -165,22 +143,16 @@ function MeetingList({ onOpen }: { onOpen: (id: string) => void }): JSX.Element 
           <Spinner className="h-5 w-5" />
         </div>
       ) : !everHad ? (
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-hairline-strong px-5 py-7 text-center">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal-tint text-signal">
-            <Users className="h-5 w-5" />
-          </span>
-          <p className="font-display mt-3 text-[16px] text-ink">
+        <div className="grain-hero flex flex-col items-center rounded-2xl px-5 pb-10 pt-12 text-center">
+          <p className="font-display text-[18px] text-ink">
             {t('meetings.emptyTitle', 'No meetings yet')}
           </p>
-          <p className="mt-1 max-w-[420px] text-[13px] leading-relaxed text-ink-muted text-pretty">
+          <p className="mt-1 max-w-[420px] text-[13px] leading-snug text-ink-muted text-pretty">
             {t(
               'meetings.emptyBody',
-              'Start notes when a call begins. TapWisper listens to you and to the meeting, writes a live transcript, and summarizes it when you stop.'
+              'Start notes when a call begins — you get a transcript and a summary.'
             )}
           </p>
-          <button type="button" className="btn-secondary mt-3" onClick={startNotes}>
-            {t('notepad.startNotes', 'Start notes')}
-          </button>
         </div>
       ) : data.meetings.length === 0 ? (
         <p className="py-8 text-center text-[13px] text-ink-muted">
@@ -190,10 +162,7 @@ function MeetingList({ onOpen }: { onOpen: (id: string) => void }): JSX.Element 
         <div className="space-y-3">
           {groups.map((group) => (
             <div key={group.label}>
-              <h3 className="section-label mb-0.5 flex items-center gap-2">
-                {group.label}
-                <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
-              </h3>
+              <h3 className="pb-0.5 pt-2 text-[12px] text-ink-soft">{group.label}</h3>
               <ul className="-mx-2">
                 {group.meetings.map((m) => (
                   <MeetingRow key={m.id} meeting={m} onOpen={onOpen} />
@@ -205,7 +174,7 @@ function MeetingList({ onOpen }: { onOpen: (id: string) => void }): JSX.Element 
             <div className="flex justify-center">
               <button
                 type="button"
-                className="btn-secondary btn-sm"
+                className="btn-ghost btn-sm"
                 onClick={() => setLimit((l) => l + PAGE_SIZE)}
               >
                 {t('home.loadMore', 'Show older')}
@@ -218,16 +187,6 @@ function MeetingList({ onOpen }: { onOpen: (id: string) => void }): JSX.Element 
   )
 }
 
-/** First line of the summary that isn't a heading, for the list preview */
-function summaryPreview(summary: string): string {
-  for (const raw of summary.split('\n')) {
-    const line = raw.trim()
-    if (!line || line.startsWith('#')) continue
-    return line.replace(/^[-*+]\s+(\[[ xX]\]\s*)?/, '').replace(/\*\*|__/g, '')
-  }
-  return ''
-}
-
 const MeetingRow = memo(function MeetingRow({
   meeting,
   onOpen
@@ -238,7 +197,6 @@ const MeetingRow = memo(function MeetingRow({
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const preview = summaryPreview(meeting.summary)
 
   const generate = async (): Promise<void> => {
     setBusy(true)
@@ -256,7 +214,7 @@ const MeetingRow = memo(function MeetingRow({
     <li className="group relative flex gap-3 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-panel focus-within:bg-panel">
       <time
         dateTime={new Date(meeting.startedAt).toISOString()}
-        className="w-[54px] shrink-0 pt-[2px] text-[11px] text-ink-soft tabular"
+        className="w-[60px] shrink-0 whitespace-nowrap pt-[2px] text-[11.5px] text-ink-soft tabular"
       >
         {formatTime(meeting.startedAt)}
       </time>
@@ -264,43 +222,44 @@ const MeetingRow = memo(function MeetingRow({
         <button
           type="button"
           onClick={() => onOpen(meeting.id)}
+          title={meeting.appName ?? undefined}
           className="block w-full min-w-0 text-start after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:rounded-lg focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-signal"
         >
           <span
-            className={`block truncate text-[13.5px] font-medium ${
+            className={`block truncate text-[13px] ${
               meeting.title.trim() ? 'text-ink' : 'text-ink-muted'
             }`}
           >
             <bdi>{meetingTitle(t, meeting)}</bdi>
           </span>
-          {preview && (
-            <span className="mt-0.5 block truncate text-[12px] text-ink-muted">
-              <bdi>{preview}</bdi>
-            </span>
-          )}
         </button>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-ink-soft">
-          <MetaText meeting={meeting} withDate={false} />
-          {meeting.appName && <span className="chip">{meeting.appName}</span>}
-          <StatusBadge status={meeting.status} />
-          {meeting.status === 'interrupted' && !meeting.summary.trim() && (
-            <button
-              type="button"
-              className="relative z-[1] inline-flex items-center gap-1 rounded-md px-1 text-[11.5px] font-medium text-signal hover:bg-signal-tint disabled:opacity-60"
-              onClick={generate}
-              disabled={busy}
-            >
-              {busy ? <Spinner className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
-              {t('notepad.generateSummary', 'Generate summary')}
-            </button>
-          )}
-        </div>
+        {meeting.status !== 'done' && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-ink-soft">
+            <StatusBadge status={meeting.status} />
+            {meeting.status === 'interrupted' && !meeting.summary.trim() && (
+              <button
+                type="button"
+                className="relative z-[1] inline-flex items-center gap-1 rounded-md px-1 text-[11.5px] font-medium text-signal hover:bg-signal-tint disabled:opacity-60"
+                onClick={generate}
+                disabled={busy}
+              >
+                {busy ? <Spinner className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+                {t('notepad.generateSummary', 'Generate summary')}
+              </button>
+            )}
+          </div>
+        )}
         {error && (
           <p role="alert" className="mt-1 text-[11.5px] text-danger">
             {error}
           </p>
         )}
       </div>
+      {meeting.durationSeconds > 0 && (
+        <span className="shrink-0 pt-[2px] text-[11.5px] text-ink-soft tabular">
+          {formatDuration(meeting.durationSeconds)}
+        </span>
+      )}
     </li>
   )
 })
@@ -314,6 +273,7 @@ function MetaText({ meeting, withDate }: { meeting: Meeting; withDate: boolean }
   if (meeting.wordCount > 0) {
     parts.push(t('meetings.words', '{{count}} words', { count: meeting.wordCount }))
   }
+  if (withDate && meeting.appName) parts.push(meeting.appName)
   return <span className="tabular">{parts.join(' · ')}</span>
 }
 
@@ -337,7 +297,7 @@ function StatusBadge({ status }: { status: Meeting['status'] }): JSX.Element | n
   }
   if (status === 'interrupted') {
     return (
-      <span className="chip !border-warning/30 !bg-warning-tint !text-warning">
+      <span className="inline-flex items-center gap-1 text-warning">
         <TriangleAlert className="h-3 w-3" />
         {t('meetings.statusInterrupted', 'Interrupted')}
       </span>
@@ -403,13 +363,9 @@ function MeetingDetail({ id, onBack }: { id: string; onBack: () => void }): JSX.
 
   const tabs = useMemo(
     () => [
-      { id: 'summary' as const, label: t('notepad.tabSummary', 'Summary'), icon: <Sparkles /> },
-      {
-        id: 'transcript' as const,
-        label: t('notepad.tabTranscript', 'Transcript'),
-        icon: <ScrollText />
-      },
-      { id: 'notes' as const, label: t('notepad.tabNotes', 'My notes'), icon: <NotebookPen /> }
+      { id: 'summary' as const, label: t('notepad.tabSummary', 'Summary') },
+      { id: 'transcript' as const, label: t('notepad.tabTranscript', 'Transcript') },
+      { id: 'notes' as const, label: t('notepad.tabNotes', 'My notes') }
     ],
     [t]
   )
@@ -468,21 +424,38 @@ function MeetingDetail({ id, onBack }: { id: string; onBack: () => void }): JSX.
     <Page width="wide">
       <div className="mb-1 flex items-center justify-between gap-2">
         <BackButton onBack={onBack} />
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
-            className="btn-secondary btn-sm"
+            className="icon-btn"
             onClick={() => void window.tapwisper.meetings.openNotepad(meeting.id)}
+            aria-label={t('meetings.openNotepad', 'Open in notepad')}
+            title={t('meetings.openNotepad', 'Open in notepad')}
           >
-            <AppWindow className="h-3.5 w-3.5" />
-            {t('meetings.openNotepad', 'Open in notepad')}
+            <AppWindow className="h-4 w-4" />
           </button>
-          <button type="button" className="btn-secondary btn-sm" onClick={exportMarkdown}>
-            <Download className="h-3.5 w-3.5" />
-            {exportState === 'saved'
-              ? t('meetings.exported', 'Saved')
-              : t('meetings.export', 'Export Markdown')}
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={exportMarkdown}
+            aria-label={t('meetings.export', 'Export Markdown')}
+            title={
+              exportState === 'saved'
+                ? t('meetings.exported', 'Saved')
+                : t('meetings.export', 'Export Markdown')
+            }
+          >
+            {exportState === 'saved' ? (
+              <Check className="h-4 w-4 text-success" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
           </button>
+          {exportState === 'saved' && (
+            <span role="status" className="sr-only">
+              {t('meetings.exported', 'Saved')}
+            </span>
+          )}
           <button
             type="button"
             className="icon-btn hover:!bg-danger-tint hover:!text-danger"
@@ -501,9 +474,8 @@ function MeetingDetail({ id, onBack }: { id: string; onBack: () => void }): JSX.
           title={meeting.title}
           className="-mx-1.5 h-9 px-1.5 text-[22px] [text-align:match-parent]"
         />
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-muted">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-soft">
           <MetaText meeting={meeting} withDate />
-          {meeting.appName && <span className="chip">{meeting.appName}</span>}
           <StatusBadge status={meeting.status} />
         </p>
       </header>
@@ -543,8 +515,8 @@ function MeetingDetail({ id, onBack }: { id: string; onBack: () => void }): JSX.
           </div>
         </div>
 
-        <aside className="space-y-3 md:sticky md:top-3">
-          <section className="card p-3" aria-labelledby="ask-title">
+        <aside className="space-y-6 md:sticky md:top-3">
+          <section aria-labelledby="ask-title">
             <h2 id="ask-title" className="section-label mb-2">
               {t('notepad.askLabel', 'Ask about this meeting')}
             </h2>
@@ -588,7 +560,7 @@ const SpeakersCard = memo(function SpeakersCard({
 }): JSX.Element {
   const { t } = useTranslation()
   return (
-    <section className="card p-3" aria-labelledby="speakers-title">
+    <section aria-labelledby="speakers-title">
       <h2 id="speakers-title" className="section-label mb-1.5">
         {t('meetings.speakers', 'Speakers')}
       </h2>

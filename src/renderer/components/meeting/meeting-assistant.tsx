@@ -29,7 +29,7 @@ export const AssistantThread = memo(function AssistantThread({
   if (items.length === 0) return null
 
   return (
-    <div className={`space-y-1.5 ${className}`} aria-live="polite">
+    <div className={`divide-y divide-hairline/70 ${className}`} aria-live="polite">
       {onClear && items.length > 1 && (
         <div className="flex justify-end">
           <button
@@ -42,11 +42,7 @@ export const AssistantThread = memo(function AssistantThread({
         </div>
       )}
       {items.map((item) => (
-        <article
-          key={item.id}
-          className="rounded-xl border border-hairline bg-panel px-3 py-2"
-          aria-busy={item.pending}
-        >
+        <article key={item.id} className="py-2 first:pt-0" aria-busy={item.pending}>
           <header className="flex items-start gap-2">
             <span className="mt-px shrink-0 text-signal">
               {item.kind === 'recap' ? (
@@ -55,7 +51,7 @@ export const AssistantThread = memo(function AssistantThread({
                 <MessageSquareText className="h-3.5 w-3.5" />
               )}
             </span>
-            <p className="min-w-0 flex-1 text-[12px] font-semibold text-ink" dir="auto">
+            <p className="min-w-0 flex-1 text-[12px] font-medium text-ink" dir="auto">
               {item.kind === 'recap'
                 ? t('notepad.recapTitle', 'Last {{minutes}} minutes', { minutes: RECAP_MINUTES })
                 : item.question}

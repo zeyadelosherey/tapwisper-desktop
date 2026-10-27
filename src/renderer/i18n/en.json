@@ -794,12 +794,10 @@
   },
   "meetings": {
     "title": "Meetings",
-    "subtitle": "Notes, transcripts and summaries of your calls — recorded on this computer, no bot in the meeting.",
     "resultCount": "{{count}} results",
-    "count": "{{count}} meetings",
     "search": "Search titles, notes, transcripts…",
     "emptyTitle": "No meetings yet",
-    "emptyBody": "Start notes when a call begins. TapWisper listens to you and to the meeting, writes a live transcript, and summarizes it when you stop.",
+    "emptyBody": "Start notes when a call begins — you get a transcript and a summary.",
     "words": "{{count}} words",
     "statusInterrupted": "Interrupted",
     "notFound": "This meeting is no longer available.",
@@ -817,8 +815,6 @@
     "showNotepad": "Show notepad",
     "detected": "{{app}} call detected",
     "detectedAsk": "take notes?",
-    "count_one": "{{count}} meeting",
-    "count_other": "{{count}} meetings",
     "resultCount_one": "{{count}} result",
     "resultCount_other": "{{count}} results",
     "words_one": "{{count}} word",
@@ -858,7 +854,7 @@
     "readyMeetingUnsupported": "Not available — mic only",
     "readyMeetingOff": "Off in Settings",
     "startTitle": "Take meeting notes",
-    "startBody": "Records your microphone and the meeting’s audio on this computer — no bot joins the call. You get a live transcript and a summary when you stop.",
+    "startBody": "No bot joins the call. Live transcript, summary when you stop.",
     "sourceMic": "Your microphone",
     "readyMicDenied": "Blocked — allow it in system settings",
     "sourceMeeting": "Meeting audio",
@@ -872,8 +868,6 @@
     "editingSummary": "Editing summary",
     "aiSummary": "AI summary",
     "copySummary": "Copy summary",
-    "copied": "Copied",
-    "copy": "Copy",
     "editSummary": "Edit summary",
     "regenerate": "Regenerate",
     "markdownHint": "Markdown: ## heading, - bullet, - [ ] task",
@@ -915,6 +909,7 @@
     "errorStart": "Couldn’t start recording. Try again.",
     "showEarlier_one": "Show 1 earlier turn",
     "showEarlier_other": "Show earlier ({{count}})",
-    "errorStillRecording": "This meeting is still being recorded — the summary is made when you stop."
+    "errorStillRecording": "This meeting is still being recorded — the summary is made when you stop.",
+    "audioSources": "Audio sources"
   }
 }

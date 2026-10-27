@@ -9,11 +9,9 @@ import {
   Play,
   Quote,
   RotateCw,
-  Search,
   Sparkles,
   Trash2,
-  WandSparkles,
-  X
+  WandSparkles
 } from 'lucide-react'
 import { useStatsStore } from '../store/stats'
 import { useActivityStore, type TranscriptionRecord } from '../store/activity'
@@ -25,6 +23,7 @@ import { useRecordShortcut } from '../hooks/use-record-shortcut'
 import { useConfirmDialog } from '../components/confirm-dialog'
 import { ShortcutKeys } from '../components/ui/keycap'
 import { Page, Spinner } from '../components/ui/primitives'
+import { ExpandingSearch } from '../components/ui/expanding-search'
 
 const PAGE_SIZE = 40
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -245,8 +244,6 @@ function HistoryList({ totalCount, refreshToken }: HistoryListProps): JSX.Elemen
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [retry, setRetry] = useState<Record<string, RetryState>>({})
-  const [searchOpen, setSearchOpen] = useState(false)
-  const searchRef = useRef<HTMLInputElement | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioUrlRef = useRef<string | null>(null)
   const checkedRef = useRef<Set<string>>(new Set())
@@ -396,63 +393,20 @@ function HistoryList({ totalCount, refreshToken }: HistoryListProps): JSX.Elemen
     return out
   }, [items])
 
-  const showSearch = searchOpen || !!search || totalCount >= SEARCH_OPEN_AT
-  const openSearch = (): void => {
-    setSearchOpen(true)
-    requestAnimationFrame(() => searchRef.current?.focus())
-  }
-  const closeSearch = (): void => {
-    setSearch('')
-    setSearchOpen(false)
-  }
-
   return (
     <section aria-labelledby="history-title">
       <div className="mb-1 flex min-h-8 items-center justify-between gap-3">
         <h2 id="history-title" className="font-display text-[17px] leading-none text-ink">
           {t('home.historyTitle', 'History')}
         </h2>
-        {totalCount > 0 &&
-          (showSearch ? (
-            <div className="relative w-56 max-w-full">
-              <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
-              <input
-                ref={searchRef}
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onBlur={() => {
-                  if (!search) setSearchOpen(false)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') closeSearch()
-                }}
-                placeholder={t('home.searchActivity', 'Search history…')}
-                aria-label={t('home.searchActivity', 'Search history…')}
-                className="field pe-8 ps-8"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={closeSearch}
-                  aria-label={t('home.clearSearch', 'Clear search')}
-                  className="icon-btn absolute end-0.5 top-1/2 h-7 w-7 -translate-y-1/2"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={openSearch}
-              aria-label={t('home.searchActivity', 'Search history…')}
-              title={t('home.searchActivity', 'Search history…')}
-              className="icon-btn"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-          ))}
+        {totalCount > 0 && (
+          <ExpandingSearch
+            value={search}
+            onChange={setSearch}
+            label={t('home.searchActivity', 'Search history…')}
+            open={totalCount >= SEARCH_OPEN_AT}
+          />
+        )}
       </div>
 
       {debouncedSearch && items && (

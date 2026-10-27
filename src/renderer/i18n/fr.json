@@ -802,12 +802,10 @@
   },
   "meetings": {
     "title": "Réunions",
-    "subtitle": "Notes, transcriptions et résumés de vos appels — enregistrés sur cet ordinateur, sans bot dans la réunion.",
     "resultCount": "{{count}} résultats",
-    "count": "{{count}} réunions",
     "search": "Rechercher titres, notes, transcriptions…",
     "emptyTitle": "Aucune réunion pour l’instant",
-    "emptyBody": "Lancez les notes au début d’un appel. TapWisper vous écoute, vous et la réunion, écrit une transcription en direct et la résume quand vous arrêtez.",
+    "emptyBody": "Lancez les notes au début d’un appel — vous obtenez transcription et résumé.",
     "words": "{{count}} mots",
     "statusInterrupted": "Interrompue",
     "notFound": "Cette réunion n’est plus disponible.",
@@ -825,9 +823,6 @@
     "showNotepad": "Afficher le bloc-notes",
     "detected": "Appel {{app}} détecté",
     "detectedAsk": "prendre des notes ?",
-    "count_one": "{{count}} réunion",
-    "count_many": "{{count}} réunions",
-    "count_other": "{{count}} réunions",
     "resultCount_one": "{{count}} résultat",
     "resultCount_many": "{{count}} résultats",
     "resultCount_other": "{{count}} résultats",
@@ -869,7 +864,7 @@
     "readyMeetingUnsupported": "Indisponible — micro uniquement",
     "readyMeetingOff": "Désactivé dans les Réglages",
     "startTitle": "Prendre des notes de réunion",
-    "startBody": "Enregistre votre micro et l’audio de la réunion sur cet ordinateur — aucun bot ne rejoint l’appel. Vous obtenez une transcription en direct et un résumé à la fin.",
+    "startBody": "Aucun bot dans l’appel. Transcription en direct, résumé à l’arrêt.",
     "sourceMic": "Votre micro",
     "readyMicDenied": "Bloqué — autorisez-le dans les réglages système",
     "sourceMeeting": "Audio de la réunion",
@@ -883,8 +878,6 @@
     "editingSummary": "Modification du résumé",
     "aiSummary": "Résumé IA",
     "copySummary": "Copier le résumé",
-    "copied": "Copié",
-    "copy": "Copier",
     "editSummary": "Modifier le résumé",
     "regenerate": "Régénérer",
     "markdownHint": "Markdown : ## titre, - puce, - [ ] tâche",
@@ -927,6 +920,7 @@
     "showEarlier_one": "Afficher 1 intervention précédente",
     "showEarlier_many": "Afficher les précédentes ({{count}})",
     "showEarlier_other": "Afficher les précédentes ({{count}})",
-    "errorStillRecording": "Cette réunion est encore en cours d’enregistrement — le résumé sera créé à l’arrêt."
+    "errorStillRecording": "Cette réunion est encore en cours d’enregistrement — le résumé sera créé à l’arrêt.",
+    "audioSources": "Sources audio"
   }
 }

@@ -794,12 +794,10 @@
   },
   "meetings": {
     "title": "Meetings",
-    "subtitle": "Notizen, Transkripte und Zusammenfassungen deiner Anrufe – auf diesem Computer aufgenommen, ohne Bot im Meeting.",
     "resultCount": "{{count}} Treffer",
-    "count": "{{count}} Meetings",
     "search": "Titel, Notizen, Transkripte durchsuchen…",
     "emptyTitle": "Noch keine Meetings",
-    "emptyBody": "Starte Notizen, wenn ein Anruf beginnt. TapWisper hört dir und dem Meeting zu, schreibt ein Live-Transkript und fasst es zusammen, sobald du stoppst.",
+    "emptyBody": "Starte Notizen, wenn ein Call beginnt — du bekommst Transkript und Zusammenfassung.",
     "words": "{{count}} Wörter",
     "statusInterrupted": "Unterbrochen",
     "notFound": "Dieses Meeting ist nicht mehr verfügbar.",
@@ -817,8 +815,6 @@
     "showNotepad": "Notizblock zeigen",
     "detected": "{{app}}-Anruf erkannt",
     "detectedAsk": "Notizen machen?",
-    "count_one": "{{count}} Meeting",
-    "count_other": "{{count}} Meetings",
     "resultCount_one": "{{count}} Treffer",
     "resultCount_other": "{{count}} Treffer",
     "words_one": "{{count}} Wort",
@@ -858,7 +854,7 @@
     "readyMeetingUnsupported": "Nicht verfügbar – nur Mikrofon",
     "readyMeetingOff": "In den Einstellungen aus",
     "startTitle": "Meeting-Notizen machen",
-    "startBody": "Nimmt dein Mikrofon und das Audio des Meetings auf diesem Computer auf – kein Bot tritt dem Anruf bei. Du bekommst ein Live-Transkript und eine Zusammenfassung, wenn du stoppst.",
+    "startBody": "Kein Bot im Call. Live-Transkript, Zusammenfassung beim Stoppen.",
     "sourceMic": "Dein Mikrofon",
     "readyMicDenied": "Blockiert – in den Systemeinstellungen erlauben",
     "sourceMeeting": "Meeting-Audio",
@@ -872,8 +868,6 @@
     "editingSummary": "Zusammenfassung bearbeiten",
     "aiSummary": "KI-Zusammenfassung",
     "copySummary": "Zusammenfassung kopieren",
-    "copied": "Kopiert",
-    "copy": "Kopieren",
     "editSummary": "Zusammenfassung bearbeiten",
     "regenerate": "Neu erstellen",
     "markdownHint": "Markdown: ## Überschrift, - Punkt, - [ ] Aufgabe",
@@ -915,6 +909,7 @@
     "errorStart": "Aufnahme konnte nicht gestartet werden. Versuch es noch einmal.",
     "showEarlier_one": "1 früheren Beitrag zeigen",
     "showEarlier_other": "Frühere zeigen ({{count}})",
-    "errorStillRecording": "Dieses Meeting wird noch aufgezeichnet – die Zusammenfassung entsteht, wenn du stoppst."
+    "errorStillRecording": "Dieses Meeting wird noch aufgezeichnet – die Zusammenfassung entsteht, wenn du stoppst.",
+    "audioSources": "Audioquellen"
   }
 }

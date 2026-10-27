@@ -162,7 +162,7 @@ export const SummaryPanel = memo(function SummaryPanel({
   // ── Summary ──────────────────────────────────────────────────
   return (
     <div className={pad}>
-      <div className="mb-2 flex items-center gap-1">
+      <div className="mb-1 flex items-center justify-end gap-0.5">
         {summarizing ? (
           <p
             className="flex min-w-0 flex-1 items-center gap-1.5 text-[11.5px] font-medium text-ink-muted"
@@ -172,7 +172,7 @@ export const SummaryPanel = memo(function SummaryPanel({
             {t('notepad.summarizing', 'Summarizing…')}
           </p>
         ) : (
-          <p className="section-label min-w-0 flex-1 truncate">
+          <p className={editing ? 'section-label min-w-0 flex-1 truncate' : 'sr-only'}>
             {editing
               ? t('notepad.editingSummary', 'Editing summary')
               : t('notepad.aiSummary', 'AI summary')}
@@ -192,7 +192,7 @@ export const SummaryPanel = memo(function SummaryPanel({
           <>
             <button
               type="button"
-              className="btn-ghost btn-sm px-2"
+              className="icon-btn"
               onClick={copy}
               disabled={summarizing}
               aria-label={t('notepad.copySummary', 'Copy summary')}
@@ -203,34 +203,27 @@ export const SummaryPanel = memo(function SummaryPanel({
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
-              <span className={dense ? 'sr-only' : ''}>
-                {copied ? t('notepad.copied', 'Copied') : t('notepad.copy', 'Copy')}
-              </span>
             </button>
             <button
               type="button"
-              className="btn-ghost btn-sm px-2"
+              className="icon-btn"
               onClick={startEdit}
               disabled={summarizing}
               aria-label={t('notepad.editSummary', 'Edit summary')}
               title={t('notepad.editSummary', 'Edit summary')}
             >
               <Pencil className="h-3.5 w-3.5" />
-              <span className={dense ? 'sr-only' : ''}>{t('common.edit', 'Edit')}</span>
             </button>
             {!live && (
               <button
                 type="button"
-                className="btn-ghost btn-sm px-2"
+                className="icon-btn"
                 onClick={generate}
                 disabled={summarizing}
                 aria-label={t('notepad.regenerate', 'Regenerate')}
                 title={t('notepad.regenerate', 'Regenerate')}
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${summarizing ? 'animate-spin' : ''}`} />
-                <span className={dense ? 'sr-only' : ''}>
-                  {t('notepad.regenerate', 'Regenerate')}
-                </span>
               </button>
             )}
           </>

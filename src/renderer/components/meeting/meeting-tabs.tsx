@@ -3,7 +3,7 @@ import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 export type MeetingTab = 'notes' | 'transcript' | 'summary'
 
 interface MeetingTabsProps {
-  tabs: { id: MeetingTab; label: string; icon?: ReactNode; badge?: ReactNode }[]
+  tabs: { id: MeetingTab; label: string; badge?: ReactNode }[]
   value: MeetingTab
   onChange: (tab: MeetingTab) => void
   label: string
@@ -60,17 +60,10 @@ export function MeetingTabs({
             aria-controls={`${idBase}-panel-${tab.id}`}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.id)}
-            className={`relative -mb-px flex items-center gap-1.5 border-b-2 px-2.5 pb-2 pt-1 text-[12.5px] font-medium transition-colors duration-200 ${
-              active ? 'border-signal text-ink' : 'border-transparent text-ink-muted hover:text-ink'
+            className={`relative -mb-px flex items-center gap-1.5 border-b-2 px-2.5 pb-2 pt-1 text-[12.5px] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 ${
+              active ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
             }`}
           >
-            {tab.icon && (
-              <span
-                className={`[&_svg]:h-3.5 [&_svg]:w-3.5 ${active ? 'text-signal' : 'text-ink-soft'}`}
-              >
-                {tab.icon}
-              </span>
-            )}
             {tab.label}
             {tab.badge}
           </button>

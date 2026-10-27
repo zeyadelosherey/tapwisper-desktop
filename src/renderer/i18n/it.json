@@ -802,12 +802,10 @@
   },
   "meetings": {
     "title": "Riunioni",
-    "subtitle": "Note, trascrizioni e riepiloghi delle tue chiamate, registrati su questo computer, senza bot nella riunione.",
     "resultCount": "{{count}} risultati",
-    "count": "{{count}} riunioni",
     "search": "Cerca titoli, note, trascrizioni…",
     "emptyTitle": "Ancora nessuna riunione",
-    "emptyBody": "Avvia le note quando inizia una chiamata. TapWisper ascolta te e la riunione, scrive una trascrizione in tempo reale e la riassume quando ti fermi.",
+    "emptyBody": "Avvia le note quando inizia una chiamata: avrai trascrizione e riassunto.",
     "words": "{{count}} parole",
     "statusInterrupted": "Interrotta",
     "notFound": "Questa riunione non è più disponibile.",
@@ -825,9 +823,6 @@
     "showNotepad": "Mostra blocco note",
     "detected": "Chiamata {{app}} rilevata",
     "detectedAsk": "prendere appunti?",
-    "count_one": "{{count}} riunione",
-    "count_many": "{{count}} riunioni",
-    "count_other": "{{count}} riunioni",
     "resultCount_one": "{{count}} risultato",
     "resultCount_many": "{{count}} risultati",
     "resultCount_other": "{{count}} risultati",
@@ -869,7 +864,7 @@
     "readyMeetingUnsupported": "Non disponibile: solo microfono",
     "readyMeetingOff": "Disattivato nelle Impostazioni",
     "startTitle": "Prendi appunti della riunione",
-    "startBody": "Registra il tuo microfono e l’audio della riunione su questo computer, senza che nessun bot entri nella chiamata. Ottieni una trascrizione dal vivo e un riepilogo alla fine.",
+    "startBody": "Nessun bot nella chiamata. Trascrizione dal vivo, riassunto quando ti fermi.",
     "sourceMic": "Il tuo microfono",
     "readyMicDenied": "Bloccato: consentilo nelle impostazioni di sistema",
     "sourceMeeting": "Audio della riunione",
@@ -883,8 +878,6 @@
     "editingSummary": "Modifica del riepilogo",
     "aiSummary": "Riepilogo IA",
     "copySummary": "Copia riepilogo",
-    "copied": "Copiato",
-    "copy": "Copia",
     "editSummary": "Modifica riepilogo",
     "regenerate": "Rigenera",
     "markdownHint": "Markdown: ## titolo, - punto, - [ ] attività",
@@ -927,6 +920,7 @@
     "showEarlier_one": "Mostra 1 intervento precedente",
     "showEarlier_many": "Mostra precedenti ({{count}})",
     "showEarlier_other": "Mostra precedenti ({{count}})",
-    "errorStillRecording": "Questa riunione è ancora in registrazione: il riepilogo viene creato quando la interrompi."
+    "errorStillRecording": "Questa riunione è ancora in registrazione: il riepilogo viene creato quando la interrompi.",
+    "audioSources": "Sorgenti audio"
   }
 }

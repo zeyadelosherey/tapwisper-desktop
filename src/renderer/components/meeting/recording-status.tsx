@@ -22,6 +22,8 @@ interface SourceMeterProps {
   /** Meeting audio only: why it isn't captured */
   state?: MeetingAudioState
   paused?: boolean
+  /** Show the source name next to the bars (popover) */
+  showLabel?: boolean
 }
 
 const BAR_HEIGHTS = [4, 6, 8, 10]
@@ -30,7 +32,8 @@ export const SourceMeter = memo(function SourceMeter({
   kind,
   step,
   state = 'on',
-  paused = false
+  paused = false,
+  showLabel = false
 }: SourceMeterProps): JSX.Element {
   const { t } = useTranslation()
   const active = state === 'on'
@@ -55,7 +58,12 @@ export const SourceMeter = memo(function SourceMeter({
       role="img"
       aria-label={label}
     >
-      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+      <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+      {showLabel && (
+        <span className="me-2 whitespace-nowrap text-[12px]" aria-hidden="true">
+          {label}
+        </span>
+      )}
       {active && (
         <span className="flex h-2.5 items-end gap-[2px]" aria-hidden="true">
           {BAR_HEIGHTS.map((h, i) => (

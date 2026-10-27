@@ -2,16 +2,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode
 import { useTranslation } from 'react-i18next'
 import {
   AppWindow,
+  AudioLines,
   ChevronLeft,
-  FileText,
   History,
   Mic,
-  NotebookPen,
   Pause,
   Play,
   Plus,
-  ScrollText,
-  Sparkles,
   Square,
   TriangleAlert,
   Volume2,
@@ -54,6 +51,9 @@ function useScreenshotRecorder(): MeetingRecorder {
   }, [])
   return (window as unknown as { __MOCK_RECORDER__: MeetingRecorder }).__MOCK_RECORDER__
 }
+
+/** The consent reminder fades out after this long (or on the first interaction) */
+const CONSENT_MS = 10_000
 
 const useRecorder: () => MeetingRecorder =
   import.meta.env.MODE === 'screenshot' ? useScreenshotRecorder : useMeetingRecorder
@@ -233,15 +233,20 @@ export function Notepad(): JSX.Element {
             <RecordingClock seconds={Math.floor(recorder.elapsedMs / 1000)} paused={paused} />
             <LiveStatus status={recorder.status} pending={recorder.pendingChunks > 0} />
             <span className="flex-1" />
-            <span className="no-drag flex items-center">
-              <SourceMeter kind="mic" step={levelStep(recorder.levels.you)} paused={paused} />
-              <SourceMeter
-                kind="meeting"
-                step={levelStep(recorder.levels.others)}
-                state={recorder.meetingAudio}
-                paused={paused}
-              />
-            </span>
+            <SourcesButton recorder={recorder} paused={paused} />
+            <button
+              type="button"
+              className="no-drag btn btn-sm bg-ink px-2.5 text-raised hover:bg-ink/85"
+              onClick={stop}
+              disabled={recorder.status === 'stopping'}
+            >
+              {recorder.status === 'stopping' ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                <Square className="h-2.5 w-2.5 fill-ember text-ember" />
+              )}
+              {t('notepad.stop', 'Stop')}
+            </button>
           </>
         ) : (
           <>
@@ -322,7 +327,7 @@ export function Notepad(): JSX.Element {
 
       {/* Recap / answers */}
       {assistant.items.length > 0 && (
-        <div className="max-h-[42%] shrink-0 overflow-y-auto border-t border-hairline bg-canvas/60 px-2.5 py-2">
+        <div className="max-h-[42%] shrink-0 overflow-y-auto border-t border-hairline px-3 py-2">
           <AssistantThread
             items={assistant.items}
             onDismiss={assistant.dismiss}
@@ -342,11 +347,10 @@ export function Notepad(): JSX.Element {
             onPause={recorder.pause}
             onResume={recorder.resume}
             onRecap={assistant.recap}
-            onStop={stop}
           />
         ) : (
           <div className="flex items-center gap-1.5">
-            <button type="button" className="btn-secondary btn-sm" onClick={() => void start()}>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => void start()}>
               <Plus className="h-3.5 w-3.5" />
               {t('notepad.newMeeting', 'New meeting')}
             </button>
@@ -404,9 +408,69 @@ const LiveStatus = memo(function LiveStatus({
           : pending
             ? t('notepad.transcribing', 'Transcribing…')
             : t('notepad.statusRecording', 'Recording')
+  // "Recording" is what the clock already says; only other states are shown
+  const quiet = status === 'recording'
   return (
-    <span className="truncate text-[12px] text-ink-muted" role="status">
+    <span className={quiet ? 'sr-only' : 'truncate text-[12px] text-ink-soft'} role="status">
       {label}
+    </span>
+  )
+})
+
+/** One small icon in the header; the two source meters live in its popover */
+const SourcesButton = memo(function SourcesButton({
+  recorder,
+  paused
+}: {
+  recorder: MeetingRecorder
+  paused: boolean
+}): JSX.Element {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+  const problem = recorder.meetingAudio === 'denied'
+  const label = t('notepad.audioSources', 'Audio sources')
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: PointerEvent): void => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <span ref={ref} className="no-drag relative">
+      <button
+        type="button"
+        className={`icon-btn h-7 w-7 ${problem ? '!text-warning' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={label}
+        title={label}
+      >
+        <AudioLines className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <span className="shadow-pop absolute end-0 top-8 z-20 flex flex-col gap-0.5 rounded-lg border border-hairline bg-raised p-1.5">
+          <SourceMeter kind="mic" step={levelStep(recorder.levels.you)} paused={paused} showLabel />
+          <SourceMeter
+            kind="meeting"
+            step={levelStep(recorder.levels.others)}
+            state={recorder.meetingAudio}
+            paused={paused}
+            showLabel
+          />
+        </span>
+      )}
     </span>
   )
 })
@@ -447,16 +511,11 @@ const NotepadTabs = memo(function NotepadTabs({
   const { t } = useTranslation()
   const tabs = useMemo(
     () => [
-      { id: 'notes' as const, label: t('notepad.tabNotes', 'My notes'), icon: <NotebookPen /> },
-      {
-        id: 'transcript' as const,
-        label: t('notepad.tabTranscript', 'Transcript'),
-        icon: <ScrollText />
-      },
+      { id: 'notes' as const, label: t('notepad.tabNotes', 'My notes') },
+      { id: 'transcript' as const, label: t('notepad.tabTranscript', 'Transcript') },
       {
         id: 'summary' as const,
         label: t('notepad.tabSummary', 'Summary'),
-        icon: <Sparkles />,
         badge: summarizing ? <Spinner className="ms-0.5 h-2.5 w-2.5 text-signal" /> : undefined
       }
     ],
@@ -510,6 +569,24 @@ const Notices = memo(function Notices({
 
   const showConsent = live && consentHidden !== meetingId
   const showAudio = live && !!audioNotice && audioHidden !== meetingId
+
+  useEffect(() => {
+    if (!showConsent) return
+    const hide = (): void => setConsentHidden(meetingId)
+    const timer = setTimeout(hide, CONSENT_MS)
+    // Wait a beat so the click that started the recording doesn't count
+    const arm = setTimeout(() => {
+      window.addEventListener('pointerdown', hide, { once: true })
+      window.addEventListener('keydown', hide, { once: true })
+    }, 600)
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(arm)
+      window.removeEventListener('pointerdown', hide)
+      window.removeEventListener('keydown', hide)
+    }
+  }, [showConsent, meetingId])
+
   if (!error && !showConsent && !showAudio) return null
 
   return (
@@ -530,13 +607,9 @@ const Notices = memo(function Notices({
         </NoticeLine>
       )}
       {showConsent && (
-        <NoticeLine
-          tone="muted"
-          icon={<Mic className="h-3.5 w-3.5" />}
-          onDismiss={() => setConsentHidden(meetingId)}
-        >
+        <p className="px-1.5 text-[11.5px] text-ink-faint">
           {t('notepad.consent', 'Let everyone know you’re recording.')}
-        </NoticeLine>
+        </p>
       )}
     </div>
   )
@@ -556,10 +629,10 @@ function NoticeLine({
   const { t } = useTranslation()
   return (
     <div
-      className={`flex items-start gap-1.5 rounded-lg px-2 py-1 text-[11.5px] leading-snug ${
+      className={`flex items-start gap-1.5 text-[11.5px] leading-snug ${
         tone === 'warning'
-          ? 'bg-warning-tint text-ink-muted [&>svg]:text-warning'
-          : 'bg-sunken/70 text-ink-muted'
+          ? 'rounded-lg bg-warning-tint px-2 py-1 text-ink-muted'
+          : 'px-1.5 text-ink-soft'
       }`}
     >
       <span className={`mt-px shrink-0 ${tone === 'warning' ? 'text-warning' : 'text-ink-soft'}`}>
@@ -584,8 +657,7 @@ const LiveControls = memo(function LiveControls({
   canRecap,
   onPause,
   onResume,
-  onRecap,
-  onStop
+  onRecap
 }: {
   paused: boolean
   stopping: boolean
@@ -593,14 +665,13 @@ const LiveControls = memo(function LiveControls({
   onPause: () => void
   onResume: () => void
   onRecap: () => void
-  onStop: () => void
 }): JSX.Element {
   const { t } = useTranslation()
   return (
     <div className="flex items-center gap-1.5">
       <button
         type="button"
-        className="btn-secondary btn-sm w-8 px-0"
+        className="icon-btn h-7 w-7"
         onClick={paused ? onResume : onPause}
         disabled={stopping}
         aria-label={paused ? t('notepad.resume', 'Resume') : t('notepad.pause', 'Pause')}
@@ -610,26 +681,12 @@ const LiveControls = memo(function LiveControls({
       </button>
       <button
         type="button"
-        className="btn-secondary btn-sm min-w-0"
+        className="btn-ghost btn-sm min-w-0"
         onClick={onRecap}
         disabled={!canRecap || stopping}
       >
-        <History className="h-3.5 w-3.5 shrink-0 text-signal" />
+        <History className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">{t('notepad.whatDidIMiss', 'What did I miss?')}</span>
-      </button>
-      <span className="flex-1" />
-      <button
-        type="button"
-        className="btn btn-sm bg-ink px-3 text-raised hover:bg-ink/85"
-        onClick={onStop}
-        disabled={stopping}
-      >
-        {stopping ? (
-          <Spinner className="h-3 w-3" />
-        ) : (
-          <Square className="h-3 w-3 fill-ember text-ember" />
-        )}
-        {t('notepad.stop', 'Stop')}
       </button>
     </div>
   )
@@ -710,105 +767,103 @@ function StartScreen({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4">
-      <div className="pt-1">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-4">
+      <div className="grain-hero px-4 pb-4 pt-2">
         <h1 className="font-display text-[20px] leading-tight text-ink">
           {t('notepad.startTitle', 'Take meeting notes')}
         </h1>
         <p className="mt-1 text-[12.5px] leading-snug text-ink-muted text-pretty">
-          {t(
-            'notepad.startBody',
-            'Records your microphone and the meeting’s audio on this computer — no bot joins the call. You get a live transcript and a summary when you stop.'
-          )}
+          {t('notepad.startBody', 'No bot joins the call. Live transcript, summary when you stop.')}
         </p>
       </div>
 
-      <button
-        type="button"
-        className="btn-signal btn-lg mt-3 w-full"
-        onClick={onStart}
-        disabled={starting}
-      >
-        {starting ? (
-          <Spinner className="h-3.5 w-3.5" />
-        ) : (
-          <span className="h-2 w-2 rounded-full bg-on-signal" />
-        )}
-        {t('notepad.startNotes', 'Start notes')}
-      </button>
-      {error && (
-        <p
-          role="alert"
-          className="mt-2 flex items-start gap-1.5 text-[12px] leading-snug text-danger"
+      <div className="px-4">
+        <button
+          type="button"
+          className="btn-signal btn-lg mt-3 w-full"
+          onClick={onStart}
+          disabled={starting}
         >
-          <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
-          {error}
-        </p>
-      )}
-
-      <ul className="mt-3 divide-y divide-hairline rounded-xl border border-hairline">
-        <ReadyRow
-          icon={<Mic className="h-3.5 w-3.5" />}
-          label={t('notepad.sourceMic', 'Your microphone')}
-          value={
-            !ready
-              ? '…'
-              : ready.mic === 'denied'
-                ? t('notepad.readyMicDenied', 'Blocked — allow it in system settings')
-                : t('notepad.readyMeeting', 'Ready')
-          }
-          ok={ready?.mic !== 'denied'}
-        />
-        <ReadyRow
-          icon={<Volume2 className="h-3.5 w-3.5" />}
-          label={t('notepad.sourceMeeting', 'Meeting audio')}
-          value={ready ? meetingText[ready.meeting] : '…'}
-          ok={ready?.meeting === 'ready'}
-          warn={ready?.meeting === 'unsupported' || ready?.meeting === 'off'}
-        />
-      </ul>
-      <p className="mt-1.5 text-[11.5px] text-ink-soft">
-        {t('notepad.consent', 'Let everyone know you’re recording.')}
-      </p>
-
-      <div className="mt-4">
-        <h2 className="section-label mb-1">{t('notepad.recent', 'Recent')}</h2>
-        {recent === null ? (
-          <div className="flex justify-center py-3 text-ink-faint">
-            <Spinner className="h-4 w-4" />
-          </div>
-        ) : recent.length === 0 ? (
-          <p className="py-2 text-[12px] text-ink-muted">
-            {t('notepad.noRecent', 'Your meetings will show up here.')}
+          {starting ? (
+            <Spinner className="h-3.5 w-3.5" />
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-on-signal" />
+          )}
+          {t('notepad.startNotes', 'Start notes')}
+        </button>
+        {error && (
+          <p
+            role="alert"
+            className="mt-2 flex items-start gap-1.5 text-[12px] leading-snug text-danger"
+          >
+            <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
+            {error}
           </p>
-        ) : (
-          <ul className="-mx-1.5">
-            {recent.map((m) => (
-              <li key={m.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpen(m.id)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-start transition-colors duration-150 hover:bg-panel"
-                >
-                  <FileText className="h-3.5 w-3.5 shrink-0 text-ink-soft" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-medium text-ink">
-                      <bdi>{meetingTitle(t, m)}</bdi>
-                    </span>
-                    <span className="block truncate text-[11px] text-ink-soft">
-                      {formatDate(m.startedAt)} · {formatTime(m.startedAt)}
-                      {m.durationSeconds > 0 && ` · ${formatDuration(m.durationSeconds)}`}
-                    </span>
-                  </span>
-                  {m.status === 'processing' && <Spinner className="h-3 w-3 text-signal" />}
-                  {m.status === 'recording' && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-ember" />
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
         )}
+
+        <ul className="mt-3 space-y-0.5">
+          <ReadyRow
+            icon={<Mic className="h-3.5 w-3.5" />}
+            label={t('notepad.sourceMic', 'Your microphone')}
+            value={
+              !ready
+                ? '…'
+                : ready.mic === 'denied'
+                  ? t('notepad.readyMicDenied', 'Blocked — allow it in system settings')
+                  : t('notepad.readyMeeting', 'Ready')
+            }
+            ok={ready?.mic !== 'denied'}
+          />
+          <ReadyRow
+            icon={<Volume2 className="h-3.5 w-3.5" />}
+            label={t('notepad.sourceMeeting', 'Meeting audio')}
+            value={ready ? meetingText[ready.meeting] : '…'}
+            ok={ready?.meeting === 'ready'}
+            warn={ready?.meeting === 'unsupported' || ready?.meeting === 'off'}
+          />
+        </ul>
+        <p className="mt-1 text-[11.5px] text-ink-faint">
+          {t('notepad.consent', 'Let everyone know you’re recording.')}
+        </p>
+
+        <div className="mt-5">
+          <h2 className="section-label mb-1">{t('notepad.recent', 'Recent')}</h2>
+          {recent === null ? (
+            <div className="flex justify-center py-3 text-ink-faint">
+              <Spinner className="h-4 w-4" />
+            </div>
+          ) : recent.length === 0 ? (
+            <p className="py-2 text-[12px] text-ink-muted">
+              {t('notepad.noRecent', 'Your meetings will show up here.')}
+            </p>
+          ) : (
+            <ul className="-mx-1.5">
+              {recent.map((m) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpen(m.id)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-start transition-colors duration-150 hover:bg-panel"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] text-ink">
+                        <bdi>{meetingTitle(t, m)}</bdi>
+                      </span>
+                      <span className="block truncate text-[11px] text-ink-soft">
+                        {formatDate(m.startedAt)} · {formatTime(m.startedAt)}
+                        {m.durationSeconds > 0 && ` · ${formatDuration(m.durationSeconds)}`}
+                      </span>
+                    </span>
+                    {m.status === 'processing' && <Spinner className="h-3 w-3 text-signal" />}
+                    {m.status === 'recording' && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-ember" />
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -828,12 +883,12 @@ function ReadyRow({
   warn?: boolean
 }): JSX.Element {
   return (
-    <li className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]">
-      <span className="text-ink-soft">{icon}</span>
-      <span className="font-medium text-ink">{label}</span>
+    <li className="flex items-center gap-2 py-0.5 text-[12px]">
+      <span className="text-ink-faint">{icon}</span>
+      <span className="text-ink-muted">{label}</span>
       <span
         className={`ms-auto flex min-w-0 items-center gap-1.5 truncate text-end ${
-          warn ? 'text-warning' : 'text-ink-muted'
+          warn ? 'text-warning' : 'text-ink-soft'
         }`}
       >
         {ok && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" />}
