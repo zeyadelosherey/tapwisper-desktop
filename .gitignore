@@ -52,3 +52,7 @@ latest*.yml
 .cache/
 .temp/
 tmp/
+.claude/worktrees/
+
+# Built macOS fn/Globe helper (scripts/build-fn-monitor.sh)
+resources/bin/

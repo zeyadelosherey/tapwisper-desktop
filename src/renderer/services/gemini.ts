@@ -6,7 +6,7 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 interface GeminiResponse {
   candidates: {
     content: {
-      parts: { text: string }[]
+      parts: { text?: string; thought?: boolean }[]
     }
   }[]
   usageMetadata?: {
@@ -35,8 +35,14 @@ export async function processWithGemini(
       }
     ],
     generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 2048
+      temperature: request.temperature ?? 0.7,
+      maxOutputTokens: request.maxTokens ?? 2048,
+      // 2.5 Flash "thinks" by default; thinking tokens count against
+      // maxOutputTokens (truncating long answers) and add seconds of latency.
+      // TapWisper's tasks are rewriting/summarizing, which don't need it.
+      ...(/flash/i.test(modelId) && /2\.5/.test(modelId)
+        ? { thinkingConfig: { thinkingBudget: 0 } }
+        : {})
     }
   }
 
@@ -52,7 +58,11 @@ export async function processWithGemini(
   }
 
   const data: GeminiResponse = await response.json()
-  const result = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  // Join every non-thought part — long answers can be split across parts
+  const result = (data.candidates?.[0]?.content?.parts ?? [])
+    .filter((p) => !p.thought && typeof p.text === 'string')
+    .map((p) => p.text)
+    .join('')
 
   return {
     result: result.trim(),

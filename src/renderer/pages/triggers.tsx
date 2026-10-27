@@ -1,32 +1,58 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Pencil, Search, Bot, Terminal, Keyboard, Smartphone, AppWindow, Rocket } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Search,
+  Bot,
+  Terminal,
+  Keyboard,
+  Smartphone,
+  AppWindow,
+  Rocket
+} from 'lucide-react'
+import { Page, PageHeader, Switch } from '../components/ui/primitives'
 import type { Trigger, TriggerActionType } from '../models/trigger'
 import { ACTION_TYPE_META } from '../models/trigger'
 import { TriggerModal } from '../components/trigger-modal'
+import { useConfirmDialog } from '../components/confirm-dialog'
 
 const ACTION_ICONS: Record<TriggerActionType, React.ReactNode> = {
   'web-search': <Search className="w-4 h-4" />,
   'ai-chat': <Bot className="w-4 h-4" />,
-  'terminal': <Terminal className="w-4 h-4" />,
-  'keyboard': <Keyboard className="w-4 h-4" />,
+  terminal: <Terminal className="w-4 h-4" />,
+  keyboard: <Keyboard className="w-4 h-4" />,
   'apple-shortcut': <Smartphone className="w-4 h-4" />,
-  'window': <AppWindow className="w-4 h-4" />,
+  window: <AppWindow className="w-4 h-4" />,
   'launch-app': <Rocket className="w-4 h-4" />
 }
 
-const ACTION_COLORS: Record<TriggerActionType, string> = {
-  'web-search': '#7EB6E0',
-  'ai-chat': '#B07CD8',
-  'terminal': '#4DC778',
-  'keyboard': '#E8A838',
-  'apple-shortcut': '#E86B6B',
-  'window': '#6BB5E8',
-  'launch-app': '#E8A838'
+/**
+ * Normalize a trigger phrase for duplicate detection:
+ * lowercase, punctuation/symbols stripped, whitespace collapsed.
+ */
+function normalizePhrase(phrase: string): string {
+  return phrase
+    .toLowerCase()
+    .replace(/[\p{P}\p{S}]+/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Find another enabled trigger that uses the same (normalized) phrase */
+function findPhraseConflict(candidate: Trigger, triggers: Trigger[]): Trigger | undefined {
+  const phrase = normalizePhrase(candidate.triggerPhrase)
+  if (!phrase) return undefined
+  return triggers.find(
+    (other) =>
+      other.id !== candidate.id && other.enabled && normalizePhrase(other.triggerPhrase) === phrase
+  )
 }
 
 export function Triggers(): JSX.Element {
   const { t } = useTranslation()
+  const { confirm, dialog } = useConfirmDialog()
   const [triggers, setTriggers] = useState<Trigger[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editingTrigger, setEditingTrigger] = useState<Trigger | null>(null)
@@ -44,27 +70,88 @@ export function Triggers(): JSX.Element {
     window.tapwisper.store.set('triggers', updated)
   }, [])
 
-  const toggleEnabled = useCallback((id: string) => {
-    const updated = triggers.map((t) =>
-      t.id === id ? { ...t, enabled: !t.enabled } : t
-    )
-    persistTriggers(updated)
-  }, [triggers, persistTriggers])
+  /** Ask the user whether to proceed when another enabled trigger has the same phrase */
+  const confirmDuplicatePhrase = useCallback(
+    (candidate: Trigger, conflict: Trigger, confirmLabel: string) =>
+      confirm({
+        title: t('triggers.duplicateTitle', 'Duplicate trigger phrase'),
+        message: t(
+          'triggers.duplicateMessage',
+          'The enabled trigger "{{name}}" already uses the phrase "{{phrase}}". Only one of them will run when you say it.',
+          { name: conflict.name, phrase: candidate.triggerPhrase }
+        ),
+        confirmLabel,
+        destructive: false
+      }),
+    [confirm, t]
+  )
 
-  const deleteTrigger = useCallback((id: string) => {
-    persistTriggers(triggers.filter((t) => t.id !== id))
-  }, [triggers, persistTriggers])
+  const toggleEnabled = useCallback(
+    async (trigger: Trigger) => {
+      const enabling = !trigger.enabled
+      if (enabling) {
+        const conflict = findPhraseConflict(trigger, triggers)
+        if (
+          conflict &&
+          !(await confirmDuplicatePhrase(
+            trigger,
+            conflict,
+            t('triggers.enableAnyway', 'Enable anyway')
+          ))
+        ) {
+          return
+        }
+      }
+      persistTriggers(
+        triggers.map((tr) => (tr.id === trigger.id ? { ...tr, enabled: enabling } : tr))
+      )
+    },
+    [triggers, persistTriggers, confirmDuplicatePhrase, t]
+  )
 
-  const handleSave = useCallback((trigger: Trigger) => {
-    const existing = triggers.find((t) => t.id === trigger.id)
-    if (existing) {
-      persistTriggers(triggers.map((t) => t.id === trigger.id ? trigger : t))
-    } else {
-      persistTriggers([...triggers, trigger])
-    }
-    setShowModal(false)
-    setEditingTrigger(null)
-  }, [triggers, persistTriggers])
+  const deleteTrigger = useCallback(
+    async (trigger: Trigger) => {
+      const ok = await confirm({
+        title: t('triggers.deleteTitle', 'Delete trigger?'),
+        message: t(
+          'triggers.deleteMessage',
+          'The trigger "{{name}}" will be permanently removed.',
+          { name: trigger.name }
+        )
+      })
+      if (!ok) return
+      persistTriggers(triggers.filter((tr) => tr.id !== trigger.id))
+    },
+    [triggers, persistTriggers, confirm, t]
+  )
+
+  const handleSave = useCallback(
+    async (trigger: Trigger) => {
+      if (trigger.enabled) {
+        const conflict = findPhraseConflict(trigger, triggers)
+        // Declining keeps the modal open so the phrase can be changed
+        if (
+          conflict &&
+          !(await confirmDuplicatePhrase(
+            trigger,
+            conflict,
+            t('triggers.saveAnyway', 'Save anyway')
+          ))
+        ) {
+          return
+        }
+      }
+      const existing = triggers.find((tr) => tr.id === trigger.id)
+      if (existing) {
+        persistTriggers(triggers.map((tr) => (tr.id === trigger.id ? trigger : tr)))
+      } else {
+        persistTriggers([...triggers, trigger])
+      }
+      setShowModal(false)
+      setEditingTrigger(null)
+    },
+    [triggers, persistTriggers, confirmDuplicatePhrase, t]
+  )
 
   const handleEdit = useCallback((trigger: Trigger) => {
     setEditingTrigger(trigger)
@@ -82,85 +169,74 @@ export function Triggers(): JSX.Element {
   }, [])
 
   const getActionLabel = (type: TriggerActionType): string => {
-    return ACTION_TYPE_META.find((m) => m.id === type)?.label || type
+    const meta = ACTION_TYPE_META.find((m) => m.id === type)
+    return meta ? t(`triggerTypes.${type}.label`, meta.label) : type
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="drag-region mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-theme-text">Triggers</h1>
-          <p className="text-sm text-theme-text-secondary mt-1">
-            Create voice-activated triggers to perform actions when you say specific phrases
-          </p>
-        </div>
-        <button
-          onClick={handleNewTrigger}
-          className="btn-primary flex items-center gap-2 shrink-0 no-drag"
-        >
-          <Plus className="w-4 h-4" />
-          New Trigger
-        </button>
-      </div>
+    <Page>
+      <PageHeader
+        title={t('nav.triggers', 'Triggers')}
+        description={t('triggers.subtitle', 'Say a phrase to run an action.')}
+        actions={
+          <button onClick={handleNewTrigger} className="btn-primary">
+            <Plus className="h-4 w-4" />
+            {t('triggers.newTrigger', 'New Trigger')}
+          </button>
+        }
+      />
 
       {/* Triggers List */}
       {triggers.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-2xl bg-theme-surface/50 flex items-center justify-center mx-auto mb-4">
-            <Search className="w-7 h-7 text-theme-text-muted" />
-          </div>
-          <p className="text-sm font-medium text-theme-text-muted">No triggers yet</p>
-          <p className="text-xs text-theme-text-muted mt-1.5 max-w-sm mx-auto">
-            Create a trigger to perform actions like web searches, AI chat, terminal commands, and more — just by speaking a phrase.
+        <div className="grain-hero flex flex-col items-center rounded-2xl px-5 pb-10 pt-12 text-center">
+          <p className="font-display text-[17px] text-ink">
+            {t('triggers.noTriggers', 'No triggers yet')}
           </p>
-          <button
-            onClick={handleNewTrigger}
-            className="mt-5 btn-primary"
-          >
-            Create Your First Trigger
+          <p className="mt-1 max-w-sm text-[13px] leading-snug text-ink-muted">
+            {t(
+              'triggers.noTriggersHint',
+              'Run a web search, AI chat or command just by saying a phrase.'
+            )}
+          </p>
+          <button onClick={handleNewTrigger} className="btn-primary mt-4">
+            {t('triggers.createFirst', 'Create Your First Trigger')}
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y divide-hairline/70 border-t border-hairline/70">
           {triggers.map((trigger) => (
             <div
               key={trigger.id}
-              className={`
-                group flex items-center gap-4 p-4 rounded-xl border transition-all
-                ${trigger.enabled
-                  ? 'bg-theme-card border-theme-border/30 hover:border-theme-border/50'
-                  : 'bg-theme-surface/30 border-theme-border/20 opacity-60'
-                }
-              `}
+              className={`group flex items-center gap-3 py-2 ${
+                trigger.enabled ? '' : 'opacity-60'
+              }`}
             >
               {/* Action type icon */}
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: `${ACTION_COLORS[trigger.actionType]}20` }}
+              <span
+                className="shrink-0 text-ink-soft"
+                title={getActionLabel(trigger.actionType)}
+                aria-hidden="true"
               >
-                <span style={{ color: ACTION_COLORS[trigger.actionType] }}>
-                  {ACTION_ICONS[trigger.actionType]}
-                </span>
-              </div>
+                {ACTION_ICONS[trigger.actionType]}
+              </span>
 
               {/* Trigger info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-theme-text truncate">
-                    {trigger.name}
-                  </span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-theme-surface/60 text-theme-text-muted shrink-0">
-                    {getActionLabel(trigger.actionType)}
-                  </span>
+                  <span className="truncate text-[13.5px] text-ink">{trigger.name}</span>
+                  <span className="sr-only">{getActionLabel(trigger.actionType)}</span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-theme-text-muted">
-                    Say: &ldquo;<span className="font-medium text-theme-text-secondary">{trigger.triggerPhrase}</span>&rdquo;
+                <div className="mt-0.5 flex items-center gap-2">
+                  <span className="text-[12px] text-ink-soft">
+                    {t('triggers.say', 'Say:')} &ldquo;
+                    <span className="text-ink-muted" dir="auto">
+                      {trigger.triggerPhrase}
+                    </span>
+                    &rdquo;
                   </span>
                   {trigger.triggerType === 'prefix' && (
-                    <span className="text-xs text-theme-text-muted">
-                      + your speech
+                    <span className="text-[12px] text-ink-faint">
+                      {t('triggers.plusSpeech', '+ your speech')}
                     </span>
                   )}
                 </div>
@@ -170,34 +246,34 @@ export function Triggers(): JSX.Element {
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => handleEdit(trigger)}
-                  className="w-8 h-8 rounded-lg hover:bg-theme-surface/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Edit"
+                  className="icon-btn opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+                  title={t('common.edit', 'Edit')}
+                  aria-label={t('triggers.editTrigger', 'Edit trigger {{name}}', {
+                    name: trigger.name
+                  })}
                 >
-                  <Pencil className="w-3.5 h-3.5 text-theme-text-muted" />
+                  <Pencil className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => deleteTrigger(trigger.id)}
-                  className="w-8 h-8 rounded-lg hover:bg-red-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Delete"
+                  onClick={() => deleteTrigger(trigger)}
+                  className="icon-btn opacity-0 transition-opacity hover:!text-danger group-focus-within:opacity-100 group-hover:opacity-100"
+                  title={t('common.delete', 'Delete')}
+                  aria-label={t('triggers.deleteTrigger', 'Delete trigger {{name}}', {
+                    name: trigger.name
+                  })}
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
 
-                {/* Toggle switch */}
-                <button
-                  onClick={() => toggleEnabled(trigger.id)}
-                  className={`
-                    relative w-10 h-6 rounded-full transition-colors shrink-0
-                    ${trigger.enabled ? 'bg-sky-accent' : 'bg-theme-surface/60'}
-                  `}
-                >
-                  <div
-                    className={`
-                      absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform
-                      ${trigger.enabled ? 'ltr:translate-x-5 rtl:-translate-x-5' : 'ltr:translate-x-1 rtl:-translate-x-1'}
-                    `}
+                <span className="ms-1">
+                  <Switch
+                    checked={trigger.enabled}
+                    onChange={() => toggleEnabled(trigger)}
+                    label={t('triggers.toggleTrigger', 'Enable trigger {{name}}', {
+                      name: trigger.name
+                    })}
                   />
-                </button>
+                </span>
               </div>
             </div>
           ))}
@@ -206,12 +282,9 @@ export function Triggers(): JSX.Element {
 
       {/* Modal */}
       {showModal && (
-        <TriggerModal
-          trigger={editingTrigger}
-          onSave={handleSave}
-          onClose={handleCloseModal}
-        />
+        <TriggerModal trigger={editingTrigger} onSave={handleSave} onClose={handleCloseModal} />
       )}
-    </div>
+      {dialog}
+    </Page>
   )
 }

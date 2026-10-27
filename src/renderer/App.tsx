@@ -8,9 +8,10 @@ const RecordingPill = lazy(() => import('./components/recording-pill').then(m =>
 const PinnedPanel = lazy(() => import('./components/pinned-panel').then(m => ({ default: m.PinnedPanel })))
 const CommandPopup = lazy(() => import('./components/command-popup').then(m => ({ default: m.CommandPopup })))
 const AISuggestionPanel = lazy(() => import('./components/ai-suggestion-panel').then(m => ({ default: m.AISuggestionPanel })))
+const Notepad = lazy(() => import('./pages/notepad').then(m => ({ default: m.Notepad })))
 const MainWindow = lazy(() => import('./pages/main-window').then(m => ({ default: m.MainWindow })))
 
-type Route = 'main' | 'recording-pill' | 'pinned-panel' | 'command-popup' | 'ai-panel'
+type Route = 'main' | 'recording-pill' | 'pinned-panel' | 'command-popup' | 'ai-panel' | 'notepad'
 type Theme = 'system' | 'dark' | 'light'
 
 function getRouteFromHash(): Route {
@@ -24,9 +25,15 @@ function getRouteFromHash(): Route {
       return 'command-popup'
     case 'ai-panel':
       return 'ai-panel'
+    case 'notepad':
+      return 'notepad'
     default:
       return 'main'
   }
+}
+
+function toTheme(value: unknown): Theme {
+  return value === 'dark' || value === 'light' ? value : 'system'
 }
 
 function applyTheme(value: Theme): void {
@@ -52,7 +59,7 @@ function App(): JSX.Element {
   useEffect(() => {
     // Load and apply saved theme
     window.tapwisper.store.get('theme').then((th) => {
-      applyTheme((th as Theme) || 'system')
+      applyTheme(toTheme(th))
     })
 
     // Listen for OS theme changes
@@ -85,6 +92,19 @@ function App(): JSX.Element {
     updateDirection(i18n.language)
   }, [i18n.language])
 
+  // Theme / language changed in another window (e.g. Settings). Overlay
+  // windows are pre-warmed at startup, so they must follow live changes.
+  useEffect(() => {
+    return window.tapwisper.on('settings:changed', (key: unknown, value: unknown) => {
+      if (key === 'theme') {
+        applyTheme(toTheme(value))
+      } else if (key === 'language' && typeof value === 'string' && value) {
+        if (i18n.language !== value) i18n.changeLanguage(value)
+        updateDirection(value)
+      }
+    })
+  }, [i18n])
+
   useEffect(() => {
     const handleHashChange = (): void => {
       setRoute(getRouteFromHash())
@@ -103,6 +123,8 @@ function App(): JSX.Element {
         return <CommandPopup />
       case 'ai-panel':
         return <AISuggestionPanel />
+      case 'notepad':
+        return <Notepad />
       case 'main':
       default:
         return <MainWindow />

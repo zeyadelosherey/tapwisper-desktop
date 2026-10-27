@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Sparkles, X, Check, Copy, Send, Mic,
+  Sparkles, X, Check, Copy, Send, AlertCircle,
   RotateCcw, Maximize2, Minimize2
 } from 'lucide-react'
 import { expandSnippets, Snippet } from '../models/snippet'
@@ -10,9 +10,12 @@ import { useActivityStore } from '../store/activity'
 import { processText } from '../services/ai-router'
 import {
   BUILT_IN_CATEGORIES,
-  type ActionCategory as StoredCategory,
-  type ActionItem as StoredAction
+  type ActionCategory as StoredCategory
 } from '../models/actions-config'
+import { CATEGORY_COLORS } from '../constants/colors'
+import { useOverlayHitRegion } from '../hooks/use-overlay-hit-region'
+import { actionLabel as builtInActionLabel, displayActionName } from '../utils/action-labels'
+import i18n from '../i18n'
 
 type PanelMode = 'suggestion' | 'ask-question'
 
@@ -24,7 +27,38 @@ interface ResultEntry {
   timestamp: number
 }
 
-import { CATEGORY_COLORS } from '../constants/colors'
+/** Everything needed to (re)run an action — kept so a failure can be retried. */
+interface ActionRequest {
+  actionId: string
+  prompt: string
+  label: string
+  inputText: string
+  /** First action on the selected text (vs. a follow-up on a result) */
+  isInitial: boolean
+}
+
+interface ConversationMessage {
+  role: 'user' | 'ai'
+  text: string
+  isError?: boolean
+}
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error && err.message
+    ? err.message
+    : String(err || i18n.t('common.unknownError', 'Unknown error'))
+}
+
+/** Find an action prompt: the user's stored (possibly edited) actions win. */
+function findActionPrompt(actionId: string, stored: StoredCategory[] | undefined): string {
+  for (const cats of [stored ?? [], BUILT_IN_CATEGORIES]) {
+    for (const cat of cats) {
+      const action = cat.actions.find((a) => a.id === actionId)
+      if (action?.prompt) return action.prompt
+    }
+  }
+  return ''
+}
 
 export function AISuggestionPanel(): JSX.Element {
   const { t } = useTranslation()
@@ -38,6 +72,14 @@ export function AISuggestionPanel(): JSX.Element {
   const [isProcessing, setIsProcessing] = useState(false)
   const [showHint, setShowHint] = useState(true)
 
+  // Error from the last AI request + the request itself (for Retry)
+  const [aiError, setAiError] = useState('')
+  const lastRequestRef = useRef<ActionRequest | null>(null)
+
+  // "Copied" feedback
+  const [copied, setCopied] = useState(false)
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Actions sidebar
   const [showActions, setShowActions] = useState(false)
   const [categories, setCategories] = useState<StoredCategory[]>(BUILT_IN_CATEGORIES)
@@ -48,11 +90,18 @@ export function AISuggestionPanel(): JSX.Element {
   // Result history stack — newest first
   const [resultHistory, setResultHistory] = useState<ResultEntry[]>([])
 
-
   // Ask Question mode
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
-  const [conversation, setConversation] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
+  const [conversation, setConversation] = useState<ConversationMessage[]>([])
+
+  // Visible card — everything else in the window is click-through
+  const cardRef = useRef<HTMLDivElement>(null)
+  useOverlayHitRegion(
+    [cardRef],
+    visible,
+    `${mode}-${isExpanded}-${showActions}`
+  )
 
   // Load user-configured actions (merged with built-in)
   const loadCategories = useCallback(() => {
@@ -77,99 +126,116 @@ export function AISuggestionPanel(): JSX.Element {
   }, [loadCategories])
 
   useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+    }
+  }, [])
+
+  /**
+   * Run an action through the AI router. On failure the current text is left
+   * untouched and an error (with Retry) is shown instead.
+   */
+  const runAction = useCallback(
+    async (request: ActionRequest) => {
+      lastRequestRef.current = request
+      setAiError('')
+      setIsProcessing(true)
+      if (request.isInitial) setActionName(request.label)
+
+      try {
+        const response = await processText({
+          prompt:
+            request.prompt ||
+            `${request.label} the following text. Only return the result text, nothing else.`,
+          text: request.inputText
+        })
+        const resultText = response.result || request.inputText
+
+        const entry: ResultEntry = {
+          id: `${Date.now()}`,
+          actionName: request.label,
+          actionId: request.actionId,
+          text: resultText,
+          timestamp: Date.now()
+        }
+        setProcessedText(resultText)
+        setActionName(request.label)
+        setResultHistory((prev) => (request.isInitial ? [entry] : [entry, ...prev]))
+        lastRequestRef.current = null
+
+        addAIAction(request.actionId, resultText.length)
+        addLLMAction({
+          llmAction: request.label,
+          llmInput: request.inputText,
+          llmResult: resultText
+        })
+      } catch (err) {
+        setAiError(getErrorMessage(err))
+      } finally {
+        setIsProcessing(false)
+      }
+    },
+    [addAIAction, addLLMAction]
+  )
+
+  // Keep the IPC listeners below pointed at the latest runAction
+  const runActionRef = useRef(runAction)
+  runActionRef.current = runAction
+
+  useEffect(() => {
     document.documentElement.classList.add('transparent')
 
     const unsubProcess = window.tapwisper.on('ai-panel:process', async (data: unknown) => {
-      const { text, actionId } = data as { text: string; actionId: string }
+      const { text, actionId, label, prompt } = data as {
+        text: string
+        actionId: string
+        label?: string
+        prompt?: string
+      }
 
-      const storedSnippets = await window.tapwisper.store.get('snippets') as Snippet[] | undefined
-      const expandedText = storedSnippets?.length
-        ? expandSnippets(text, storedSnippets)
-        : text
+      const storedSnippets = (await window.tapwisper.store.get('snippets')) as
+        | Snippet[]
+        | undefined
+      const expandedText = storedSnippets?.length ? expandSnippets(text, storedSnippets) : text
 
-      const prettyName = actionId.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+      const prettyName =
+        label || actionId.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
 
       setOriginalText(expandedText)
-      setActionName(prettyName)
+      setProcessedText('')
       setMode('suggestion')
-      setIsProcessing(true)
       setVisible(true)
       setResultHistory([])
       setShowActions(false)
 
-      // Find the action prompt from categories
-      let actionPrompt = ''
-      for (const cat of BUILT_IN_CATEGORIES) {
-        const action = cat.actions.find((a) => a.id === actionId)
-        if (action) {
-          actionPrompt = action.prompt
-          break
-        }
-      }
-      // Also check user categories
-      const storedActions = await window.tapwisper.store.get('actions') as StoredCategory[] | undefined
-      if (!actionPrompt && storedActions) {
-        for (const cat of storedActions) {
-          const action = cat.actions.find((a: StoredAction) => a.id === actionId)
-          if (action) {
-            actionPrompt = action.prompt
-            break
-          }
-        }
-      }
+      const storedActions = (await window.tapwisper.store.get('actions')) as
+        | StoredCategory[]
+        | undefined
+      const actionPrompt = prompt || findActionPrompt(actionId, storedActions)
 
-      try {
-        const response = await processText({
-          prompt: actionPrompt || `${prettyName} the following text. Only return the result text, nothing else.`,
-          text: expandedText
-        })
-        const resultText = response.result || expandedText
-        setProcessedText(resultText)
-        setIsProcessing(false)
-
-        const entry: ResultEntry = {
-          id: `${Date.now()}`,
-          actionName: prettyName,
-          actionId,
-          text: resultText,
-          timestamp: Date.now()
-        }
-        setResultHistory([entry])
-
-        addAIAction(actionId, resultText.length)
-        addLLMAction({
-          llmAction: prettyName,
-          llmInput: expandedText,
-          llmResult: resultText
-        })
-      } catch (err: any) {
-        console.error('AI processing failed:', err)
-        const fallback = expandedText + ' (AI processed)'
-        setProcessedText(fallback)
-        setIsProcessing(false)
-        setResultHistory([{
-          id: `${Date.now()}`,
-          actionName: prettyName,
-          actionId,
-          text: fallback,
-          timestamp: Date.now()
-        }])
-      }
+      runActionRef.current({
+        actionId,
+        prompt: actionPrompt,
+        label: prettyName,
+        inputText: expandedText,
+        isInitial: true
+      })
     })
 
     const unsubAsk = window.tapwisper.on('ai-panel:ask-question', async (data: unknown) => {
       const { text } = data as { text: string }
 
-      const storedSnippets = await window.tapwisper.store.get('snippets') as Snippet[] | undefined
-      const expandedText = storedSnippets?.length
-        ? expandSnippets(text, storedSnippets)
-        : text
+      const storedSnippets = (await window.tapwisper.store.get('snippets')) as
+        | Snippet[]
+        | undefined
+      const expandedText = storedSnippets?.length ? expandSnippets(text, storedSnippets) : text
 
       setOriginalText(expandedText)
       setMode('ask-question')
       setConversation([])
       setQuestion('')
       setAnswer('')
+      setAiError('')
       setResultHistory([])
       setVisible(true)
     })
@@ -181,54 +247,19 @@ export function AISuggestionPanel(): JSX.Element {
   }, [])
 
   // Run a new action on the current (latest) text
-  const handleRunAction = useCallback(async (actionId: string, prompt: string, label: string) => {
-    if (isProcessing) return
-    const currentText = processedText || originalText
-    if (!currentText) return
+  const handleRunAction = useCallback(
+    (actionId: string, prompt: string, label: string) => {
+      if (isProcessing) return
+      const currentText = processedText || originalText
+      if (!currentText) return
+      runAction({ actionId, prompt, label, inputText: currentText, isInitial: false })
+    },
+    [isProcessing, processedText, originalText, runAction]
+  )
 
-    setIsProcessing(true)
-
-    const prettyName = label
-
-    try {
-      const response = await processText({
-        prompt,
-        text: currentText
-      })
-      const resultText = response.result || currentText
-      setProcessedText(resultText)
-      setActionName(prettyName)
-      setIsProcessing(false)
-
-      const entry: ResultEntry = {
-        id: `${Date.now()}`,
-        actionName: prettyName,
-        actionId,
-        text: resultText,
-        timestamp: Date.now()
-      }
-      setResultHistory((prev) => [entry, ...prev])
-
-      addAIAction(actionId, resultText.length)
-      addLLMAction({
-        llmAction: prettyName,
-        llmInput: currentText,
-        llmResult: resultText
-      })
-    } catch (err: any) {
-      console.error('AI action failed:', err)
-      setIsProcessing(false)
-    }
-  }, [isProcessing, processedText, originalText, addAIAction, addLLMAction])
-
-  const handleAccept = useCallback(() => {
-    window.tapwisper.clipboard.insertText(processedText)
-    handleClose()
-  }, [processedText])
-
-  const handleCopy = useCallback(() => {
-    window.tapwisper.clipboard.write(mode === 'ask-question' ? answer : processedText)
-  }, [mode, answer, processedText])
+  const handleRetry = useCallback(() => {
+    if (lastRequestRef.current && !isProcessing) runAction(lastRequestRef.current)
+  }, [isProcessing, runAction])
 
   const handleClose = useCallback(() => {
     setVisible(false)
@@ -240,9 +271,27 @@ export function AISuggestionPanel(): JSX.Element {
     setResultHistory([])
     setShowActions(false)
     setIsExpanded(false)
+    setAiError('')
+    setCopied(false)
+    lastRequestRef.current = null
     window.tapwisper.window.setAIPanelExpanded(false)
     window.tapwisper.window.hide('aiPanel')
   }, [])
+
+  const handleAccept = useCallback(() => {
+    if (!processedText) return
+    window.tapwisper.clipboard.insertText(processedText)
+    handleClose()
+  }, [processedText, handleClose])
+
+  const handleCopy = useCallback(() => {
+    const text = mode === 'ask-question' ? answer : processedText
+    if (!text) return
+    window.tapwisper.clipboard.write(text)
+    setCopied(true)
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
+  }, [mode, answer, processedText])
 
   const handleToggleExpand = useCallback(() => {
     const next = !isExpanded
@@ -266,11 +315,11 @@ export function AISuggestionPanel(): JSX.Element {
   }, [resultHistory, originalText])
 
   const handleAskSubmit = useCallback(async () => {
-    if (!question.trim()) return
+    if (!question.trim() || isProcessing) return
 
-    const newConv = [
+    const newConv: ConversationMessage[] = [
       ...conversation,
-      { role: 'user' as const, text: question }
+      { role: 'user', text: question }
     ]
     setConversation(newConv)
     const currentQuestion = question
@@ -283,23 +332,23 @@ export function AISuggestionPanel(): JSX.Element {
         text: originalText,
         systemInstruction: 'You are a helpful assistant. The user has shared some text and is asking a question about it. Answer their question based on the provided text context. Be concise and helpful.'
       })
-      const aiResponse = response.result || 'Sorry, I could not generate a response.'
-      setConversation([...newConv, { role: 'ai' as const, text: aiResponse }])
+      const aiResponse =
+        response.result || t('aiPanel.noResponse', 'Sorry, I could not generate a response.')
+      setConversation([...newConv, { role: 'ai', text: aiResponse }])
       setAnswer(aiResponse)
-      setIsProcessing(false)
       addAIAction('ask-question', aiResponse.length)
       addLLMAction({
         llmAction: 'Ask Question',
         llmInput: `Context: ${originalText}\n\nQuestion: ${currentQuestion}`,
         llmResult: aiResponse
       })
-    } catch (err: any) {
-      const fallbackResponse = `Sorry, an error occurred: ${err.message || 'Unknown error'}`
-      setConversation([...newConv, { role: 'ai' as const, text: fallbackResponse }])
-      setAnswer(fallbackResponse)
+    } catch (err) {
+      const errorText = `${t('aiPanel.errorTitle', 'AI request failed')}: ${getErrorMessage(err)}`
+      setConversation([...newConv, { role: 'ai', text: errorText, isError: true }])
+    } finally {
       setIsProcessing(false)
     }
-  }, [question, conversation, originalText, addAIAction, addLLMAction])
+  }, [question, isProcessing, conversation, originalText, addAIAction, addLLMAction, t])
 
   if (!visible) return <div className="w-full h-full" />
 
@@ -311,6 +360,7 @@ export function AISuggestionPanel(): JSX.Element {
       cat.actions.map((action) => ({
         id: action.id,
         label: action.label,
+        displayLabel: builtInActionLabel(t, action),
         prompt: action.prompt,
         color: CATEGORY_COLORS[cat.id] || cat.color
       }))
@@ -320,22 +370,72 @@ export function AISuggestionPanel(): JSX.Element {
     ? 'w-full max-w-[720px] h-[calc(100vh-24px)] max-h-[90vh] min-h-[400px]'
     : 'w-[420px] max-h-[520px]'
 
+  // Initial action failed: there is no result to accept or copy
+  const hasResult = processedText.length > 0
+
+  const errorBox = aiError ? (
+    <div
+      role="alert"
+      className="flex flex-col gap-2 p-3 rounded-xl bg-danger-tint border border-danger/25"
+    >
+      <div className="flex items-start gap-2">
+        <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-danger">
+            {t('aiPanel.errorTitle', 'AI request failed')}
+          </p>
+          <p className="text-xs text-theme-text-secondary mt-0.5 break-words">{aiError}</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        {hasResult && (
+          <button
+            onClick={() => setAiError('')}
+            className="no-drag px-2.5 py-1 rounded-lg text-xs text-theme-text-secondary hover:text-theme-text transition-colors"
+          >
+            {t('aiPanel.dismiss', 'Dismiss')}
+          </button>
+        )}
+        <button
+          onClick={handleRetry}
+          disabled={isProcessing}
+          className="no-drag flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 text-xs font-medium transition-all disabled:opacity-40"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          {t('aiPanel.retry', 'Retry')}
+        </button>
+      </div>
+    </div>
+  ) : null
+
   return (
-    <div className="w-full h-full flex items-center justify-center no-select p-3">
-      <div className={`flex items-start gap-2 animate-scale-up ${isExpanded ? 'w-full h-full max-w-[740px]' : ''}`}>
+    <div className="w-full h-full flex items-center justify-center p-3">
+      <div
+        ref={cardRef}
+        className={`flex items-start gap-2 animate-scale-up ${isExpanded ? 'w-full h-full max-w-[740px]' : ''}`}
+      >
         {/* ── Main panel ── */}
         <div className={`glass rounded-2xl panel-shadow flex flex-col overflow-hidden ${isExpanded ? 'flex-1' : ''} ${panelSizeClasses}`}>
           {/* Header */}
-          <div className="drag-region flex items-center gap-2 px-4 py-3 border-b border-theme-border/50">
+          <div className="drag-region no-select flex items-center gap-2 px-4 py-3 border-b border-theme-border/50">
             <Sparkles className="w-4 h-4 text-sky-accent no-drag" />
-            <span className="flex-1 text-sm font-medium text-theme-text">
-              {mode === 'ask-question' ? t('actions.askQuestion') : actionName || 'AI Assistant'}
+            <span className="font-display flex-1 text-[16px] leading-none text-theme-text">
+              {mode === 'ask-question'
+                ? t('actions.askQuestion')
+                : actionName
+                  ? displayActionName(t, actionName)
+                  : t('aiPanel.assistant', 'AI Assistant')}
             </span>
             <div className="flex items-center gap-1.5 no-drag">
               <button
                 onClick={handleToggleExpand}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-theme-surface/50 text-theme-text-tertiary hover:text-sky-accent hover:bg-sky-accent/10 transition-all text-xs font-medium"
-                title={isExpanded ? t('aiPanel.collapse', 'Collapse panel') : t('aiPanel.expand', 'Expand panel')}
+                title={
+                  isExpanded
+                    ? t('aiPanel.collapsePanel', 'Collapse panel')
+                    : t('aiPanel.expandPanel', 'Expand panel')
+                }
+                aria-expanded={isExpanded}
               >
                 {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                 <span>{isExpanded ? t('aiPanel.collapse', 'Collapse') : t('aiPanel.expand', 'Expand')}</span>
@@ -344,13 +444,17 @@ export function AISuggestionPanel(): JSX.Element {
                 <button
                   onClick={() => setShowActions(!showActions)}
                   className="w-7 h-7 rounded-full bg-theme-surface/50 flex items-center justify-center text-theme-text-tertiary hover:text-sky-accent hover:bg-sky-accent/10 transition-all"
-                  title="More actions"
+                  title={t('aiPanel.moreActions', 'More actions')}
+                  aria-label={t('aiPanel.moreActions', 'More actions')}
+                  aria-expanded={showActions}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                 </button>
               )}
               <button
                 onClick={handleClose}
+                title={t('aiPanel.close', 'Close')}
+                aria-label={t('aiPanel.close', 'Close')}
                 className="w-7 h-7 rounded-full bg-theme-surface/50 flex items-center justify-center text-theme-text-tertiary hover:text-theme-text hover:bg-theme-surface transition-all"
               >
                 <X className="w-3.5 h-3.5" />
@@ -367,7 +471,9 @@ export function AISuggestionPanel(): JSX.Element {
                     {actionName && (
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-accent/10 border border-sky-accent/20">
                         <Sparkles className="w-3 h-3 text-sky-accent/70" />
-                        <span className="text-[11px] font-medium text-sky-accent/70">{actionName}</span>
+                        <span className="text-[11px] font-medium text-sky-accent/70">
+                          {displayActionName(t, actionName)}
+                        </span>
                       </div>
                     )}
                     <div className="flex gap-1.5">
@@ -378,6 +484,8 @@ export function AISuggestionPanel(): JSX.Element {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {errorBox}
+
                     {/* Current (latest) result */}
                     {processedText && (
                       <>
@@ -386,10 +494,14 @@ export function AISuggestionPanel(): JSX.Element {
                           <div className="flex items-center gap-1.5">
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-accent/10 border border-sky-accent/20">
                               <Sparkles className="w-3 h-3 text-sky-accent/70" />
-                              <span className="text-[11px] font-medium text-sky-accent/70">{actionName}</span>
+                              <span className="text-[11px] font-medium text-sky-accent/70">
+                                {displayActionName(t, actionName)}
+                              </span>
                             </div>
                             {resultHistory.length > 1 && (
-                              <span className="text-[10px] text-theme-text-muted">latest</span>
+                              <span className="text-[10px] text-theme-text-muted">
+                                {t('recordingPill.latest', 'latest')}
+                              </span>
                             )}
                           </div>
                         )}
@@ -405,7 +517,9 @@ export function AISuggestionPanel(): JSX.Element {
                       <div className="space-y-2 pt-1">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 border-t border-theme-border/30" />
-                          <span className="text-[10px] text-theme-text-muted uppercase tracking-wider">Previous versions</span>
+                          <span className="text-[10px] text-theme-text-muted uppercase tracking-wider">
+                            {t('aiPanel.previousVersions', 'Previous versions')}
+                          </span>
                           <div className="flex-1 border-t border-theme-border/30" />
                         </div>
 
@@ -414,15 +528,19 @@ export function AISuggestionPanel(): JSX.Element {
                             <div className="flex items-center gap-1.5 mb-1">
                               <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-theme-surface/40">
                                 <Sparkles className="w-2.5 h-2.5 text-theme-text-tertiary" />
-                                <span className="text-[10px] font-medium text-theme-text-tertiary">{entry.actionName}</span>
+                                <span className="text-[10px] font-medium text-theme-text-tertiary">
+                                  {displayActionName(t, entry.actionName)}
+                                </span>
                               </div>
                               <button
                                 onClick={() => handleRevert(idx)}
-                                className="no-drag opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-accent/10 text-sky-accent hover:bg-sky-accent/20 transition-all"
-                                title="Revert to this version"
+                                className="no-drag opacity-0 group-hover:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-accent/10 text-sky-accent hover:bg-sky-accent/20 transition-all"
+                                title={t('aiPanel.revertToVersion', 'Revert to this version')}
                               >
                                 <RotateCcw className="w-2.5 h-2.5" />
-                                <span className="text-[10px] font-medium">Revert</span>
+                                <span className="text-[10px] font-medium">
+                                  {t('recordingPill.revert', 'Revert')}
+                                </span>
                               </button>
                             </div>
                             <div className="text-xs text-theme-text-secondary leading-relaxed p-2.5 bg-theme-surface/20 rounded-lg line-clamp-3 opacity-60">
@@ -434,7 +552,7 @@ export function AISuggestionPanel(): JSX.Element {
                     )}
 
                     {/* Expand hint when collapsed — easy to find for reading/moving */}
-                    {!isExpanded && (processedText || originalText) && (
+                    {!isExpanded && hasResult && (
                       <div className="flex items-center justify-between gap-2 px-3 py-2 bg-theme-surface/40 rounded-lg border border-theme-border/30">
                         <p className="text-xs text-theme-text-secondary">
                           {t('aiPanel.expandToRead', 'Expand panel to read and move it easily. Drag the title bar to move.')}
@@ -450,10 +568,10 @@ export function AISuggestionPanel(): JSX.Element {
                     )}
 
                     {/* Hint */}
-                    {showHint && resultHistory.length <= 1 && (
+                    {showHint && hasResult && resultHistory.length <= 1 && (
                       <div className="flex items-center justify-between px-3 py-2 bg-sky-accent/10 rounded-lg">
                         <p className="text-xs text-sky-accent/70">
-                          {t('aiPanel.revertHint', 'Click the ✨ button to apply more actions')}
+                          {t('aiPanel.moreActionsHint', 'Click the ✨ button to apply more actions')}
                         </p>
                         <button
                           onClick={() => setShowHint(false)}
@@ -495,7 +613,7 @@ export function AISuggestionPanel(): JSX.Element {
                 {/* Conversation */}
                 {conversation.map((msg, i) => (
                   <div key={i}>
-                    {msg.role === 'ai' && i === 1 && (
+                    {msg.role === 'ai' && i === 1 && !msg.isError && (
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-sky-accent/8 border border-sky-accent/15">
                           <Sparkles className="w-2.5 h-2.5 text-sky-accent/60" />
@@ -504,10 +622,13 @@ export function AISuggestionPanel(): JSX.Element {
                       </div>
                     )}
                     <div
-                      className={`p-3 rounded-xl text-sm ${
+                      role={msg.isError ? 'alert' : undefined}
+                      className={`p-3 rounded-xl text-sm whitespace-pre-wrap ${
                         msg.role === 'user'
                           ? 'bg-sky-accent/10 text-sky-accent ms-8'
-                          : 'bg-theme-surface/40 text-theme-text me-8'
+                          : msg.isError
+                            ? 'bg-danger-tint border border-danger/25 text-danger me-8'
+                            : 'bg-theme-surface/40 text-theme-text me-8'
                       }`}
                     >
                       {msg.text}
@@ -532,14 +653,23 @@ export function AISuggestionPanel(): JSX.Element {
               <div className="flex items-center justify-between">
                 <button
                   onClick={handleCopy}
-                  className="no-drag flex items-center gap-1.5 px-3 py-2 rounded-xl bg-theme-surface/40 text-theme-text-secondary hover:text-theme-text transition-all text-sm"
+                  disabled={!hasResult}
+                  className="no-drag flex items-center gap-1.5 px-3 py-2 rounded-xl bg-theme-surface/40 text-theme-text-secondary hover:text-theme-text transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Copy className="w-4 h-4" />
-                  {t('aiPanel.copy', 'Copy')}
+                  {copied ? (
+                    <Check className="w-4 h-4 text-green-accent" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                  {copied ? t('aiPanel.copied', 'Copied') : t('aiPanel.copy', 'Copy')}
                 </button>
+                <span className="sr-only" aria-live="polite">
+                  {copied ? t('aiPanel.copied', 'Copied') : ''}
+                </span>
                 <button
                   onClick={handleAccept}
-                  className="no-drag flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-accent text-white font-medium hover:bg-green-accent/80 transition-all text-sm"
+                  disabled={!hasResult}
+                  className="no-drag flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-accent text-white font-medium hover:bg-green-accent/80 transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-green-accent"
                 >
                   <Check className="w-4 h-4" />
                   {t('recording.accept')}
@@ -549,12 +679,10 @@ export function AISuggestionPanel(): JSX.Element {
 
             {mode === 'ask-question' && (
               <div className="flex items-center gap-2">
-                <button className="no-drag w-9 h-9 rounded-full bg-theme-surface/40 flex items-center justify-center text-theme-text-tertiary hover:text-sky-accent transition-all">
-                  <Mic className="w-4 h-4" />
-                </button>
                 <input
                   type="text"
                   placeholder={t('aiPanel.askPlaceholder', 'Ask a question about this text...')}
+                  aria-label={t('aiPanel.askPlaceholder', 'Ask a question about this text...')}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAskSubmit()}
@@ -563,9 +691,11 @@ export function AISuggestionPanel(): JSX.Element {
                 <button
                   onClick={handleAskSubmit}
                   disabled={!question.trim() || isProcessing}
+                  aria-label={t('aiPanel.send', 'Send')}
+                  title={t('aiPanel.send', 'Send')}
                   className="no-drag w-9 h-9 rounded-full bg-sky-accent flex items-center justify-center text-white hover:bg-sky-accent/80 transition-all disabled:opacity-30"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 rtl-flip" />
                 </button>
               </div>
             )}
@@ -576,9 +706,9 @@ export function AISuggestionPanel(): JSX.Element {
         {showActions && mode === 'suggestion' && !isProcessing && (
           <div className={`glass rounded-2xl panel-shadow w-[200px] flex flex-col overflow-hidden animate-scale-up shrink-0 ${isExpanded ? 'max-h-[90vh]' : 'max-h-[520px]'}`}>
             {/* Sidebar header */}
-            <div className="px-3 py-2.5 border-b border-theme-border/50">
+            <div className="no-select px-3 py-2.5 border-b border-theme-border/50">
               <p className="text-xs font-semibold text-theme-text-secondary uppercase tracking-wider">
-                Actions
+                {t('nav.actions', 'Actions')}
               </p>
             </div>
 
@@ -597,7 +727,7 @@ export function AISuggestionPanel(): JSX.Element {
                       color: action.color
                     }}
                   >
-                    {action.label}
+                    {action.displayLabel}
                   </button>
                 ))}
               </div>

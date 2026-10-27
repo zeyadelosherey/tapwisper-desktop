@@ -3,16 +3,32 @@
  * Migrates data from electron-store to SQLite database
  */
 
-import { getStore } from './store'
+import { getStore, migrateApiKeysToSafeStorage } from './store'
+
+/** Untyped view of the store for keys that predate the current AppConfig schema */
+// Legacy JSON shapes are loosely typed; numbers/strings are coerced below
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type LegacyRecord = Record<string, any>
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+function legacyStore(): {
+  get: (key: string) => unknown
+  delete: (key: string) => void
+} {
+  return getStore() as unknown as {
+    get: (key: string) => unknown
+    delete: (key: string) => void
+  }
+}
 import * as db from './database'
 
 /**
  * Migrate stats data from electron-store to database
  */
 function migrateStats(): void {
-  const store = getStore()
-  const oldStats = store.get('stats' as any)
-  
+  const legacy = legacyStore()
+  const oldStats = legacy.get('stats') as LegacyRecord | undefined
+
   if (!oldStats) {
     return
   }
@@ -32,9 +48,9 @@ function migrateStats(): void {
       dailyStats: JSON.stringify(oldStats.dailyStats || []),
       recentActivity: JSON.stringify(oldStats.recentActivity || [])
     })
-    
+
     // Remove old data to avoid re-migration
-    store.delete('stats' as any)
+    legacy.delete('stats')
   } catch {
     // Migration failure is non-fatal — old data stays in electron-store
   }
@@ -44,9 +60,9 @@ function migrateStats(): void {
  * Migrate activity records from electron-store to database
  */
 function migrateActivityRecords(): void {
-  const store = getStore()
-  const oldRecords = store.get('activityRecords' as any)
-  
+  const legacy = legacyStore()
+  const oldRecords = legacy.get('activityRecords')
+
   if (!oldRecords || !Array.isArray(oldRecords)) {
     return
   }
@@ -69,22 +85,99 @@ function migrateActivityRecords(): void {
         // Skip records that fail (e.g. duplicate IDs)
       }
     }
-    
+
     // Remove old data to avoid re-migration
-    store.delete('activityRecords' as any)
+    legacy.delete('activityRecords')
   } catch {
     // Migration failure is non-fatal — old data stays in electron-store
   }
 }
 
 /**
+ * Older builds stored a display id ("soniox-stt-async-v3") instead of a real
+ * Soniox model id — replace it so the API accepts it and Settings highlights it.
+ */
+function migrateSonioxModel(): void {
+  const store = getStore()
+  const voiceModels = store.get('voiceModels')
+  if (voiceModels && !voiceModels.soniox?.startsWith('stt-')) {
+    store.set('voiceModels', { ...voiceModels, soniox: 'stt-async-v4' })
+  }
+}
+
+/**
+ * v1.2: single speechLanguage → speechLanguages[], free-text vocabulary →
+ * dictionary entries.
+ */
+function migrateSpeechSettings(): void {
+  const legacy = legacyStore()
+  const store = getStore()
+
+  const oldLanguage = legacy.get('speechLanguage')
+  if (typeof oldLanguage === 'string') {
+    if (oldLanguage && oldLanguage !== 'auto' && store.get('speechLanguages').length === 0) {
+      store.set('speechLanguages', [oldLanguage])
+    }
+    legacy.delete('speechLanguage')
+  }
+
+  const oldVocabulary = legacy.get('speechVocabulary')
+  if (typeof oldVocabulary === 'string') {
+    const existing = store.get('dictionary')
+    const known = new Set(existing.map((e) => e.term.toLowerCase()))
+    const added = oldVocabulary
+      .split(/[\n,]+/)
+      .map((t) => t.trim())
+      .filter((t) => t && !known.has(t.toLowerCase()))
+      .map((term, i) => ({
+        id: `migrated-${Date.now()}-${i}`,
+        term,
+        aliases: [],
+        createdAt: Date.now()
+      }))
+    if (added.length) store.set('dictionary', [...existing, ...added])
+    legacy.delete('speechVocabulary')
+  }
+}
+
+/**
+ * The record shortcut default changed from Option+Space to hold fn (macOS) /
+ * Ctrl+Win (Windows) / Right Ctrl (Linux). Move users still on the old
+ * default once; anyone who picked a shortcut keeps it.
+ */
+function migrateShortcutDefault(): void {
+  const store = getStore()
+  if (store.get('shortcutDefaultsMigrated')) return
+  const shortcuts = store.get('shortcuts')
+  if (shortcuts?.record === 'Option+Space') {
+    const record =
+      process.platform === 'darwin'
+        ? 'Fn'
+        : process.platform === 'win32'
+          ? 'Ctrl+Win'
+          : 'RightControl'
+    store.set('shortcuts', { ...shortcuts, record })
+  }
+  store.set('shortcutDefaultsMigrated', true)
+}
+
+/**
  * Run all migrations
  */
 export function runMigrations(): void {
-  try {
-    migrateStats()
-    migrateActivityRecords()
-  } catch {
-    // Migration failure is non-fatal — app continues with empty database
+  // Each migration is independent — one failing must not skip the others
+  for (const migrate of [
+    migrateStats,
+    migrateActivityRecords,
+    migrateSonioxModel,
+    migrateSpeechSettings,
+    migrateShortcutDefault,
+    migrateApiKeysToSafeStorage
+  ]) {
+    try {
+      migrate()
+    } catch {
+      // Migration failure is non-fatal — app continues with current data
+    }
   }
 }

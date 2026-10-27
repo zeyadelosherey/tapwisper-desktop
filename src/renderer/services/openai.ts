@@ -38,8 +38,8 @@ export async function processWithOpenAI(
     body: JSON.stringify({
       model: modelId,
       messages,
-      temperature: 0.7,
-      max_tokens: 2048
+      temperature: request.temperature ?? 0.7,
+      max_tokens: request.maxTokens ?? 2048
     })
   })
 

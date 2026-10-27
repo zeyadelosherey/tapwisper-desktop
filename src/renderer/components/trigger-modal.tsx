@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   X, ChevronLeft, ChevronRight, Search, Bot, Terminal, Keyboard,
   Smartphone, AppWindow, Rocket, Check, Plus, Trash2
@@ -16,9 +18,33 @@ import type {
   LaunchAppConfig,
   SearchEngine,
   BrowserChoice,
-  WindowAction
+  WindowAction,
+  ActionTypeMeta
 } from '../models/trigger'
-import { ACTION_TYPE_META, getDefaultActionConfig } from '../models/trigger'
+import {
+  ACTION_TYPE_META,
+  getAvailableActionTypes,
+  getDefaultActionConfig
+} from '../models/trigger'
+
+const IS_MAC = window.tapwisper.platform.os === 'darwin'
+
+/** Translated label/description/example for an action type (model data stays English) */
+function actionTypeText(
+  t: TFunction,
+  meta: ActionTypeMeta
+): { label: string; description: string; example: string } {
+  return {
+    label: t(`triggerTypes.${meta.id}.label`, meta.label),
+    description: t(`triggerTypes.${meta.id}.description`, meta.description),
+    example: t(`triggerTypes.${meta.id}.example`, meta.example)
+  }
+}
+
+function actionTypeLabel(t: TFunction, type: TriggerActionType): string {
+  const meta = ACTION_TYPE_META.find((m) => m.id === type)
+  return meta ? actionTypeText(t, meta).label : type
+}
 
 // ── Props ───────────────────────────────────────────────────────
 
@@ -42,19 +68,10 @@ const ACTION_ICONS: Record<TriggerActionType, React.ReactNode> = {
   'launch-app': <Rocket className="w-5 h-5" />
 }
 
-const ACTION_COLORS: Record<TriggerActionType, string> = {
-  'web-search': '#7EB6E0',
-  'ai-chat': '#B07CD8',
-  'terminal': '#4DC778',
-  'keyboard': '#E8A838',
-  'apple-shortcut': '#E86B6B',
-  'window': '#6BB5E8',
-  'launch-app': '#E8A838'
-}
-
 // ── Main Component ──────────────────────────────────────────────
 
 export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): JSX.Element {
+  const { t } = useTranslation()
   const isEditing = !!trigger
   const [step, setStep] = useState<Step>(isEditing ? 'configure' : 'action-type')
   const [actionType, setActionType] = useState<TriggerActionType>(trigger?.actionType || 'web-search')
@@ -65,12 +82,17 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
   const [triggerType, setTriggerType] = useState<'exact' | 'prefix'>(trigger?.triggerType || 'prefix')
   const [name, setName] = useState(trigger?.name || '')
 
-  // Auto-set name from trigger phrase if not manually set
+  // Escape closes the dialog
   useEffect(() => {
-    if (!isEditing && triggerPhrase && !name) {
-      // Will be set on save
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
     }
-  }, [triggerPhrase, name, isEditing])
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   const handleActionTypeSelect = useCallback((type: TriggerActionType) => {
     setActionType(type)
@@ -96,7 +118,7 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
   }, [step, isEditing])
 
   const handleSave = useCallback(() => {
-    const finalName = name || `${ACTION_TYPE_META.find((m) => m.id === actionType)?.label} - ${triggerPhrase}`
+    const finalName = name || `${actionTypeLabel(t, actionType)} - ${triggerPhrase}`
 
     onSave({
       id: trigger?.id || Date.now().toString(),
@@ -108,35 +130,47 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
       enabled: trigger?.enabled ?? true,
       createdAt: trigger?.createdAt || Date.now()
     })
-  }, [trigger, name, actionType, actionConfig, triggerPhrase, triggerType, onSave])
+  }, [trigger, name, actionType, actionConfig, triggerPhrase, triggerType, onSave, t])
 
   const isValid = triggerPhrase.trim().length >= 2
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#0D0D0D] border border-white/[0.06] rounded-2xl shadow-2xl w-[580px] max-h-[85vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(18_17_16/0.38)] backdrop-blur-[3px] animate-fade-in">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="trigger-modal-title"
+        className="shadow-pop bg-raised border border-hairline rounded-xl w-[600px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col overflow-hidden animate-scale-up"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-theme-border/40">
           <div>
-            <h2 className="text-lg font-semibold text-white">
-              {isEditing ? 'Edit Trigger' : 'New Trigger'}
+            <h2 id="trigger-modal-title" className="font-display text-[16px] leading-tight text-ink">
+              {isEditing
+                ? t('triggerModal.editTitle', 'Edit Trigger')
+                : t('triggerModal.newTitle', 'New Trigger')}
             </h2>
-            <p className="text-xs text-white/30 mt-0.5">
-              {step === 'action-type' && 'Choose what action this trigger performs'}
-              {step === 'configure' && 'Configure the action and set your trigger phrase'}
-              {step === 'trigger-phrase' && 'Set the phrase that activates this trigger'}
+            <p className="text-xs text-theme-text-muted mt-0.5">
+              {step === 'action-type' &&
+                t('triggerModal.stepActionType', 'Choose what action this trigger performs')}
+              {step === 'configure' &&
+                t('triggerModal.stepConfigure', 'Configure the action and set your trigger phrase')}
+              {step === 'trigger-phrase' &&
+                t('triggerModal.stepPhrase', 'Set the phrase that activates this trigger')}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center"
+            aria-label={t('common.close', 'Close')}
+            title={t('common.close', 'Close')}
+            className="icon-btn"
           >
-            <X className="w-4 h-4 text-white/40" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-4 py-3">
           {step === 'action-type' && (
             <ActionTypeStep
               selected={actionType}
@@ -164,24 +198,24 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-theme-border/40">
           <div>
             {(step === 'configure' || step === 'trigger-phrase') && (
               <button
                 onClick={handleBack}
-                className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" />
-                Back
+                <ChevronLeft className="w-4 h-4 rtl-flip" />
+                {t('common.back', 'Back')}
               </button>
             )}
             {step === 'action-type' && (
               <button
                 onClick={onClose}
-                className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
-                Cancel
+                {t('common.cancel', 'Cancel')}
               </button>
             )}
           </div>
@@ -189,10 +223,10 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
           {step === 'configure' && (
             <button
               onClick={handleNext}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-[#0D0D0D] text-sm font-semibold hover:bg-white/90 transition-all"
+              className="btn-primary"
             >
-              Continue
-              <ChevronRight className="w-4 h-4" />
+              {t('common.continue', 'Continue')}
+              <ChevronRight className="w-4 h-4 rtl-flip" />
             </button>
           )}
 
@@ -202,12 +236,14 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
               disabled={!isValid}
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 isValid
-                  ? 'bg-white text-[#0D0D0D] hover:bg-white/90'
-                  : 'bg-white/10 text-white/30 cursor-not-allowed'
+                  ? 'bg-theme-text text-theme-bg hover:bg-theme-text/90'
+                  : 'bg-theme-surface text-theme-text-muted cursor-not-allowed'
               }`}
             >
               <Check className="w-4 h-4" />
-              {isEditing ? 'Save Changes' : 'Create Trigger'}
+              {isEditing
+                ? t('triggerModal.saveChanges', 'Save Changes')
+                : t('triggerModal.createTrigger', 'Create Trigger')}
             </button>
           )}
         </div>
@@ -225,12 +261,13 @@ function ActionTypeStep({
   selected: TriggerActionType
   onSelect: (type: TriggerActionType) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   return (
     <div>
       <div className="grid grid-cols-3 gap-2.5">
-        {ACTION_TYPE_META.map((meta) => {
+        {getAvailableActionTypes(window.tapwisper.platform.os).map((meta) => {
           const isActive = selected === meta.id
-          const color = ACTION_COLORS[meta.id]
+          const text = actionTypeText(t, meta)
           return (
             <button
               key={meta.id}
@@ -238,26 +275,31 @@ function ActionTypeStep({
               className={`
                 relative flex flex-col items-center text-center p-4 rounded-xl border transition-all
                 ${isActive
-                  ? 'border-sky-accent/50 bg-[#111111]'
-                  : 'border-white/[0.04] bg-[#080808] hover:border-white/[0.08] hover:bg-[#0F0F0F]'
+                  ? 'border-signal bg-signal-tint/40 ring-4 ring-signal/10'
+                  : 'border-hairline bg-raised hover:border-hairline-strong'
                 }
               `}
             >
               {isActive && (
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-2 end-2">
                   <Check className="w-3.5 h-3.5 text-sky-accent" />
                 </div>
               )}
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center mb-2.5"
-                style={{ backgroundColor: `${color}15` }}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2.5 border ${
+                  isActive
+                    ? 'border-signal/30 bg-signal-tint text-signal'
+                    : 'border-hairline bg-panel text-ink-muted'
+                }`}
               >
-                <span style={{ color }}>{ACTION_ICONS[meta.id]}</span>
+                {ACTION_ICONS[meta.id]}
               </div>
-              <p className="text-[13px] font-semibold text-white">{meta.label}</p>
-              <p className="text-[11px] text-white/40 mt-1 leading-tight line-clamp-2">{meta.description}</p>
-              <p className="text-[10px] mt-2 font-mono leading-tight" style={{ color: `${color}99` }}>
-                {meta.example}
+              <p className="text-[13px] font-semibold text-theme-text">{text.label}</p>
+              <p className="text-[11px] text-theme-text-tertiary mt-1 leading-tight line-clamp-2">
+                {text.description}
+              </p>
+              <p className="text-[10px] mt-2 font-mono leading-tight text-ink-soft">
+                {text.example}
               </p>
             </button>
           )
@@ -278,11 +320,14 @@ function ConfigureStep({
   config: TriggerActionConfig
   onChange: (config: TriggerActionConfig) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   return (
     <div>
-      <h3 className="text-sm font-semibold text-theme-text mb-1">Configure Action</h3>
+      <h3 className="text-sm font-semibold text-theme-text mb-1">
+        {t('triggerModal.configureTitle', 'Configure Action')}
+      </h3>
       <p className="text-xs text-theme-text-muted mb-5">
-        Set up how this action should work
+        {t('triggerModal.configureSubtitle', 'Set up how this action should work')}
       </p>
 
       {actionType === 'web-search' && (
@@ -350,56 +395,73 @@ function TriggerPhraseStep({
   onTypeChange: (v: 'exact' | 'prefix') => void
   onNameChange: (v: string) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const isValid = triggerPhrase.trim().length >= 2
-
-  const meta = ACTION_TYPE_META.find((m) => m.id === actionType)
+  const phrase = triggerPhrase.trim() || t('triggerModal.phraseWord', 'phrase')
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Example usage */}
       {triggerType === 'prefix' && (
         <div className="bg-theme-surface/30 rounded-xl p-4">
-          <p className="text-xs font-medium text-theme-text-muted mb-2">Example Usage</p>
+          <p className="text-xs font-medium text-theme-text-muted mb-2">
+            {t('triggerModal.exampleUsage', 'Example Usage')}
+          </p>
           <p className="text-sm text-sky-accent font-mono">
-            &ldquo;{triggerPhrase || 'phrase'} [your question or command]&rdquo;
+            {t('common.quoted', '“{{text}}”', {
+              text: t('triggerModal.prefixExample', '{{phrase}} [your question or command]', {
+                phrase
+              })
+            })}
           </p>
           <p className="text-xs text-theme-text-muted mt-2">
-            Everything after the trigger phrase will be passed as input. This is a prefix trigger — say the wake word followed by your input.
+            {t(
+              'triggerModal.prefixExplanation',
+              'Start with the trigger phrase, then say your input. Everything after the phrase is passed to the action. Multi-word phrases also work mid-sentence.'
+            )}
           </p>
         </div>
       )}
 
       {triggerType === 'exact' && (
         <div className="bg-theme-surface/30 rounded-xl p-4">
-          <p className="text-xs font-medium text-theme-text-muted mb-2">Example Usage</p>
+          <p className="text-xs font-medium text-theme-text-muted mb-2">
+            {t('triggerModal.exampleUsage', 'Example Usage')}
+          </p>
           <p className="text-sm text-sky-accent font-mono">
-            &ldquo;Could you {triggerPhrase || 'phrase'} about this?&rdquo;
+            {t('common.quoted', '“{{text}}”', { text: phrase })}
           </p>
           <p className="text-xs text-theme-text-muted mt-2">
-            Say this phrase anywhere in your sentence. The entire message will be passed to the action.
+            {t(
+              'triggerModal.exactExplanation',
+              'Say only this phrase, e.g. just “open spotify”. The trigger fires only when your whole utterance is the phrase, so it never runs in the middle of normal dictation.'
+            )}
           </p>
         </div>
       )}
 
       {/* Trigger Phrase */}
       <div>
-        <label className="text-sm font-medium text-theme-text block mb-2">
-          Trigger Phrase
+        <label htmlFor="trigger-phrase" className="text-sm font-medium text-theme-text block mb-2">
+          {t('triggerModal.phraseLabel', 'Trigger Phrase')}
         </label>
         <p className="text-xs text-theme-text-muted mb-3">
-          The phrase that activates this trigger when spoken
+          {t('triggerModal.phraseHint', 'The phrase that activates this trigger when spoken')}
         </p>
         <input
+          id="trigger-phrase"
           type="text"
           value={triggerPhrase}
           onChange={(e) => onPhraseChange(e.target.value)}
-          placeholder="e.g. google, ask ai, open spotify"
+          placeholder={t('triggerModal.phrasePlaceholder', 'e.g. google, ask ai, open spotify')}
           className="w-full px-3 py-2.5 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50 transition-colors"
         />
         {isValid && (
           <div className="flex items-center gap-1.5 mt-2">
             <Check className="w-3.5 h-3.5 text-green-400" />
-            <span className="text-xs text-green-400 font-medium">Valid trigger phrase</span>
+            <span className="text-xs text-green-400 font-medium">
+              {t('triggerModal.validPhrase', 'Valid trigger phrase')}
+            </span>
           </div>
         )}
       </div>
@@ -407,7 +469,7 @@ function TriggerPhraseStep({
       {/* Trigger Type */}
       <div>
         <label className="text-sm font-medium text-theme-text block mb-2">
-          Trigger Type
+          {t('triggerModal.typeLabel', 'Trigger Type')}
         </label>
         <div className="flex gap-2">
           <button
@@ -418,7 +480,7 @@ function TriggerPhraseStep({
                 : 'border-theme-border/30 text-theme-text-secondary hover:border-theme-border/50'
             }`}
           >
-            Prefix (phrase + speech)
+            {t('triggerModal.typePrefix', 'Prefix (phrase + speech)')}
           </button>
           <button
             onClick={() => onTypeChange('exact')}
@@ -428,21 +490,25 @@ function TriggerPhraseStep({
                 : 'border-theme-border/30 text-theme-text-secondary hover:border-theme-border/50'
             }`}
           >
-            Exact (phrase only)
+            {t('triggerModal.typeExact', 'Exact (phrase only)')}
           </button>
         </div>
       </div>
 
       {/* Name (optional) */}
       <div>
-        <label className="text-sm font-medium text-theme-text block mb-2">
-          Name <span className="text-theme-text-muted font-normal">(optional)</span>
+        <label htmlFor="trigger-name" className="text-sm font-medium text-theme-text block mb-2">
+          {t('triggerModal.nameLabel', 'Name')}{' '}
+          <span className="text-theme-text-muted font-normal">
+            {t('triggerModal.optional', '(optional)')}
+          </span>
         </label>
         <input
+          id="trigger-name"
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder={`${meta?.label || 'Trigger'} - ${triggerPhrase || '...'}`}
+          placeholder={`${actionTypeLabel(t, actionType)} - ${triggerPhrase || '...'}`}
           className="w-full px-3 py-2.5 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50 transition-colors"
         />
       </div>
@@ -495,101 +561,143 @@ function WebSearchConfigForm({
   config: WebSearchConfig
   onChange: (c: TriggerActionConfig) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const update = (partial: Partial<WebSearchConfig>) => {
     onChange({ ...config, ...partial })
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* How it works */}
       <div className="bg-theme-surface/30 rounded-xl p-4">
-        <p className="text-xs font-medium text-theme-text-muted mb-1">How it works</p>
+        <p className="text-xs font-medium text-theme-text-muted mb-1">
+          {t('triggerModal.howItWorks', 'How it works')}
+        </p>
         <p className="text-xs text-theme-text-secondary">
-          Say the trigger phrase followed by your search query. For example, say &ldquo;Google best coffee shops&rdquo; to search for &ldquo;best coffee shops&rdquo;.
+          {t(
+            'triggerModal.webSearchHow',
+            'Say the trigger phrase followed by your search query. For example, say “Google best coffee shops” to search for “best coffee shops”.'
+          )}
         </p>
       </div>
 
       {/* Search Engine */}
       <div>
-        <SectionLabel>Search Engine</SectionLabel>
+        <SectionLabel>{t('triggerModal.searchEngine', 'Search Engine')}</SectionLabel>
         <OptionGroup<SearchEngine>
           options={['google', 'duckduckgo', 'bing', 'custom']}
           value={config.searchEngine}
           onChange={(v) => update({ searchEngine: v })}
-          labels={{ google: 'Google', duckduckgo: 'DuckDuckGo', bing: 'Bing', custom: 'Custom URL' }}
+          labels={{
+            google: 'Google',
+            duckduckgo: 'DuckDuckGo',
+            bing: 'Bing',
+            custom: t('triggerModal.customUrl', 'Custom URL')
+          }}
         />
       </div>
 
       {config.searchEngine === 'custom' && (
         <div>
-          <SectionLabel>Custom Search URL</SectionLabel>
+          <SectionLabel>{t('triggerModal.customSearchUrl', 'Custom Search URL')}</SectionLabel>
           <input
             type="text"
             value={config.customUrl || ''}
             onChange={(e) => update({ customUrl: e.target.value })}
             placeholder="https://example.com/search?q=%s"
+            dir="ltr"
             className="w-full px-3 py-2.5 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50"
           />
-          <p className="text-xs text-theme-text-muted mt-1">Use %s as placeholder for the search query</p>
+          <p className="text-xs text-theme-text-muted mt-1">
+            {t('triggerModal.customUrlHint', 'Use %s as placeholder for the search query')}
+          </p>
         </div>
       )}
 
       {/* Search Query */}
       <div>
-        <SectionLabel>Search Query</SectionLabel>
-        <p className="text-xs text-theme-text-muted mb-2">Build your search query by adding text before or after what you say</p>
+        <SectionLabel>{t('triggerModal.searchQuery', 'Search Query')}</SectionLabel>
+        <p className="text-xs text-theme-text-muted mb-2">
+          {t(
+            'triggerModal.searchQueryHint',
+            'Build your search query by adding text before or after what you say'
+          )}
+        </p>
         <div className="grid grid-cols-3 gap-2 items-center">
           <input
             type="text"
             value={config.beforeText || ''}
             onChange={(e) => update({ beforeText: e.target.value })}
-            placeholder="Optional"
+            placeholder={t('triggerModal.optionalPlaceholder', 'Optional')}
+            aria-label={t('triggerModal.before', 'Before')}
             className="px-3 py-2 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50"
           />
           <div className="px-3 py-2 rounded-lg bg-sky-accent/10 border border-sky-accent/30 text-sm text-sky-accent text-center font-medium">
-            Your speech
+            {t('triggerModal.yourSpeech', 'Your speech')}
           </div>
           <input
             type="text"
             value={config.afterText || ''}
             onChange={(e) => update({ afterText: e.target.value })}
-            placeholder="Optional"
+            placeholder={t('triggerModal.optionalPlaceholder', 'Optional')}
+            aria-label={t('triggerModal.after', 'After')}
             className="px-3 py-2 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50"
           />
         </div>
         <div className="grid grid-cols-3 gap-2 mt-1">
-          <span className="text-[10px] text-theme-text-muted text-center">Before</span>
-          <span className="text-[10px] text-theme-text-muted text-center">What you say</span>
-          <span className="text-[10px] text-theme-text-muted text-center">After</span>
+          <span className="text-[10px] text-theme-text-muted text-center">
+            {t('triggerModal.before', 'Before')}
+          </span>
+          <span className="text-[10px] text-theme-text-muted text-center">
+            {t('triggerModal.whatYouSay', 'What you say')}
+          </span>
+          <span className="text-[10px] text-theme-text-muted text-center">
+            {t('triggerModal.after', 'After')}
+          </span>
         </div>
       </div>
 
       {/* Quick Presets */}
       <div>
-        <p className="text-xs text-theme-text-muted mb-2">Quick Presets (click to add as &ldquo;Before&rdquo; text)</p>
+        <p className="text-xs text-theme-text-muted mb-2">
+          {t('triggerModal.quickPresets', 'Quick Presets (click to add as “Before” text)')}
+        </p>
         <div className="flex flex-wrap gap-2">
-          {['Reddit', 'GitHub', 'Stack Overflow', 'PDF Files'].map((preset) => (
+          {/* The inserted text is part of the search query, so it stays English */}
+          {[
+            { id: 'reddit', label: 'Reddit', text: 'reddit ' },
+            { id: 'github', label: 'GitHub', text: 'github ' },
+            { id: 'stackoverflow', label: 'Stack Overflow', text: 'stack overflow ' },
+            { id: 'pdf', label: t('triggerModal.presetPdf', 'PDF Files'), text: 'pdf files ' }
+          ].map((preset) => (
             <button
-              key={preset}
-              onClick={() => update({ beforeText: preset.toLowerCase() + ' ' })}
+              key={preset.id}
+              onClick={() => update({ beforeText: preset.text })}
               className="px-2.5 py-1 rounded-md bg-sky-accent/10 text-xs font-medium text-sky-accent hover:bg-sky-accent/20 transition-colors"
             >
-              {preset}
+              {preset.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Browser */}
-      <div>
-        <SectionLabel>Browser</SectionLabel>
-        <OptionGroup<BrowserChoice>
-          options={['default', 'safari', 'chrome', 'firefox']}
-          value={config.browser}
-          onChange={(v) => update({ browser: v })}
-          labels={{ default: 'Default Browser', safari: 'Safari', chrome: 'Chrome', firefox: 'Firefox' }}
-        />
-      </div>
+      {/* Browser — choosing a specific browser is only supported on macOS */}
+      {IS_MAC && (
+        <div>
+          <SectionLabel>{t('triggerModal.browser', 'Browser')}</SectionLabel>
+          <OptionGroup<BrowserChoice>
+            options={['default', 'safari', 'chrome', 'firefox']}
+            value={config.browser}
+            onChange={(v) => update({ browser: v })}
+            labels={{
+              default: t('triggerModal.defaultBrowser', 'Default Browser'),
+              safari: 'Safari',
+              chrome: 'Chrome',
+              firefox: 'Firefox'
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -603,16 +711,19 @@ function AIChatConfigForm({
   config: AIChatConfig
   onChange: (c: TriggerActionConfig) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const update = (partial: Partial<AIChatConfig>) => {
     onChange({ ...config, ...partial })
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* AI Provider */}
       <div>
-        <SectionLabel>AI Provider</SectionLabel>
-        <p className="text-xs text-theme-text-muted mb-2">Uses your configured API key from Settings</p>
+        <SectionLabel>{t('triggerModal.aiProvider', 'AI Provider')}</SectionLabel>
+        <p className="text-xs text-theme-text-muted mb-2">
+          {t('triggerModal.aiProviderHint', 'Uses your configured API key from Settings')}
+        </p>
         <OptionGroup
           options={['gemini', 'together', 'openai', 'claude'] as const}
           value={config.provider}
@@ -623,18 +734,38 @@ function AIChatConfigForm({
 
       {/* Response Handling */}
       <div>
-        <SectionLabel>Response Handling</SectionLabel>
-        <p className="text-xs text-theme-text-muted mb-2">How should the AI response be delivered?</p>
+        <SectionLabel>{t('triggerModal.responseHandling', 'Response Handling')}</SectionLabel>
+        <p className="text-xs text-theme-text-muted mb-2">
+          {t('triggerModal.responseHandlingHint', 'How should the AI response be delivered?')}
+        </p>
         <div className="space-y-2">
-          {([
-            { id: 'modal' as const, label: 'Show in Panel', desc: 'Display result in the floating panel' },
-            { id: 'inject' as const, label: 'Inject Text', desc: 'Insert AI response directly at cursor position' },
-            { id: 'clipboard' as const, label: 'Copy to Clipboard', desc: 'Copy response to clipboard for manual pasting' }
-          ]).map((opt) => (
+          {[
+            {
+              id: 'modal' as const,
+              label: t('triggerModal.responseModal', 'Show in Panel'),
+              desc: t('triggerModal.responseModalDesc', 'Display result in the floating panel')
+            },
+            {
+              id: 'inject' as const,
+              label: t('triggerModal.responseInject', 'Inject Text'),
+              desc: t(
+                'triggerModal.responseInjectDesc',
+                'Insert AI response directly at cursor position'
+              )
+            },
+            {
+              id: 'clipboard' as const,
+              label: t('triggerModal.responseClipboard', 'Copy to Clipboard'),
+              desc: t(
+                'triggerModal.responseClipboardDesc',
+                'Copy response to clipboard for manual pasting'
+              )
+            }
+          ].map((opt) => (
             <button
               key={opt.id}
               onClick={() => update({ responseHandling: opt.id })}
-              className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+              className={`w-full text-start px-4 py-3 rounded-xl border transition-all ${
                 config.responseHandling === opt.id
                   ? 'border-sky-accent/50 bg-sky-accent/8'
                   : 'border-theme-border/30 hover:border-theme-border/50'
@@ -656,11 +787,12 @@ function AIChatConfigForm({
 
       {/* System Prompt */}
       <div>
-        <SectionLabel>System Prompt (optional)</SectionLabel>
+        <SectionLabel>{t('triggerModal.systemPrompt', 'System Prompt (optional)')}</SectionLabel>
         <textarea
           value={config.systemPrompt || ''}
           onChange={(e) => update({ systemPrompt: e.target.value })}
-          placeholder="You are a helpful AI assistant..."
+          placeholder={t('triggerModal.systemPromptPlaceholder', 'You are a helpful AI assistant...')}
+          aria-label={t('triggerModal.systemPrompt', 'System Prompt (optional)')}
           rows={3}
           className="w-full px-3 py-2.5 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50 resize-none"
         />
@@ -678,6 +810,7 @@ function TerminalConfigForm({
   config: TerminalConfig
   onChange: (c: TriggerActionConfig) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const update = (partial: Partial<TerminalConfig>) => {
     onChange({ ...config, ...partial })
   }
@@ -698,32 +831,40 @@ function TerminalConfigForm({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Execution Mode */}
       <div>
-        <SectionLabel>Execution Mode</SectionLabel>
+        <SectionLabel>{t('triggerModal.executionMode', 'Execution Mode')}</SectionLabel>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => update({ executionMode: 'background' })}
-            className={`px-4 py-3 rounded-xl border text-left transition-all ${
+            className={`px-4 py-3 rounded-xl border text-start transition-all ${
               config.executionMode === 'background'
                 ? 'border-sky-accent/50 bg-sky-accent/8'
                 : 'border-theme-border/30 hover:border-theme-border/50'
             }`}
           >
-            <p className="text-sm font-medium text-theme-text">Background</p>
-            <p className="text-xs text-theme-text-muted mt-0.5">Runs silently without opening any windows</p>
+            <p className="text-sm font-medium text-theme-text">
+              {t('triggerModal.modeBackground', 'Background')}
+            </p>
+            <p className="text-xs text-theme-text-muted mt-0.5">
+              {t('triggerModal.modeBackgroundDesc', 'Runs silently without opening any windows')}
+            </p>
           </button>
           <button
             onClick={() => update({ executionMode: 'visual' })}
-            className={`px-4 py-3 rounded-xl border text-left transition-all ${
+            className={`px-4 py-3 rounded-xl border text-start transition-all ${
               config.executionMode === 'visual'
                 ? 'border-sky-accent/50 bg-sky-accent/8'
                 : 'border-theme-border/30 hover:border-theme-border/50'
             }`}
           >
-            <p className="text-sm font-medium text-theme-text">Visual</p>
-            <p className="text-xs text-theme-text-muted mt-0.5">Shows commands in your terminal app</p>
+            <p className="text-sm font-medium text-theme-text">
+              {t('triggerModal.modeVisual', 'Visual')}
+            </p>
+            <p className="text-xs text-theme-text-muted mt-0.5">
+              {t('triggerModal.modeVisualDesc', 'Shows commands in your terminal app')}
+            </p>
           </button>
         </div>
       </div>
@@ -731,24 +872,38 @@ function TerminalConfigForm({
       {/* Show Output */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-theme-text">Show output in panel</p>
-          <p className="text-xs text-theme-text-muted">Stream command output to the floating bar while executing</p>
+          <p className="text-sm font-medium text-theme-text">
+            {t('triggerModal.showOutput', 'Show output in panel')}
+          </p>
+          <p className="text-xs text-theme-text-muted">
+            {t(
+              'triggerModal.showOutputDesc',
+              'Show the command output in the floating panel when it finishes'
+            )}
+          </p>
         </div>
         <button
           onClick={() => update({ showOutput: !config.showOutput })}
+          role="switch"
+          aria-checked={config.showOutput}
+          aria-label={t('triggerModal.showOutput', 'Show output in panel')}
           className={`relative w-10 h-6 rounded-full transition-colors shrink-0 ${
             config.showOutput ? 'bg-sky-accent' : 'bg-theme-surface/60'
           }`}
         >
-          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-            config.showOutput ? 'translate-x-5' : 'translate-x-1'
-          }`} />
+          <div
+            className={`absolute top-1 start-0 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+              config.showOutput
+                ? 'ltr:translate-x-5 rtl:-translate-x-5'
+                : 'ltr:translate-x-1 rtl:-translate-x-1'
+            }`}
+          />
         </button>
       </div>
 
       {/* Commands */}
       <div>
-        <SectionLabel>Commands</SectionLabel>
+        <SectionLabel>{t('triggerModal.commands', 'Commands')}</SectionLabel>
         <div className="space-y-2">
           {config.commands.map((cmd, idx) => (
             <div key={idx} className="flex gap-2">
@@ -756,15 +911,21 @@ function TerminalConfigForm({
                 type="text"
                 value={cmd}
                 onChange={(e) => updateCommand(idx, e.target.value)}
-                placeholder="Add a command..."
+                placeholder={t('triggerModal.commandPlaceholder', 'Add a command...')}
+                aria-label={t('triggerModal.commandLabel', 'Command {{number}}', {
+                  number: idx + 1
+                })}
+                dir="ltr"
                 className="flex-1 px-3 py-2.5 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text font-mono placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50"
               />
               {config.commands.length > 1 && (
                 <button
                   onClick={() => removeCommand(idx)}
-                  className="w-9 h-9 rounded-lg hover:bg-red-500/10 flex items-center justify-center shrink-0 self-center"
+                  aria-label={t('triggerModal.removeCommand', 'Remove command')}
+                  title={t('triggerModal.removeCommand', 'Remove command')}
+                  className="icon-btn h-9 w-9 shrink-0 self-center hover:!text-danger"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
@@ -775,10 +936,21 @@ function TerminalConfigForm({
           className="mt-2 text-xs text-sky-accent hover:text-sky-accent/80 flex items-center gap-1"
         >
           <Plus className="w-3 h-3" />
-          Add command
+          {t('triggerModal.addCommand', 'Add command')}
         </button>
         <p className="text-xs text-theme-text-muted mt-2">
-          Use <code className="px-1 py-0.5 rounded bg-theme-surface/50 font-mono text-[11px]">$SPEECH_INPUT</code> to access voice input
+          <Trans
+            i18nKey="triggerModal.speechInputHint"
+            defaults="Use <code>$SPEECH_INPUT</code> to access voice input"
+            components={{
+              code: (
+                <code
+                  className="px-1 py-0.5 rounded bg-theme-surface/50 font-mono text-[11px]"
+                  dir="ltr"
+                />
+              )
+            }}
+          />
         </p>
       </div>
     </div>
@@ -794,31 +966,40 @@ function KeyboardConfigForm({
   config: KeyboardConfig
   onChange: (c: TriggerActionConfig) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const update = (partial: Partial<KeyboardConfig>) => {
     onChange({ ...config, ...partial })
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div>
-        <SectionLabel>Keyboard Shortcut</SectionLabel>
+        <SectionLabel>{t('triggerModal.keyboardShortcut', 'Keyboard Shortcut')}</SectionLabel>
         <p className="text-xs text-theme-text-muted mb-2">
-          Enter the shortcut to simulate (e.g. Cmd+K, Ctrl+Shift+P)
+          {t(
+            'triggerModal.keyboardShortcutHint',
+            'Enter the shortcut to simulate (e.g. Cmd+K, Ctrl+Shift+P)'
+          )}
         </p>
         <input
           type="text"
+          dir="ltr"
           value={config.shortcut}
           onChange={(e) => update({ shortcut: e.target.value })}
-          placeholder="e.g. Cmd+K or Ctrl+Shift+P"
+          aria-label={t('triggerModal.keyboardShortcut', 'Keyboard Shortcut')}
+          placeholder={t('triggerModal.keyboardShortcutPlaceholder', 'e.g. Cmd+K or Ctrl+Shift+P')}
           className="w-full px-3 py-2.5 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text font-mono placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50"
         />
       </div>
 
       <div>
-        <SectionLabel>Delay (ms)</SectionLabel>
-        <p className="text-xs text-theme-text-muted mb-2">Optional delay before executing the shortcut</p>
+        <SectionLabel>{t('triggerModal.delay', 'Delay (ms)')}</SectionLabel>
+        <p className="text-xs text-theme-text-muted mb-2">
+          {t('triggerModal.delayHint', 'Optional delay before executing the shortcut')}
+        </p>
         <input
           type="number"
+          aria-label={t('triggerModal.delay', 'Delay (ms)')}
           value={config.delay || 0}
           onChange={(e) => update({ delay: parseInt(e.target.value) || 0 })}
           min={0}
@@ -848,28 +1029,35 @@ function AppleShortcutConfigForm({
       .finally(() => setLoading(false))
   }, [])
 
+  const { t } = useTranslation()
   const update = (partial: Partial<AppleShortcutConfig>) => {
     onChange({ ...config, ...partial })
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div>
-        <SectionLabel>Apple Shortcut</SectionLabel>
+        <SectionLabel>{actionTypeLabel(t, 'apple-shortcut')}</SectionLabel>
         <p className="text-xs text-theme-text-muted mb-2">
-          Select a shortcut from your Shortcuts app, or type its name
+          {t(
+            'triggerModal.appleShortcutHint',
+            'Select a shortcut from your Shortcuts app, or type its name'
+          )}
         </p>
 
         <input
           type="text"
           value={config.shortcutName}
           onChange={(e) => update({ shortcutName: e.target.value })}
-          placeholder="Type shortcut name..."
+          placeholder={t('triggerModal.shortcutNamePlaceholder', 'Type shortcut name...')}
+          aria-label={t('triggerModal.shortcutNamePlaceholder', 'Type shortcut name...')}
           className="w-full px-3 py-2.5 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50"
         />
 
         {loading ? (
-          <p className="text-xs text-theme-text-muted mt-2">Loading shortcuts...</p>
+          <p className="text-xs text-theme-text-muted mt-2">
+            {t('triggerModal.loadingShortcuts', 'Loading shortcuts...')}
+          </p>
         ) : shortcuts.length > 0 ? (
           <div className="mt-3 max-h-40 overflow-y-auto space-y-1 rounded-lg border border-theme-border/20 p-2">
             {shortcuts
@@ -879,7 +1067,7 @@ function AppleShortcutConfigForm({
                 <button
                   key={s}
                   onClick={() => update({ shortcutName: s })}
-                  className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  className={`w-full text-start px-3 py-1.5 rounded-md text-sm transition-colors ${
                     config.shortcutName === s
                       ? 'bg-sky-accent/10 text-sky-accent'
                       : 'text-theme-text-secondary hover:bg-theme-surface/40'
@@ -891,7 +1079,10 @@ function AppleShortcutConfigForm({
           </div>
         ) : (
           <p className="text-xs text-theme-text-muted mt-2">
-            No shortcuts found. Make sure you have shortcuts in the Shortcuts app.
+            {t(
+              'triggerModal.noShortcuts',
+              'No shortcuts found. Make sure you have shortcuts in the Shortcuts app.'
+            )}
           </p>
         )}
       </div>
@@ -999,39 +1190,90 @@ function WindowConfigForm({
   config: WindowConfig
   onChange: (c: TriggerActionConfig) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const update = (partial: Partial<WindowConfig>) => {
     onChange({ ...config, ...partial })
   }
 
+  // Screen areas are physical, so left/right stay left/right in RTL too
   const actions: { id: WindowAction; label: string; desc: string }[] = [
-    { id: 'left-half', label: 'Left Half', desc: 'Snap to left 50% of screen' },
-    { id: 'right-half', label: 'Right Half', desc: 'Snap to right 50% of screen' },
-    { id: 'top-half', label: 'Top Half', desc: 'Snap to top 50% of screen' },
-    { id: 'bottom-half', label: 'Bottom Half', desc: 'Snap to bottom 50% of screen' },
-    { id: 'top-left-quarter', label: 'Top Left Quarter', desc: 'Snap to top-left 25% corner' },
-    { id: 'top-right-quarter', label: 'Top Right Quarter', desc: 'Snap to top-right 25% corner' },
-    { id: 'bottom-left-quarter', label: 'Bottom Left Quarter', desc: 'Snap to bottom-left 25% corner' },
-    { id: 'bottom-right-quarter', label: 'Bottom Right Quarter', desc: 'Snap to bottom-right 25% corner' },
-    { id: 'center', label: 'Center', desc: 'Center on screen (keeps current size)' },
-    { id: 'maximize', label: 'Maximize', desc: 'Fill entire screen (respects menu bar)' },
-    { id: 'fullscreen', label: 'Fullscreen', desc: 'Enter macOS fullscreen mode' }
+    {
+      id: 'left-half',
+      label: t('triggerModal.window.leftHalf', 'Left Half'),
+      desc: t('triggerModal.window.leftHalfDesc', 'Snap to left 50% of screen')
+    },
+    {
+      id: 'right-half',
+      label: t('triggerModal.window.rightHalf', 'Right Half'),
+      desc: t('triggerModal.window.rightHalfDesc', 'Snap to right 50% of screen')
+    },
+    {
+      id: 'top-half',
+      label: t('triggerModal.window.topHalf', 'Top Half'),
+      desc: t('triggerModal.window.topHalfDesc', 'Snap to top 50% of screen')
+    },
+    {
+      id: 'bottom-half',
+      label: t('triggerModal.window.bottomHalf', 'Bottom Half'),
+      desc: t('triggerModal.window.bottomHalfDesc', 'Snap to bottom 50% of screen')
+    },
+    {
+      id: 'top-left-quarter',
+      label: t('triggerModal.window.topLeftQuarter', 'Top Left Quarter'),
+      desc: t('triggerModal.window.topLeftQuarterDesc', 'Snap to top-left 25% corner')
+    },
+    {
+      id: 'top-right-quarter',
+      label: t('triggerModal.window.topRightQuarter', 'Top Right Quarter'),
+      desc: t('triggerModal.window.topRightQuarterDesc', 'Snap to top-right 25% corner')
+    },
+    {
+      id: 'bottom-left-quarter',
+      label: t('triggerModal.window.bottomLeftQuarter', 'Bottom Left Quarter'),
+      desc: t('triggerModal.window.bottomLeftQuarterDesc', 'Snap to bottom-left 25% corner')
+    },
+    {
+      id: 'bottom-right-quarter',
+      label: t('triggerModal.window.bottomRightQuarter', 'Bottom Right Quarter'),
+      desc: t('triggerModal.window.bottomRightQuarterDesc', 'Snap to bottom-right 25% corner')
+    },
+    {
+      id: 'center',
+      label: t('triggerModal.window.center', 'Center'),
+      desc: t('triggerModal.window.centerDesc', 'Center on screen (keeps current size)')
+    },
+    {
+      id: 'maximize',
+      label: t('triggerModal.window.maximize', 'Maximize'),
+      desc: t('triggerModal.window.maximizeDesc', 'Fill entire screen (respects menu bar)')
+    },
+    {
+      id: 'fullscreen',
+      label: t('triggerModal.window.fullscreen', 'Fullscreen'),
+      desc: t('triggerModal.window.fullscreenDesc', 'Enter macOS fullscreen mode')
+    }
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* How it works */}
       <div className="bg-theme-surface/30 rounded-xl p-4">
-        <p className="text-xs font-medium text-theme-text-muted mb-1">How it works</p>
+        <p className="text-xs font-medium text-theme-text-muted mb-1">
+          {t('triggerModal.howItWorks', 'How it works')}
+        </p>
         <p className="text-xs text-theme-text-secondary">
-          This trigger will position the frontmost window to a predefined layout. For example, if your
-          trigger is &ldquo;window&rdquo;, saying &ldquo;window left&rdquo; positions to left half, &ldquo;window right&rdquo; to right half,
-          &ldquo;window full&rdquo; toggles fullscreen, etc.
+          {t(
+            'triggerModal.windowHow',
+            'Saying the trigger phrase moves the frontmost window to the layout you pick below. For example, a “window left” trigger for the left half and a “window full” trigger for fullscreen.'
+          )}
         </p>
       </div>
 
       <div>
-        <SectionLabel>Window Management</SectionLabel>
-        <p className="text-xs text-theme-text-muted mb-3">Select which layout this trigger will apply</p>
+        <SectionLabel>{t('triggerModal.windowManagement', 'Window Management')}</SectionLabel>
+        <p className="text-xs text-theme-text-muted mb-3">
+          {t('triggerModal.windowManagementHint', 'Select which layout this trigger will apply')}
+        </p>
         <div className="grid grid-cols-2 gap-2">
           {actions.map((a) => {
             const isActive = config.action === a.id
@@ -1039,7 +1281,7 @@ function WindowConfigForm({
               <button
                 key={a.id}
                 onClick={() => update({ action: a.id })}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl border text-start transition-all ${
                   isActive
                     ? 'border-sky-accent/50 bg-sky-accent/8'
                     : 'border-theme-border/30 hover:border-theme-border/50'
@@ -1068,6 +1310,7 @@ function LaunchAppConfigForm({
   config: LaunchAppConfig
   onChange: (c: TriggerActionConfig) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const [apps, setApps] = useState<{ name: string; path: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -1087,11 +1330,11 @@ function LaunchAppConfigForm({
   )
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div>
-        <SectionLabel>Application</SectionLabel>
+        <SectionLabel>{t('triggerModal.application', 'Application')}</SectionLabel>
         <p className="text-xs text-theme-text-muted mb-2">
-          Select an application to launch or type its name
+          {t('triggerModal.applicationHint', 'Select an application to launch or type its name')}
         </p>
 
         <input
@@ -1101,12 +1344,15 @@ function LaunchAppConfigForm({
             setFilter(e.target.value)
             update({ appName: e.target.value, appPath: '' })
           }}
-          placeholder="Search apps..."
+          placeholder={t('triggerModal.searchApps', 'Search apps...')}
+          aria-label={t('triggerModal.searchApps', 'Search apps...')}
           className="w-full px-3 py-2.5 rounded-lg bg-theme-surface/40 border border-theme-border/30 text-sm text-theme-text placeholder:text-theme-text-muted/50 focus:outline-none focus:border-sky-accent/50"
         />
 
         {loading ? (
-          <p className="text-xs text-theme-text-muted mt-2">Loading installed apps...</p>
+          <p className="text-xs text-theme-text-muted mt-2">
+            {t('triggerModal.loadingApps', 'Loading installed apps...')}
+          </p>
         ) : (
           <div className="mt-3 max-h-48 overflow-y-auto space-y-0.5 rounded-lg border border-theme-border/20 p-2">
             {filteredApps.slice(0, 30).map((app) => (
@@ -1116,7 +1362,7 @@ function LaunchAppConfigForm({
                   update({ appName: app.name, appPath: app.path })
                   setFilter(app.name)
                 }}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                className={`w-full text-start px-3 py-2 rounded-md text-sm transition-colors ${
                   config.appName === app.name
                     ? 'bg-sky-accent/10 text-sky-accent'
                     : 'text-theme-text-secondary hover:bg-theme-surface/40'
@@ -1126,7 +1372,9 @@ function LaunchAppConfigForm({
               </button>
             ))}
             {filteredApps.length === 0 && (
-              <p className="text-xs text-theme-text-muted text-center py-4">No matching apps found</p>
+              <p className="text-xs text-theme-text-muted text-center py-4">
+                {t('triggerModal.noApps', 'No matching apps found')}
+              </p>
             )}
           </div>
         )}

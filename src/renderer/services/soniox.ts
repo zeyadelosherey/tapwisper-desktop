@@ -1,50 +1,97 @@
-import type { TranscriptionResponse } from './ai-router'
+import type { TranscriptionResponse, TranscriptionOptions } from './ai-router'
+import { audioFileName } from './whisper'
+import i18n from '../i18n'
 
 const API_BASE = 'https://api.soniox.com/v1'
+const DEFAULT_MODEL = 'stt-async-v4'
+const POLL_INTERVAL_MS = 250
+const TIMEOUT_MS = 60_000
 
-export async function transcribeWithSoniox(
-  audioBlob: Blob,
-  apiKey: string,
-  language?: string
-): Promise<TranscriptionResponse> {
-  // Convert blob to base64
-  const arrayBuffer = await audioBlob.arrayBuffer()
-  const base64Audio = btoa(
-    String.fromCharCode(...new Uint8Array(arrayBuffer))
-  )
+interface SonioxTranscription {
+  id: string
+  status: 'queued' | 'processing' | 'completed' | 'error'
+  error_message?: string | null
+}
 
-  const response = await fetch(`${API_BASE}/speech:transcribe`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      audio: {
-        content: base64Audio
-      },
-      config: {
-        model: 'stt-async-v3',
-        language: language || 'en',
-        encoding: 'LINEAR16',
-        sampleRateHertz: 16000
-      }
-    })
+interface SonioxTranscript {
+  text?: string
+  tokens?: Array<{ text: string }>
+}
+
+async function sonioxFetch<T>(apiKey: string, path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${apiKey}`, ...(init.headers || {}) }
   })
-
   if (!response.ok) {
     const error = await response.text()
     throw new Error(`Soniox transcription error: ${response.status} - ${error}`)
   }
+  if (response.status === 204) return undefined as T
+  return (await response.json()) as T
+}
 
-  const data = await response.json()
-  const text = data.results
-    ?.map((r: any) => r.alternatives?.[0]?.transcript || '')
-    .join(' ')
-    .trim()
+/**
+ * Transcribe with Soniox's async API: upload the file, create a transcription
+ * job, poll until it completes, fetch the transcript, then delete both the job
+ * and the uploaded file (Soniox keeps them — and counts them against quota —
+ * until deleted).
+ */
+export async function transcribeWithSoniox(
+  audioBlob: Blob,
+  apiKey: string,
+  options: TranscriptionOptions,
+  model?: string
+): Promise<TranscriptionResponse> {
+  const form = new FormData()
+  form.append('file', audioBlob, audioFileName(audioBlob))
+  const file = await sonioxFetch<{ id: string }>(apiKey, '/files', { method: 'POST', body: form })
 
-  return {
-    text: text || '',
-    provider: 'soniox'
+  let transcriptionId: string | null = null
+  try {
+    const body: Record<string, unknown> = {
+      // Older configs stored a display id like "soniox-stt-async-v3"; only pass real model ids
+      model: model && model.startsWith('stt-') ? model : DEFAULT_MODEL,
+      file_id: file.id
+    }
+    const hints = options.languageHints ?? (options.language ? [options.language] : [])
+    if (hints.length) body.language_hints = hints
+    if (options.prompt) body.context = options.prompt
+
+    const created = await sonioxFetch<SonioxTranscription>(apiKey, '/transcriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    transcriptionId = created.id
+
+    const deadline = Date.now() + TIMEOUT_MS
+    let status = created
+    while (status.status !== 'completed') {
+      if (status.status === 'error') {
+        throw new Error(`Soniox transcription error: ${status.error_message || 'unknown error'}`)
+      }
+      if (Date.now() > deadline) {
+        throw new Error(i18n.t('errors.sonioxTimeout', 'Soniox transcription timed out'))
+      }
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+      status = await sonioxFetch<SonioxTranscription>(apiKey, `/transcriptions/${created.id}`)
+    }
+
+    const transcript = await sonioxFetch<SonioxTranscript>(
+      apiKey,
+      `/transcriptions/${created.id}/transcript`
+    )
+    const text = transcript.text ?? transcript.tokens?.map((t) => t.text).join('') ?? ''
+
+    return { text: text.trim(), provider: 'soniox' }
+  } finally {
+    // Best-effort cleanup; never let it mask the real result or error
+    if (transcriptionId) {
+      sonioxFetch(apiKey, `/transcriptions/${transcriptionId}`, { method: 'DELETE' }).catch(
+        () => {}
+      )
+    }
+    sonioxFetch(apiKey, `/files/${file.id}`, { method: 'DELETE' }).catch(() => {})
   }
 }

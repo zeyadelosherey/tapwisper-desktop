@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { WaveformBars } from './waveform-bars'
+import { useOverlayHitRegion } from '../hooks/use-overlay-hit-region'
 import { processText } from '../services/ai-router'
 import {
   BUILT_IN_CATEGORIES,
@@ -7,8 +9,22 @@ import {
 } from '../models/actions-config'
 import { useStatsStore } from '../store/stats'
 import { useActivityStore } from '../store/activity'
+import { actionLabel as builtInActionLabel, displayActionName } from '../utils/action-labels'
+import i18n from '../i18n'
 
-type PillState = 'hidden' | 'recording' | 'transcribing' | 'loading-ai' | 'result' | 'error' | 'post-recording' | 'done'
+type PillState =
+  | 'hidden'
+  | 'recording'
+  | 'transcribing'
+  | 'loading-ai'
+  | 'result'
+  | 'error'
+  | 'transient-error'
+  | 'post-recording'
+  | 'done'
+
+// How long a transcription/trigger error notice stays on screen
+const TRANSIENT_ERROR_MS = 5000
 
 interface ResultEntry {
   id: string
@@ -19,6 +35,7 @@ interface ResultEntry {
 import { CATEGORY_COLORS } from '../constants/colors'
 
 export function RecordingPill(): JSX.Element {
+  const { t } = useTranslation()
   const [state, setState] = useState<PillState>('hidden')
   const [waveformData, setWaveformData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0])
   const [resultText, setResultText] = useState('')
@@ -35,6 +52,13 @@ export function RecordingPill(): JSX.Element {
   const [isFullExpanded, setIsFullExpanded] = useState(false)
   const [postRecordingText, setPostRecordingText] = useState('')
   const postRecordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Inline error for a failed follow-up action (the result stays visible)
+  const [actionError, setActionError] = useState('')
+  const transientErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Visible elements — used to keep the rest of the overlay click-through
+  const pillBarRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   const addAIAction = useStatsStore((s) => s.addAIAction)
   const addLLMAction = useActivityStore((s) => s.addLLMAction)
@@ -61,10 +85,19 @@ export function RecordingPill(): JSX.Element {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [loadCategories])
 
+  const clearTransientErrorTimer = useCallback(() => {
+    if (transientErrorTimerRef.current) {
+      clearTimeout(transientErrorTimerRef.current)
+      transientErrorTimerRef.current = null
+    }
+  }, [])
+
   const resetAll = useCallback(() => {
     setResultText('')
     setActionLabel('')
     setErrorText('')
+    setActionError('')
+    clearTransientErrorTimer()
     setCopied(false)
     setShowActions(false)
     setResultHistory([])
@@ -74,7 +107,14 @@ export function RecordingPill(): JSX.Element {
       clearTimeout(postRecordingTimerRef.current)
       postRecordingTimerRef.current = null
     }
-  }, [])
+  }, [clearTransientErrorTimer])
+
+  // Hide the transient error notice. The main process collapses the window
+  // and sends recording-pill:hide, which resets the state.
+  const dismissTransientError = useCallback(() => {
+    clearTransientErrorTimer()
+    window.tapwisper.recordingPill.hide()
+  }, [clearTransientErrorTimer])
 
   const dismiss = useCallback(() => {
     setState('done')
@@ -107,14 +147,17 @@ export function RecordingPill(): JSX.Element {
   const handleRunAction = useCallback(async (actionId: string, prompt: string, label: string) => {
     if (state === 'loading-ai' || !resultText) return
 
+    const previousLabel = actionLabel
+
     // Save current result to history
     setResultHistory((prev) => [{
       id: `${Date.now()}`,
-      actionName: actionLabel || 'Voice Command',
+      actionName: previousLabel || 'Voice Command',
       text: resultText
     }, ...prev])
 
     setActionLabel(label)
+    setActionError('')
     setState('loading-ai')
     setShowActions(false)
 
@@ -130,11 +173,24 @@ export function RecordingPill(): JSX.Element {
         llmInput: resultText,
         llmResult: newText
       })
-    } catch (err: any) {
-      console.error('Follow-up action failed:', err)
+    } catch (err) {
+      // Revert to the previous result: text was never replaced, so restore
+      // the label and drop the history entry pushed above.
+      setActionLabel(previousLabel)
+      setResultHistory((prev) => prev.slice(1))
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : t('common.unknownError', 'Unknown error')
+      setActionError(
+        t('recordingPill.actionFailed', '{{action}} failed: {{error}}', {
+          action: displayActionName(t, label),
+          error: message
+        })
+      )
       setState('result')
     }
-  }, [state, resultText, actionLabel, addAIAction, addLLMAction])
+  }, [state, resultText, actionLabel, addAIAction, addLLMAction, t])
 
   // Revert to a previous version
   const handleRevert = useCallback((index: number) => {
@@ -174,16 +230,18 @@ export function RecordingPill(): JSX.Element {
     document.documentElement.classList.add('transparent')
 
     const unsubShow = window.tapwisper.on('recording-pill:show', () => {
-      setState('recording')
+      // A show can be delivered just after an error notice — don't replace it
+      setState((s) => (s === 'transient-error' ? s : 'recording'))
     })
 
     const unsubHide = window.tapwisper.on('recording-pill:hide', () => {
       setState('done')
       resetAll()
-      setTimeout(() => setState('hidden'), 250)
+      setTimeout(() => setState((s) => (s === 'done' ? 'hidden' : s)), 250)
     })
 
     const unsubStart = window.tapwisper.on('recording:start', () => {
+      clearTransientErrorTimer()
       if (postRecordingTimerRef.current) {
         clearTimeout(postRecordingTimerRef.current)
         postRecordingTimerRef.current = null
@@ -199,7 +257,7 @@ export function RecordingPill(): JSX.Element {
     const unsubCancel = window.tapwisper.on('recording:cancel', () => {
       setState('done')
       resetAll()
-      setTimeout(() => setState('hidden'), 250)
+      setTimeout(() => setState((s) => (s === 'done' ? 'hidden' : s)), 250)
     })
 
     const unsubWaveform = window.tapwisper.on('waveform:data', (data: unknown) => {
@@ -235,6 +293,24 @@ export function RecordingPill(): JSX.Element {
         setErrorText(msg)
         setState('error')
       }
+    })
+
+    // Transcription / trigger failure reported by the pinned panel. Can
+    // arrive at any time (no prior result-panel:loading). Shows a compact
+    // notice that auto-dismisses.
+    const unsubRecordingError = window.tapwisper.on('recording:error', (msg: unknown) => {
+      resetAll()
+      setErrorText(
+        typeof msg === 'string' && msg.trim()
+          ? msg
+          : i18n.t('recordingPill.genericError', 'Something went wrong')
+      )
+      setState('transient-error')
+      window.tapwisper.recordingPill.expand()
+      transientErrorTimerRef.current = setTimeout(() => {
+        transientErrorTimerRef.current = null
+        window.tapwisper.recordingPill.hide()
+      }, TRANSIENT_ERROR_MS)
     })
 
     const dismissPostRecording = (): void => {
@@ -273,13 +349,15 @@ export function RecordingPill(): JSX.Element {
       unsubLoading()
       unsubResult()
       unsubError()
+      unsubRecordingError()
       unsubPostRecording()
       unsubPostRecordingOpened()
       if (postRecordingTimerRef.current) clearTimeout(postRecordingTimerRef.current)
       if (animationRef.current) cancelAnimationFrame(animationRef.current)
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      clearTransientErrorTimer()
     }
-  }, [resetAll])
+  }, [resetAll, clearTransientErrorTimer])
 
   useEffect(() => {
     if (state === 'transcribing' || state === 'loading-ai') {
@@ -289,10 +367,17 @@ export function RecordingPill(): JSX.Element {
     }
   }, [state])
 
-  if (state === 'hidden') return <></>
-
   const isExiting = state === 'done'
   const showResultPanel = state === 'loading-ai' || state === 'result' || state === 'error'
+  const isTransientError = state === 'transient-error'
+
+  useOverlayHitRegion(
+    [pillBarRef, panelRef],
+    showResultPanel || isTransientError,
+    `${state}-${isFullExpanded}-${showActions}`
+  )
+
+  if (state === 'hidden') return <></>
 
   // Flatten all actions from all visible categories into a single list
   const flatActions = categories
@@ -302,6 +387,7 @@ export function RecordingPill(): JSX.Element {
       cat.actions.map((action) => ({
         id: action.id,
         label: action.label,
+        displayLabel: builtInActionLabel(t, action),
         prompt: action.prompt,
         color: CATEGORY_COLORS[cat.id] || cat.color
       }))
@@ -311,61 +397,101 @@ export function RecordingPill(): JSX.Element {
     <div className="w-full flex flex-col items-center no-select overflow-hidden" style={{ height: '100vh' }}>
       {/* ── Top pill bar ── */}
       <div
-        onClick={state === 'post-recording' ? handleOpenActions : undefined}
+        ref={pillBarRef}
+        onClick={
+          state === 'post-recording'
+            ? handleOpenActions
+            : isTransientError
+              ? dismissTransientError
+              : undefined
+        }
         className={`
           shrink-0 flex items-center justify-center gap-3 px-4 py-1.5
-          bg-[#0A0A0A]/95 rounded-full pill-shadow
+          bg-capsule/95 border border-white/[0.08] rounded-full pill-shadow
           transition-all duration-300 ease-out
-          ${state === 'post-recording' ? 'cursor-pointer hover:bg-[#1A1A1A]/95' : ''}
+          ${state === 'post-recording' || isTransientError ? 'cursor-pointer hover:bg-capsule' : ''}
+          ${isTransientError ? 'border border-[#F2857A]/40' : ''}
           ${isExiting ? 'opacity-0 scale-75' : 'opacity-100 scale-100 animate-scale-up'}
         `}
         style={{ height: 44 }}
       >
         {state === 'post-recording' ? (
           <div className="flex items-center gap-2 px-1">
-            <svg className="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-capsule-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
-            <span className="text-[11px] text-white/60 font-medium">AI Actions</span>
+            <span className="text-[11px] text-white/60 font-medium">
+              {t('commandPopup.title', 'AI Actions')}
+            </span>
           </div>
         ) : state === 'loading-ai' ? (
           <div className="flex items-center gap-2.5 px-1">
             <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
-            <span className="text-[11px] text-white/60 font-medium">Processing...</span>
+            <span className="text-[11px] text-white/60 font-medium">
+              {t('recordingPill.processing', 'Processing...')}
+            </span>
           </div>
-        ) : (state === 'result' || state === 'error') ? (
+        ) : (state === 'result' || state === 'error' || isTransientError) ? (
           <div className="flex items-center gap-2 px-1">
             {state === 'result' ? (
-              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="w-4 h-4 text-[#6FCF9C]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="w-4 h-4 text-[#F2857A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
               </svg>
             )}
             <span className="text-[12px] text-white/70 font-medium">
-              {state === 'result' ? 'Done' : 'Error'}
+              {state === 'result'
+                ? t('recordingPill.done', 'Done')
+                : t('recordingPill.error', 'Error')}
             </span>
           </div>
         ) : (
-          <WaveformBars
-            data={waveformData}
-            barCount={7}
-            barWidth={3}
-            maxHeight={22}
-            color={state === 'transcribing' ? 'rgba(255,255,255,0.4)' : '#FFFFFF'}
-            animated={state === 'recording'}
-            settled={state === 'transcribing'}
-          />
+          <div className="flex items-center gap-2.5">
+            {state === 'recording' && (
+              <span aria-hidden="true" className="w-2 h-2 rounded-full bg-ember" />
+            )}
+            <WaveformBars
+              data={waveformData}
+              barCount={7}
+              barWidth={3}
+              maxHeight={22}
+              color={state === 'transcribing' ? 'rgba(255,255,255,0.4)' : 'rgb(var(--capsule-signal))'}
+              animated={state === 'recording'}
+              settled={state === 'transcribing'}
+            />
+          </div>
         )}
       </div>
+
+      {/* ── Transient error notice (transcription / trigger failure) ── */}
+      {isTransientError && (
+        <div
+          ref={panelRef}
+          role="alert"
+          onClick={dismissTransientError}
+          className="mt-2 w-[340px] max-w-[calc(100%-16px)] flex items-start gap-2.5 px-4 py-3 bg-capsule/95 border border-white/[0.08] rounded-2xl pill-shadow border border-[#F2857A]/30 cursor-pointer animate-slide-down"
+        >
+          <svg className="w-4 h-4 mt-0.5 shrink-0 text-[#F2857A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-[#F5A39A] leading-relaxed line-clamp-4 break-words">{errorText}</p>
+            <p className="mt-1 text-[10px] text-white/30">
+              {t('recordingPill.clickToDismiss', 'Click to dismiss')}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Result Panel (slides in below pill) ── */}
       {showResultPanel && (
         <div
+          ref={panelRef}
           className={`
-            mt-2 bg-[#0A0A0A]/95 rounded-2xl pill-shadow
+            mt-2 bg-capsule/95 border border-white/[0.08] rounded-2xl pill-shadow
             transition-all duration-300 ease-out
             animate-slide-down overflow-hidden flex flex-col
             ${isFullExpanded ? 'w-full max-w-[500px]' : 'w-[380px]'}
@@ -379,13 +505,17 @@ export function RecordingPill(): JSX.Element {
               {state === 'result' && actionLabel ? (
                 <div className="flex items-center gap-1.5">
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/8 border border-white/10">
-                    <svg className="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-3 h-3 text-capsule-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    <span className="text-[11px] font-medium text-white/60">{actionLabel}</span>
+                    <span className="text-[11px] font-medium text-white/60">
+                      {displayActionName(t, actionLabel)}
+                    </span>
                   </div>
                   {resultHistory.length > 0 && (
-                    <span className="text-[10px] text-white/30">latest</span>
+                    <span className="text-[10px] text-white/30">
+                      {t('recordingPill.latest', 'latest')}
+                    </span>
                   )}
                 </div>
               ) : <div />}
@@ -393,21 +523,28 @@ export function RecordingPill(): JSX.Element {
               <button
                 onClick={handleToggleFullExpand}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/40 hover:text-white/80 transition-all cursor-pointer shrink-0"
-                title={isFullExpanded ? 'Collapse' : 'Expand to read'}
+                title={
+                  isFullExpanded
+                    ? t('aiPanel.collapse', 'Collapse')
+                    : t('recordingPill.expandToRead', 'Expand to read')
+                }
+                aria-expanded={isFullExpanded}
               >
                 {isFullExpanded ? (
                   <>
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 14h6m0 0v6m0-6L3 21M20 10h-6m0 0V4m0 6l7-7" />
                     </svg>
-                    <span className="text-[10px] font-medium">Collapse</span>
+                    <span className="text-[10px] font-medium">
+                      {t('aiPanel.collapse', 'Collapse')}
+                    </span>
                   </>
                 ) : (
                   <>
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 3h6m0 0v6m0-6l-7 7M9 21H3m0 0v-6m0 6l7-7" />
                     </svg>
-                    <span className="text-[10px] font-medium">Expand</span>
+                    <span className="text-[10px] font-medium">{t('aiPanel.expand', 'Expand')}</span>
                   </>
                 )}
               </button>
@@ -423,14 +560,16 @@ export function RecordingPill(): JSX.Element {
               <div className="flex flex-col items-center justify-center py-6 gap-3">
                 {actionLabel && (
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/8 border border-white/10">
-                    <svg className="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-3 h-3 text-capsule-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    <span className="text-[11px] font-medium text-white/60">{actionLabel}</span>
+                    <span className="text-[11px] font-medium text-white/60">
+                      {displayActionName(t, actionLabel)}
+                    </span>
                   </div>
                 )}
                 <div className="w-6 h-6 rounded-full border-2 border-white/15 border-t-white/70 animate-spin" />
-                <p className="text-xs text-white/40">Thinking...</p>
+                <p className="text-xs text-white/40">{t('recording.thinking', 'Thinking...')}</p>
               </div>
             )}
 
@@ -446,18 +585,22 @@ export function RecordingPill(): JSX.Element {
                   <div className="space-y-1.5 pt-1">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 border-t border-white/10" />
-                      <span className="text-[9px] text-white/25 uppercase tracking-wider">Previous</span>
+                      <span className="text-[9px] text-white/25 uppercase tracking-wider">
+                        {t('recordingPill.previous', 'Previous')}
+                      </span>
                       <div className="flex-1 border-t border-white/10" />
                     </div>
                     {resultHistory.map((entry, idx) => (
                       <div key={entry.id} className="group">
                         <div className="flex items-center gap-1.5 mb-0.5">
-                          <span className="text-[10px] text-white/30">{entry.actionName}</span>
+                          <span className="text-[10px] text-white/30">
+                            {displayActionName(t, entry.actionName)}
+                          </span>
                           <button
                             onClick={() => handleRevert(idx)}
-                            className="opacity-0 group-hover:opacity-100 text-[10px] text-sky-400 hover:text-sky-300 transition-all"
+                            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[10px] text-capsule-signal hover:text-capsule-signal/80 transition-all"
                           >
-                            Revert
+                            {t('recordingPill.revert', 'Revert')}
                           </button>
                         </div>
                         <p className="text-xs text-white/40 leading-relaxed line-clamp-2">{entry.text}</p>
@@ -469,8 +612,26 @@ export function RecordingPill(): JSX.Element {
             )}
 
             {state === 'error' && (
-              <div className="py-2">
-                <p className="text-xs text-red-400/90 leading-relaxed">{errorText}</p>
+              <div className="py-2" role="alert">
+                <p className="text-xs text-[#F2857A] leading-relaxed">{errorText}</p>
+              </div>
+            )}
+
+            {state === 'result' && actionError && (
+              <div
+                role="alert"
+                className="mt-2.5 flex items-start gap-2 px-3 py-2 rounded-xl bg-[#F2857A]/10 border border-[#F2857A]/25"
+              >
+                <p className="flex-1 text-[11px] text-[#F5A39A] leading-relaxed break-words">{actionError}</p>
+                <button
+                  onClick={() => setActionError('')}
+                  aria-label={t('recordingPill.dismissError', 'Dismiss error')}
+                  className="shrink-0 text-[#F5A39A]/60 hover:text-[#F5A39A] transition-colors cursor-pointer"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             )}
           </div>
@@ -489,14 +650,19 @@ export function RecordingPill(): JSX.Element {
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      <span className="text-[11px] font-medium">Apply another action</span>
+                      <span className="text-[11px] font-medium">
+                        {t('recordingPill.applyAnother', 'Apply another action')}
+                      </span>
                     </button>
                   ) : (
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Actions</span>
+                        <span className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">
+                          {t('nav.actions', 'Actions')}
+                        </span>
                         <button
                           onClick={() => setShowActions(false)}
+                          aria-label={t('recordingPill.closeActions', 'Close actions')}
                           className="text-white/30 hover:text-white/60 transition-all cursor-pointer"
                         >
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -516,7 +682,7 @@ export function RecordingPill(): JSX.Element {
                               color: action.color
                             }}
                           >
-                            {action.label}
+                            {action.displayLabel}
                           </button>
                         ))}
                       </div>
@@ -531,9 +697,9 @@ export function RecordingPill(): JSX.Element {
                   <>
                     <button
                       onClick={handleAccept}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-full bg-white/90 hover:bg-white text-black text-xs font-semibold transition-all cursor-pointer"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-full bg-white hover:bg-white/90 text-capsule text-xs font-semibold transition-all cursor-pointer"
                     >
-                      Confirm
+                      {t('common.confirm', 'Confirm')}
                     </button>
 
                     <button
@@ -542,17 +708,17 @@ export function RecordingPill(): JSX.Element {
                     >
                       {copied ? (
                         <>
-                          <svg className="w-3.5 h-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <svg className="w-3.5 h-3.5 text-[#6FCF9C]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
-                          Copied
+                          {t('aiPanel.copied', 'Copied')}
                         </>
                       ) : (
                         <>
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                           </svg>
-                          Copy
+                          {t('aiPanel.copy', 'Copy')}
                         </>
                       )}
                     </button>
@@ -561,6 +727,8 @@ export function RecordingPill(): JSX.Element {
 
                 <button
                   onClick={dismiss}
+                  aria-label={t('common.close', 'Close')}
+                  title={t('common.close', 'Close')}
                   className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/50 hover:text-white/80 transition-all cursor-pointer"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

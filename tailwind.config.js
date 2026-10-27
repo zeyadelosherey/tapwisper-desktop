@@ -5,47 +5,93 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        sky: {
-          accent: '#7EB6E0'
+        // "Paper & Signal" semantic tokens (see src/renderer/styles/globals.css)
+        canvas: 'rgb(var(--canvas) / <alpha-value>)',
+        raised: 'rgb(var(--raised) / <alpha-value>)',
+        panel: 'rgb(var(--panel) / <alpha-value>)',
+        sunken: 'rgb(var(--sunken) / <alpha-value>)',
+        hover: 'rgb(var(--hover) / <alpha-value>)',
+        hairline: {
+          DEFAULT: 'rgb(var(--hairline) / <alpha-value>)',
+          strong: 'rgb(var(--hairline-strong) / <alpha-value>)'
         },
-        cream: '#F8F6F1',
-        dark: {
-          bg: '#000000',
-          surface: '#202020',
-          card: '#0E0E0E',
-          border: '#262626',
-          primary: '#000000'
+        ink: {
+          DEFAULT: 'rgb(var(--ink) / <alpha-value>)',
+          muted: 'rgb(var(--ink-muted) / <alpha-value>)',
+          soft: 'rgb(var(--ink-soft) / <alpha-value>)',
+          faint: 'rgb(var(--ink-faint) / <alpha-value>)'
+        },
+        signal: {
+          DEFAULT: 'rgb(var(--signal) / <alpha-value>)',
+          strong: 'rgb(var(--signal-strong) / <alpha-value>)',
+          tint: 'rgb(var(--signal-tint) / <alpha-value>)'
+        },
+        'on-signal': 'rgb(var(--on-signal) / <alpha-value>)',
+        ember: 'rgb(var(--ember) / <alpha-value>)',
+        danger: {
+          DEFAULT: 'rgb(var(--danger) / <alpha-value>)',
+          tint: 'rgb(var(--danger-tint) / <alpha-value>)'
+        },
+        success: {
+          DEFAULT: 'rgb(var(--success) / <alpha-value>)',
+          tint: 'rgb(var(--success-tint) / <alpha-value>)'
+        },
+        warning: {
+          DEFAULT: 'rgb(var(--warning) / <alpha-value>)',
+          tint: 'rgb(var(--warning-tint) / <alpha-value>)'
+        },
+        capsule: {
+          DEFAULT: 'rgb(var(--capsule) / <alpha-value>)',
+          signal: 'rgb(var(--capsule-signal) / <alpha-value>)'
+        },
+        // Older names, kept as aliases of the tokens above
+        sky: {
+          accent: 'rgb(var(--signal) / <alpha-value>)'
         },
         green: {
-          accent: '#4DC778'
+          accent: 'rgb(var(--success) / <alpha-value>)'
         },
         recording: {
-          red: '#F04545'
+          red: 'rgb(var(--danger) / <alpha-value>)'
         },
-        input: {
-          bg: '#F5F5F5'
-        },
-        // Theme-aware colors (switch automatically between light/dark)
-        // Uses rgb channel format for Tailwind opacity modifier support (e.g. bg-theme-bg/50)
         theme: {
           bg: 'rgb(var(--color-theme-bg) / <alpha-value>)',
           surface: 'rgb(var(--color-theme-surface) / <alpha-value>)',
           card: 'rgb(var(--color-theme-card) / <alpha-value>)',
           border: 'rgb(var(--color-theme-border) / <alpha-value>)',
           text: 'rgb(var(--color-theme-text) / <alpha-value>)',
-          'text-secondary': 'rgb(var(--color-theme-text-secondary) / var(--tw-text-secondary-alpha))',
-          'text-tertiary': 'rgb(var(--color-theme-text-tertiary) / var(--tw-text-tertiary-alpha))',
-          'text-muted': 'rgb(var(--color-theme-text-muted) / var(--tw-text-muted-alpha))'
+          'text-secondary': 'rgb(var(--color-theme-text-secondary) / <alpha-value>)',
+          'text-tertiary': 'rgb(var(--color-theme-text-tertiary) / <alpha-value>)',
+          'text-muted': 'rgb(var(--color-theme-text-muted) / <alpha-value>)'
         }
+      },
+      // Extra steps used across the UI (e.g. bg-sky-accent/8, bg-white/12)
+      // that aren't on Tailwind's default 5%-step opacity scale.
+      opacity: {
+        8: '0.08',
+        12: '0.12',
+        45: '0.45'
+      },
+      spacing: {
+        4.5: '1.125rem'
       },
       borderRadius: {
         panel: '12px',
-        pill: '20px'
+        pill: '20px',
+        sheet: '20px'
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        serif: ['Georgia', 'Cambria', 'Times New Roman', 'Times', 'serif'],
-        arabic: ['SF Arabic', 'Geeza Pro', 'Arial', 'sans-serif']
+        sans: [
+          'Inter Variable',
+          'IBM Plex Sans Arabic',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'sans-serif'
+        ],
+        serif: ['Fraunces Variable', 'IBM Plex Sans Arabic', 'Georgia', 'serif'],
+        arabic: ['IBM Plex Sans Arabic', 'Inter Variable', 'system-ui', 'sans-serif']
       },
       animation: {
         'pulse-ring': 'pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -56,7 +102,10 @@ module.exports = {
         'scale-up': 'scale-up 0.2s ease-out',
         'slide-up': 'slide-up 0.3s ease-out',
         'breathe': 'breathe 2s ease-in-out infinite',
-        'slide-down': 'slide-down 0.3s ease-out'
+        'slide-down': 'slide-down 0.3s ease-out',
+        rise: 'rise 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) backwards',
+        'wave-drift': 'wave-drift 6s linear infinite',
+        'live-pulse': 'live-pulse 1.6s ease-in-out infinite'
       },
       keyframes: {
         'pulse-ring': {
@@ -94,6 +143,18 @@ module.exports = {
         'slide-down': {
           '0%': { transform: 'translateY(-8px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' }
+        },
+        rise: {
+          '0%': { transform: 'translateY(6px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' }
+        },
+        'wave-drift': {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' }
+        },
+        'live-pulse': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.45' }
         }
       }
     }

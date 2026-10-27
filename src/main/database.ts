@@ -35,7 +35,18 @@ export interface ActivityRecord {
   llmAction?: string
   llmInput?: string
   llmResult?: string
+  /** Transcript before dictionary/Smart Formatting, when it differs */
+  rawTranscription?: string
+  /** App the text was dictated into */
+  appName?: string
+  /** Detected/selected spoken language (ISO-639-1), when known */
+  language?: string
 }
+
+/** Fields that may be changed after a record is created (e.g. re-transcription) */
+export type ActivityRecordUpdate = Partial<
+  Pick<ActivityRecord, 'transcription' | 'rawTranscription' | 'wordCount' | 'language' | 'llmResult'>
+>
 
 // ── Database Instance ─────────────────────────────────────────────
 let db: Database.Database | null = null
@@ -68,14 +79,31 @@ export function initDatabase(): Database.Database {
   // Enable WAL mode for better concurrency and performance
   db.pragma('journal_mode = WAL')
   db.pragma('synchronous = NORMAL') // Faster writes, still safe
-  db.pragma('cache_size = 10000') // 10MB cache
+  db.pragma('cache_size = -4000') // 4MB page cache (the database is small)
   db.pragma('temp_store = MEMORY')
-  db.pragma('mmap_size = 268435456') // 256MB memory-mapped I/O (sufficient for app-sized DB)
+  db.pragma('mmap_size = 67108864') // 64MB memory-mapped I/O (app-sized database)
 
   // Create schema
   createSchema(db)
+  migrateSchema(db)
 
   return db
+}
+
+/**
+ * Additive column migrations for databases created by older versions
+ */
+function migrateSchema(database: Database.Database): void {
+  const columns = new Set(
+    (database.prepare('PRAGMA table_info(activity_records)').all() as { name: string }[]).map(
+      (c) => c.name
+    )
+  )
+  for (const column of ['rawTranscription', 'appName', 'language']) {
+    if (!columns.has(column)) {
+      database.exec(`ALTER TABLE activity_records ADD COLUMN ${column} TEXT`)
+    }
+  }
 }
 
 /**
@@ -194,7 +222,7 @@ export function updateStats(data: Partial<StatsData>): void {
   const database = getDatabase()
   
   const updates: string[] = []
-  const values: any[] = []
+  const values: Array<string | number> = []
   
   // Build dynamic UPDATE query
   for (const [key, value] of Object.entries(data)) {
@@ -256,6 +284,58 @@ export function getActivityRecords(limit = 100): ActivityRecord[] {
   return stmt.all(limit) as ActivityRecord[]
 }
 
+export interface ActivityQuery {
+  /** Number of records to skip (for paging). Default 0. */
+  offset?: number
+  /** Page size. Default 25, max 500. */
+  limit?: number
+  /** Case-insensitive substring matched against text fields. */
+  search?: string
+}
+
+export interface ActivityQueryResult {
+  records: ActivityRecord[]
+  /** Total number of records matching the search (ignores offset/limit). */
+  total: number
+}
+
+/**
+ * Paged + searchable activity query, newest first. Search matches the
+ * transcription, LLM action, LLM input and LLM result.
+ */
+export function queryActivityRecords(query: ActivityQuery = {}): ActivityQueryResult {
+  const database = getDatabase()
+
+  const offset = Math.max(0, Math.floor(Number(query.offset) || 0))
+  const limit = Math.min(500, Math.max(0, Math.floor(Number(query.limit ?? 25) || 0)))
+  const search = typeof query.search === 'string' ? query.search.trim() : ''
+
+  let where = ''
+  const params: string[] = []
+  if (search) {
+    // Escape LIKE wildcards so user input is matched literally
+    const pattern = `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+    const fields = ['transcription', 'llmAction', 'llmInput', 'llmResult']
+    where = `WHERE ${fields.map((f) => `IFNULL(${f}, '') LIKE ? ESCAPE '\\'`).join(' OR ')}`
+    params.push(...fields.map(() => pattern))
+  }
+
+  const { total } = database
+    .prepare(`SELECT COUNT(*) as total FROM activity_records ${where}`)
+    .get(...params) as { total: number }
+
+  const records =
+    limit > 0
+      ? (database
+          .prepare(
+            `SELECT * FROM activity_records ${where} ORDER BY timestamp DESC LIMIT ? OFFSET ?`
+          )
+          .all(...params, limit, offset) as ActivityRecord[])
+      : []
+
+  return { records, total }
+}
+
 /**
  * Add new activity record
  */
@@ -265,8 +345,8 @@ export function addActivityRecord(record: ActivityRecord): void {
   const stmt = database.prepare(`
     INSERT INTO activity_records (
       id, timestamp, type, transcription, durationSeconds, wordCount,
-      llmAction, llmInput, llmResult
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      llmAction, llmInput, llmResult, rawTranscription, appName, language
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   
   stmt.run(
@@ -278,8 +358,30 @@ export function addActivityRecord(record: ActivityRecord): void {
     record.wordCount,
     record.llmAction || null,
     record.llmInput || null,
-    record.llmResult || null
+    record.llmResult || null,
+    record.rawTranscription || null,
+    record.appName || null,
+    record.language || null
   )
+}
+
+/**
+ * Update mutable fields of an activity record
+ */
+export function updateActivityRecord(id: string, update: ActivityRecordUpdate): void {
+  const allowed: (keyof ActivityRecordUpdate)[] = [
+    'transcription',
+    'rawTranscription',
+    'wordCount',
+    'language',
+    'llmResult'
+  ]
+  const entries = allowed.filter((k) => update[k] !== undefined).map((k) => [k, update[k]] as const)
+  if (entries.length === 0) return
+  const sets = entries.map(([k]) => `${k} = ?`).join(', ')
+  getDatabase()
+    .prepare(`UPDATE activity_records SET ${sets} WHERE id = ?`)
+    .run(...entries.map(([, v]) => v ?? null), id)
 }
 
 /**
@@ -334,7 +436,7 @@ export function getActivityStats(startDate: number, endDate: number): {
     WHERE timestamp >= ? AND timestamp <= ?
   `)
   
-  return stmt.get(startDate, endDate) as any
+  return stmt.get(startDate, endDate) as ReturnType<typeof getActivityStats>
 }
 
 /**
@@ -352,7 +454,17 @@ export interface WeeklyStatsFromActivity {
   aiTimeSavedSeconds: number
   weekStartDate: string
   dailyStats: Array<{ voiceSeconds: number; aiActions: number; wordCount: number; timeSavedSeconds: number }>
-  recentActivity: Array<{ id: string; type: 'voice' | 'ai'; description: string; timestamp: number; value?: string }>
+  recentActivity: Array<{
+    id: string
+    type: 'voice' | 'ai'
+    description: string
+    timestamp: number
+    value?: string
+    words?: number
+    seconds?: number
+    action?: string
+    chars?: number
+  }>
 }
 
 /**
@@ -423,7 +535,9 @@ export function getWeeklyStatsFromActivity(): WeeklyStatsFromActivity {
         type: 'ai',
         description: `AI Action: ${(r.llmAction || 'general').replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}`,
         timestamp: r.timestamp,
-        value: `${r.llmResult.length} chars`
+        value: `${r.llmResult.length} chars`,
+        action: r.llmAction || 'general',
+        chars: r.llmResult.length
       })
     } else {
       const typingSeconds = words > 0 ? (words / TYPING_WPM) * 60 : 0
@@ -438,7 +552,9 @@ export function getWeeklyStatsFromActivity(): WeeklyStatsFromActivity {
         type: 'voice',
         description: `Transcribed ${words} words`,
         timestamp: r.timestamp,
-        value: `${Math.round(secs)}s`
+        value: `${Math.round(secs)}s`,
+        words,
+        seconds: Math.round(secs)
       })
     }
   }

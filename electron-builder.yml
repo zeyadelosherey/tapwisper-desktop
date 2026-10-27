@@ -17,6 +17,7 @@ mac:
   extendInfo:
     NSMicrophoneUsageDescription: "TapWisper needs microphone access for voice dictation."
     NSAppleEventsUsageDescription: "TapWisper needs accessibility access for global shortcuts and text insertion."
+    NSAudioCaptureUsageDescription: "TapWisper records meeting audio so it can transcribe and summarize your calls."
   notarize: false
   # Do NOT pin arch here. With multiple archs listed, electron-builder rebuilds
   # native modules for every configured arch even when the CLI passes `--arm64`

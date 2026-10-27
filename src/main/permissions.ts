@@ -49,6 +49,12 @@ export function checkPermissions(): PermissionResult {
 }
 
 function checkMicrophonePermission(): PermissionStatus {
+  // systemPreferences.getMediaAccessStatus is only implemented on macOS and
+  // Windows. Linux has no OS-level microphone permission gate that Electron
+  // can query (access is mediated by PulseAudio/PipeWire or the portal when
+  // getUserMedia runs), so treat it as granted to avoid blocking onboarding.
+  if (process.platform === 'linux') return 'granted'
+
   try {
     const status = systemPreferences.getMediaAccessStatus('microphone')
     return normalizeStatus(status)
@@ -158,7 +164,8 @@ async function requestMicrophonePermission(
     return { status: current, action: 'use-renderer' }
   }
 
-  // Linux: similar to Windows — getUserMedia triggers the prompt
+  // Linux: no OS-level permission to query; getUserMedia in the renderer
+  // surfaces any sandbox/portal prompt.
   return { status: checkMicrophonePermission(), action: 'use-renderer' }
 }
 
