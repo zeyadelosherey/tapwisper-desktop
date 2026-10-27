@@ -7,6 +7,11 @@ export interface ActionCategory {
   isVisible: boolean
   order: number
   actions: ActionItem[]
+  /**
+   * Built-in actions the user has hidden. Overlays only read `actions`, so an
+   * action moved here disappears from the toolbar and panels until restored.
+   */
+  hiddenActions?: ActionItem[]
 }
 
 export interface ActionItem {
