@@ -10,6 +10,7 @@ import {
   Sparkles,
   LayoutGrid,
   Settings as SettingsIcon,
+  Users,
   type LucideProps
 } from 'lucide-react'
 import appLogo from '../assets/logo.png'
@@ -22,6 +23,8 @@ import { Snippets } from './snippets'
 import { Dictionary } from './dictionary'
 import { Style } from './style'
 import { Settings, type SettingsTab } from './settings'
+import { Meetings } from './meetings'
+import { MeetingBanners } from '../components/meeting/meeting-banners'
 import { Onboarding } from './onboarding'
 import { useStatsStore } from '../store/stats'
 import { useRecordShortcut } from '../hooks/use-record-shortcut'
@@ -30,6 +33,7 @@ import { Spinner } from '../components/ui/primitives'
 
 export type Page =
   | 'home'
+  | 'meetings'
   | 'dictionary'
   | 'snippets'
   | 'style'
@@ -50,6 +54,7 @@ interface NavItem {
 
 const MAIN_NAV: NavItem[] = [
   { id: 'home', labelKey: 'nav.home', icon: HomeIcon },
+  { id: 'meetings', labelKey: 'nav.meetings', icon: Users },
   { id: 'dictionary', labelKey: 'nav.dictionary', icon: BookA },
   { id: 'snippets', labelKey: 'nav.snippets', icon: TextQuote },
   { id: 'style', labelKey: 'nav.style', icon: Feather },
@@ -107,6 +112,7 @@ export function MainWindow(): JSX.Element {
   const { t, i18n } = useTranslation()
   const [activePage, setActivePage] = useState<Page>('home')
   const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(undefined)
+  const [meetingId, setMeetingId] = useState<string | undefined>(undefined)
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState('')
   const loadStats = useStatsStore((s) => s.loadStats)
@@ -168,7 +174,18 @@ export function MainWindow(): JSX.Element {
 
   const navigate: Navigate = useCallback((page, tab) => {
     setSettingsTab(tab)
+    setMeetingId(undefined)
     setActivePage(page)
+  }, [])
+
+  // The notepad's "Open in TapWisper" shows a meeting here
+  useEffect(() => {
+    return window.tapwisper.on('meetings:open', (id: unknown) => {
+      if (typeof id !== 'string') return
+      setSettingsTab(undefined)
+      setMeetingId(id)
+      setActivePage('meetings')
+    })
   }, [])
 
   const selectPage = useCallback((page: Page) => navigate(page), [navigate])
@@ -177,6 +194,8 @@ export function MainWindow(): JSX.Element {
     switch (activePage) {
       case 'home':
         return <Home />
+      case 'meetings':
+        return <Meetings initialMeetingId={meetingId} />
       case 'dictionary':
         return <Dictionary />
       case 'style':
@@ -295,8 +314,15 @@ export function MainWindow(): JSX.Element {
         >
           {/* Frameless title bar (macOS): keep the window draggable from the top */}
           {IS_MAC && <div className="drag-region absolute inset-x-0 top-0 z-10 h-7" />}
-          <div key={`${activePage}-${settingsTab ?? ''}`} className="h-full overflow-y-auto">
-            {renderPage()}
+          <div className="flex h-full flex-col">
+            <MeetingBanners />
+            <div
+              id="main-scroll"
+              key={`${activePage}-${settingsTab ?? ''}-${meetingId ?? ''}`}
+              className="min-h-0 flex-1 overflow-y-auto"
+            >
+              {renderPage()}
+            </div>
           </div>
         </main>
       </div>

@@ -20,7 +20,8 @@ import {
   ShieldCheck,
   BookA,
   ArrowRight,
-  Lock
+  Lock,
+  Users
 } from 'lucide-react'
 import { updateDirection } from '../i18n'
 import { testApiKey, type KeyProvider, type KeyTestResult } from '../services/key-test'
@@ -48,10 +49,12 @@ import {
 import { ShortcutPicker } from '../components/shortcut-picker'
 import { SpeechLanguagePicker } from '../components/speech-language-picker'
 import { MicrophonePicker } from '../components/microphone-picker'
+import { NotetakerSettings } from '../components/meeting/notetaker-settings'
+import { LanguageSelect } from '../components/meeting/translate-control'
 import type { Navigate } from './main-window'
 
 type Theme = 'system' | 'dark' | 'light'
-export type SettingsTab = 'general' | 'speech' | 'ai-provider' | 'shortcuts' | 'about'
+export type SettingsTab = 'general' | 'speech' | 'notetaker' | 'ai-provider' | 'shortcuts' | 'about'
 type ProviderSubTab = 'ai' | 'transcription'
 
 // ── Provider Logos (inline SVGs) ────────────────────────────────
@@ -439,6 +442,12 @@ const TABS: { id: SettingsTab; labelKey: string; fallback: string; icon: ReactNo
     icon: <Mic className="h-4 w-4" />
   },
   {
+    id: 'notetaker',
+    labelKey: 'settings.tabNotetaker',
+    fallback: 'Notetaker',
+    icon: <Users className="h-4 w-4" />
+  },
+  {
     id: 'ai-provider',
     labelKey: 'settings.tabAIProvider',
     fallback: 'AI Provider',
@@ -663,6 +672,7 @@ export function Settings({
   const [microphoneId, setMicrophoneId] = useState('')
   const [keepMicWarm, setKeepMicWarm] = useState(false)
   const [keepRecordings, setKeepRecordings] = useState(true)
+  const [dictationTranslateTo, setDictationTranslateTo] = useState('')
 
   // AI Provider
   const [providerSubTab, setProviderSubTab] = useState<ProviderSubTab>('ai')
@@ -714,10 +724,27 @@ export function Settings({
       window.tapwisper.store.get('speechLanguages'),
       window.tapwisper.store.get('keepMicWarm'),
       window.tapwisper.store.get('microphoneDeviceId'),
-      window.tapwisper.store.get('keepRecordings')
+      window.tapwisper.store.get('keepRecordings'),
+      window.tapwisper.store.get('dictationTranslateTo')
     ]).then(
-      ([lang, th, auto, platform, llm, voice, keys, mdls, vMdls, sLangs, warm, mic, keepRec]) => {
+      ([
+        lang,
+        th,
+        auto,
+        platform,
+        llm,
+        voice,
+        keys,
+        mdls,
+        vMdls,
+        sLangs,
+        warm,
+        mic,
+        keepRec,
+        tr
+      ]) => {
         setSpeechLanguages(normalizeSpeechLanguages(sLangs))
+        if (typeof tr === 'string') setDictationTranslateTo(tr)
         if (typeof warm === 'boolean') setKeepMicWarm(warm)
         if (typeof mic === 'string') setMicrophoneId(mic)
         if (typeof keepRec === 'boolean') setKeepRecordings(keepRec)
@@ -784,6 +811,11 @@ export function Settings({
   const handleKeepMicWarmChange = useCallback((value: boolean) => {
     setKeepMicWarm(value)
     window.tapwisper.store.set('keepMicWarm', value)
+  }, [])
+
+  const handleDictationTranslateChange = useCallback((code: string) => {
+    setDictationTranslateTo(code)
+    window.tapwisper.store.set('dictationTranslateTo', code)
   }, [])
 
   const handleKeepRecordingsChange = useCallback((value: boolean) => {
@@ -978,6 +1010,29 @@ export function Settings({
         )}
       >
         <SpeechLanguagePicker value={speechLanguages} onChange={handleSpeechLanguagesChange} />
+      </Section>
+
+      <Section title={t('settings.translation', 'Translation')}>
+        <RowGroup>
+          <Row
+            title={t('settings.dictationTranslate', 'Translate dictation into')}
+            description={t(
+              'settings.dictationTranslateHint',
+              'Speak in any language; TapWisper pastes the translation.'
+            )}
+            htmlFor="dictation-translate"
+            control={
+              <LanguageSelect
+                id="dictation-translate"
+                value={dictationTranslateTo}
+                onChange={handleDictationTranslateChange}
+                label={t('settings.dictationTranslate', 'Translate dictation into')}
+                offLabel={t('settings.translateOff', 'Off')}
+                className="h-8 w-44"
+              />
+            }
+          />
+        </RowGroup>
       </Section>
 
       <Section title={t('nav.dictionary', 'Dictionary')}>
@@ -1303,6 +1358,7 @@ export function Settings({
       <div key={activeTab} role="tabpanel" className="animate-rise">
         {activeTab === 'general' && renderGeneralTab()}
         {activeTab === 'speech' && renderSpeechTab()}
+        {activeTab === 'notetaker' && <NotetakerSettings />}
         {activeTab === 'ai-provider' && renderAIProviderTab()}
         {activeTab === 'shortcuts' && renderShortcutsTab()}
         {activeTab === 'about' && renderAboutTab()}
