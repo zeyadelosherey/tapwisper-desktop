@@ -1,4 +1,5 @@
 import type { AIRequest, AIResponse } from './ai-router'
+import { toChatMessages } from '../../shared/local-ai/catalog'
 
 const DEFAULT_MODEL = 'gpt-4.1'
 const API_BASE = 'https://api.openai.com/v1'
@@ -19,15 +20,7 @@ export async function processWithOpenAI(
 ): Promise<AIResponse> {
   const modelId = model || DEFAULT_MODEL
 
-  const messages = [
-    ...(request.systemInstruction
-      ? [{ role: 'system', content: request.systemInstruction }]
-      : []),
-    {
-      role: 'user',
-      content: `${request.prompt}\n\nText: ${request.text}`
-    }
-  ]
+  const messages = toChatMessages(request)
 
   const response = await fetch(`${API_BASE}/chat/completions`, {
     method: 'POST',

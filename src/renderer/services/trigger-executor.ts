@@ -83,8 +83,10 @@ async function executeAIChat(config: AIChatConfig, speechInput: string): Promise
       prompt: speechInput,
       text: '',
       systemInstruction: config.systemPrompt || 'You are a helpful AI assistant. Respond to the user\'s request concisely.',
-      providerOverride: config.provider,
-      modelOverride: config.model || undefined
+      ...(config.provider !== 'default' && {
+        providerOverride: config.provider,
+        modelOverride: config.model || undefined
+      })
     })
 
     const result = aiResult.result || ''

@@ -1,4 +1,14 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import type {
+  ChatInput,
+  DeviceProfile,
+  LocalAiResult,
+  LocalModelKind,
+  SelfHostedEndpoint,
+  SelfHostedTestResult,
+  SidecarStatus,
+  TranscribeInput
+} from '../shared/local-ai/types'
 
 export type IpcCallback = (...args: unknown[]) => void
 
@@ -335,6 +345,44 @@ const api = {
   context: {
     /** Frontmost app (null if unavailable, e.g. missing permission) */
     activeApp: (): Promise<ActiveAppInfo | null> => ipcRenderer.invoke('context:active-app')
+  },
+
+  // ── Local models (on-device whisper.cpp / llama.cpp) ────────────
+  // Progress and status arrive as `localAi:download-progress` / `localAi:status` events
+  localAi: {
+    profile: (): Promise<DeviceProfile> => ipcRenderer.invoke('localAi:profile'),
+    /** Ids of downloaded catalog models */
+    installed: (): Promise<string[]> => ipcRenderer.invoke('localAi:installed'),
+    status: (): Promise<SidecarStatus[]> => ipcRenderer.invoke('localAi:status'),
+    download: (id: string): Promise<LocalAiResult<void>> =>
+      ipcRenderer.invoke('localAi:download', id),
+    cancelDownload: (id: string): Promise<void> =>
+      ipcRenderer.invoke('localAi:cancel-download', id),
+    delete: (id: string): Promise<LocalAiResult<void>> => ipcRenderer.invoke('localAi:delete', id),
+    /** Load the active model ahead of the first request */
+    warmUp: (kind: LocalModelKind): Promise<LocalAiResult<void>> =>
+      ipcRenderer.invoke('localAi:warm-up', kind),
+    /** Clear a failed state so the next request starts the server again */
+    retry: (kind: LocalModelKind): Promise<void> => ipcRenderer.invoke('localAi:retry', kind),
+    transcribe: (input: TranscribeInput): Promise<LocalAiResult<string>> =>
+      ipcRenderer.invoke('localAi:transcribe', input),
+    chat: (input: ChatInput): Promise<LocalAiResult<string>> =>
+      ipcRenderer.invoke('localAi:chat', input),
+    chooseModelsDir: (): Promise<string | null> => ipcRenderer.invoke('localAi:choose-models-dir'),
+    openModelsDir: (): Promise<void> => ipcRenderer.invoke('localAi:open-models-dir')
+  },
+
+  // ── Self-hosted OpenAI-compatible servers ───────────────────────
+  selfHosted: {
+    test: (
+      kind: LocalModelKind,
+      target: SelfHostedEndpoint & { apiKey: string }
+    ): Promise<LocalAiResult<SelfHostedTestResult>> =>
+      ipcRenderer.invoke('selfHosted:test', kind, target),
+    transcribe: (input: TranscribeInput): Promise<LocalAiResult<string>> =>
+      ipcRenderer.invoke('selfHosted:transcribe', input),
+    chat: (input: ChatInput): Promise<LocalAiResult<string>> =>
+      ipcRenderer.invoke('selfHosted:chat', input)
   },
 
   // ── Trigger Actions ──────────────────────────────────────────────

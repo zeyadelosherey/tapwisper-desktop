@@ -4,6 +4,7 @@
 import type { TFunction } from 'i18next'
 import type { Meeting, MeetingSegment, SegmentSource } from '../models/meeting'
 import type { RecorderError } from '../hooks/use-meeting-recorder'
+import { LocalEngineError } from '../services/local-ai'
 
 /** `meetings:changed` payload for a deleted meeting */
 export interface DeletedMeeting {
@@ -74,6 +75,8 @@ export function meetingAIErrorMessage(t: TFunction, err: unknown): string {
       'This meeting is still being recorded — the summary is made when you stop.'
     )
   }
+  // Already translated, and its wording may mention API keys that aren't the cloud kind
+  if (err instanceof LocalEngineError) return message
   if (/api key/i.test(message)) {
     return t(
       'notepad.errorNoKey',
@@ -98,6 +101,11 @@ export function recorderErrorMessage(t: TFunction, error: RecorderError): string
       return t(
         'notepad.errorNoVoiceKey',
         'Add an API key for your voice provider in Settings → AI Provider to transcribe meetings.'
+      )
+    case 'engine-not-ready':
+      return t(
+        'notepad.errorEngineNotReady',
+        'Finish setting up Speech-to-Text in Settings to transcribe meetings.'
       )
     case 'transcription-failed':
       return t(

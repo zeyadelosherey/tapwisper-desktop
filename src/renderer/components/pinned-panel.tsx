@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { WaveformBars } from './waveform-bars'
 import { useAudio } from '../hooks/use-audio'
 import { transcribeAudio, processText } from '../services/ai-router'
+import { warmUpLocalModels } from '../services/local-ai'
 import type { Snippet } from '../models/snippet'
 import type { DictionaryEntry } from '../models/dictionary'
 import type { WritingStyles } from '../models/style'
@@ -374,6 +375,8 @@ export function PinnedPanel(): JSX.Element {
     recordingStartRef.current = uiStartTime
     isRecordingRef.current = true
     setState('recording')
+    // Local models load while the user is still speaking
+    void warmUpLocalModels('dictation')
 
     // Start actual recording (should be instant if permission already granted)
     try {

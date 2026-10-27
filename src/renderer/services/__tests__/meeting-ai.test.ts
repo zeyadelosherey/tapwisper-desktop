@@ -2,11 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { MeetingSegment as MeetingSegmentDTO } from '../../models/meeting'
 
 const processText = vi.fn()
-vi.mock('../ai-router', () => ({ processText: (...args: unknown[]) => processText(...args) }))
+let maxInputChars = 120_000
+vi.mock('../ai-router', () => ({
+  processText: (...args: unknown[]) => processText(...args),
+  getMaxInputChars: async () => maxInputChars
+}))
 
-const { transcriptToText, formatTimestamp, generateMeetingSummary, recapRecent } = await import(
-  '../meeting-ai'
-)
+const { transcriptToText, formatTimestamp, generateMeetingSummary, recapRecent, askMeeting } =
+  await import('../meeting-ai')
 
 function seg(source: 'you' | 'others', startMs: number, text: string): MeetingSegmentDTO {
   return { id: `${source}-${startMs}`, meetingId: 'm1', source, startMs, endMs: startMs + 5000, text }
@@ -14,6 +17,7 @@ function seg(source: 'you' | 'others', startMs: number, text: string): MeetingSe
 
 beforeEach(() => {
   processText.mockReset()
+  maxInputChars = 120_000
 })
 
 describe('formatTimestamp', () => {
@@ -57,6 +61,19 @@ describe('generateMeetingSummary', () => {
     expect(processText.mock.calls.length).toBeGreaterThanOrEqual(3)
   })
 
+  it('keeps every request within a small local model context', async () => {
+    maxInputChars = 2000
+    processText.mockResolvedValue({ result: 'note '.repeat(60), provider: 'local', model: 'm' })
+    const long = Array.from({ length: 200 }, (_, i) =>
+      seg(i % 2 ? 'you' : 'others', i * 5000, 'word '.repeat(20))
+    )
+    await generateMeetingSummary({ segments: long })
+    const texts = processText.mock.calls.map((c) => (c[0] as { text: string }).text)
+    // Notes from the first round were long again, so they were condensed once more
+    expect(texts.length).toBeGreaterThan(12)
+    for (const text of texts) expect(text.length).toBeLessThanOrEqual(2100)
+  })
+
   it('rejects an empty meeting', async () => {
     await expect(generateMeetingSummary({ segments: [] })).rejects.toThrow('empty-meeting')
   })
@@ -72,5 +89,18 @@ describe('recapRecent', () => {
     const sent = processText.mock.calls[0][0].text as string
     expect(sent).toContain('recent stuff')
     expect(sent).not.toContain('old stuff')
+  })
+})
+
+describe('askMeeting', () => {
+  it('sends only the most recent transcript that fits the model', async () => {
+    maxInputChars = 5000
+    processText.mockResolvedValue({ result: 'answer', provider: 'local', model: 'm' })
+    const long = Array.from({ length: 300 }, (_, i) => seg('others', i * 5000, `line ${i} here`))
+    await askMeeting('What was said last?', { segments: long })
+    const sent = processText.mock.calls[0][0].text as string
+    expect(sent.length).toBeLessThanOrEqual(5000)
+    expect(sent).toContain('line 299 here')
+    expect(sent).not.toContain('line 0 here')
   })
 })

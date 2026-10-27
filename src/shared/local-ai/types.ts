@@ -129,7 +129,9 @@ export interface ChatInput {
   prompt: string
   text: string
   systemInstruction?: string
+  /** Output token budget (default 2048) — raise for long outputs like meeting summaries */
   maxTokens?: number
+  /** Sampling temperature (default 0.7); use low values for faithful rewriting */
   temperature?: number
 }
 
