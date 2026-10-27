@@ -298,7 +298,7 @@ You can sponsor the project through GitHub Sponsors — every contribution helps
 
 If your company uses TapWisper and would like to sponsor the project, partner on features, or discuss enterprise support, we'd love to hear from you:
 
-- 📧 **Email**: [support@tapwisper.ai](mailto:support@tapwisper.ai)
+- 📧 **Email**: [zeyadelosherey@gmail.com](mailto:zeyadelosherey@gmail.com)
 - 💬 **GitHub Discussions**: [Start a conversation](https://github.com/zeyadelosherey/tapwisper-desktop/discussions)
 
 > Corporate sponsors get visibility on this README and priority feature discussions.
@@ -309,7 +309,7 @@ If your company uses TapWisper and would like to sponsor the project, partner on
 
 Have a question, found a bug, or want to request a feature?
 
-- 📧 **Email**: [support@tapwisper.ai](mailto:support@tapwisper.ai)
+- 📧 **Email**: [zeyadelosherey@gmail.com](mailto:zeyadelosherey@gmail.com)
 - 🐛 **Issues**: [GitHub Issues](https://github.com/zeyadelosherey/tapwisper-desktop/issues)
 
 ## 🤝 Contributing
