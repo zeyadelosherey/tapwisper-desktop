@@ -179,7 +179,7 @@ export class SidecarServer {
     const ended = new Promise<never>((_, reject) => {
       child.once('error', (err) => reject(new LocalAiError('server-failed', err.message)))
       child.once('exit', (code, signal) =>
-        reject(new LocalAiError('server-failed', `exited (${signal ?? code})`))
+        reject(new LocalAiError('server-failed', `exited (${signal ?? exitCodeText(code)})`))
       )
     })
     ended.catch(() => undefined)
@@ -192,7 +192,9 @@ export class SidecarServer {
       await this.terminate()
       const code = err instanceof LocalAiError ? err.code : 'server-failed'
       this.setState(this.crashes.length >= MAX_CRASHES ? 'failed' : 'stopped', { error: code })
-      throw new SidecarStartError(code, this.stderrTail || (err as Error).message)
+      // The exit code tells a crash (e.g. 0xC0000005 on Windows) from a reported error
+      const detail = [this.stderrTail.trim(), (err as Error).message].filter(Boolean).join('\n')
+      throw new SidecarStartError(code, detail)
     }
     this.setState('ready')
     return this.baseUrl
@@ -225,6 +227,11 @@ export class SidecarServer {
     this.status = { ...this.status, ...patch, state }
     this.onStatus(this.status)
   }
+}
+
+/** Windows crash codes are NTSTATUS values, readable in hex (0xC0000005) */
+function exitCodeText(code: number | null): string {
+  return code !== null && code > 0xffff ? `0x${code.toString(16).toUpperCase()}` : String(code)
 }
 
 /** Ask the OS for an unused port on the loopback interface */

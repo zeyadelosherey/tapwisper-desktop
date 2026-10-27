@@ -57,7 +57,10 @@ if (!SUPPORTED.includes(target)) {
  * - Everything else: CPU backends for every instruction-set level, loaded at
  *   runtime (GGML_BACKEND_DL), so old CPUs without AVX2 don't crash with SIGILL.
  *   That needs shared libraries, which sit next to the binary ($ORIGIN rpath).
- * - No OpenMP and a static MSVC runtime: nothing to install on the user's machine.
+ * - No OpenMP, and on Windows the shared MSVC runtime with its DLLs copied next
+ *   to the binaries: nothing to install on the user's machine. (A static runtime
+ *   gives each DLL its own C library, and llama.dll reads files that
+ *   ggml-base.dll opened, which then crashes.)
  */
 function platformOptions(name) {
   const common = ['-DCMAKE_BUILD_TYPE=Release', '-DGGML_NATIVE=OFF', '-DGGML_OPENMP=OFF']
@@ -89,7 +92,7 @@ function platformOptions(name) {
   }
   const gpu = vulkan && name === 'llama' ? ['-DGGML_VULKAN=ON'] : []
   if (platform === 'win32') {
-    return [...common, ...dynamicCpu, ...gpu, '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
+    return [...common, ...dynamicCpu, ...gpu, '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL']
   }
   return [...common, ...dynamicCpu, ...gpu, '-DCMAKE_INSTALL_RPATH=$ORIGIN']
 }
@@ -115,6 +118,25 @@ function manifestTool(buildDir) {
     .at(-1)
   if (!latest) throw new Error('mt.exe not found: install the Windows 10/11 SDK')
   return latest
+}
+
+/** The Visual C++ runtime DLLs of the newest Visual Studio install (app-local deployment) */
+function vcRuntimeDlls() {
+  const vswhere = 'C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe'
+  const vs = execFileSync(vswhere, ['-latest', '-products', '*', '-property', 'installationPath'], {
+    encoding: 'utf8'
+  }).trim()
+  const redist = join(vs, 'VC', 'Redist', 'MSVC')
+  const version = readdirSync(redist)
+    .filter((v) => /^\d+\.\d+\.\d+$/.test(v))
+    .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+    .at(-1)
+  const x64 = version ? join(redist, version, 'x64') : null
+  const crt = x64 && readdirSync(x64).find((d) => /^Microsoft\.VC\d+\.CRT$/.test(d))
+  if (!crt) throw new Error(`Visual C++ runtime not found under ${redist}`)
+  return readdirSync(join(x64, crt))
+    .filter((f) => f.endsWith('.dll'))
+    .map((f) => join(x64, crt, f))
 }
 
 /** Merge the UTF-8 manifest into the one the linker embedded */
@@ -214,7 +236,8 @@ function build(name, spec) {
   for (const file of [...binaries, ...libraries]) {
     copyFileSync(file, join(outDir, basename(file)))
   }
-  if (manifest) {
+  if (platform === 'win32') {
+    for (const dll of vcRuntimeDlls()) copyFileSync(dll, join(outDir, basename(dll)))
     const mt = manifestTool(buildDir)
     for (const binary of binaries) embedUtf8Manifest(mt, join(outDir, basename(binary)))
   }
