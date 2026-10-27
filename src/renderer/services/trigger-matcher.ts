@@ -1,7 +1,14 @@
 import { compareTwoStrings } from 'string-similarity'
 import type { Trigger, TriggerMatch } from '../models/trigger'
 
-const SIMILARITY_THRESHOLD = 0.8
+/** Fuzzy threshold for a prefix trigger's phrase at the start of the input */
+const PREFIX_SIMILARITY_THRESHOLD = 0.8
+/** Exact triggers compare the whole utterance, so allow a little more slack for STT noise */
+const EXACT_SIMILARITY_THRESHOLD = 0.85
+/** Bigram similarity is meaningless for very short strings ("go" vs "so") */
+const MIN_FUZZY_PHRASE_CHARS = 4
+
+const SENTENCE_END = /[.!?؟。]$/
 
 /**
  * Strip punctuation and extra whitespace that speech-to-text engines add.
@@ -11,162 +18,142 @@ function normalizeTranscription(text: string): string {
   return text
     .trim()
     .toLowerCase()
-    .replace(/[.,!?;:'"()[\]{}…–—]+/g, '')
+    .replace(/[.,!?;:'"()[\]{}…–—،؛؟]+/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+interface Token {
+  /** Word as spoken, with punctuation (used to rebuild speechInput / prefixText) */
+  original: string
+  /** Normalized word used for matching */
+  norm: string
+}
+
+/**
+ * Split into words, keeping the original and normalized form side by side so
+ * indices always line up (punctuation-only tokens like "—" are dropped from both).
+ */
+function tokenize(text: string): Token[] {
+  return text
+    .trim()
+    .split(/\s+/)
+    .map((original) => ({ original, norm: normalizeTranscription(original) }))
+    .filter((t) => t.norm.length > 0)
+}
+
+function joinOriginal(tokens: Token[]): string {
+  return tokens.map((t) => t.original).join(' ')
+}
+
+/** Strip a leading "," / ":" etc. left over after removing the trigger phrase */
+function cleanSpeechInput(text: string): string {
+  return text.replace(/^[\s,.:;!?،؛\-–—]+/, '').trim()
 }
 
 /**
  * Match transcribed speech against configured triggers.
  * Returns the best match or null if no trigger matches.
  *
- * Strategy:
- * 1. Try start-of-input exact prefix match first (highest priority)
- * 2. Scan for the trigger phrase anywhere in the transcription.
- *    - Prefix triggers: text after the phrase → speechInput
- *    - Exact triggers: entire transcription → speechInput
- * 3. Fall back to fuzzy matching on the start of the input
- * 4. Longest matching trigger phrase wins (prevents "go" from matching over "google")
+ * - Exact triggers ("phrase only"): the whole utterance must be the phrase.
+ *   They run commands, keystrokes, window moves — they must never fire because
+ *   the phrase happened to appear inside ordinary dictation.
+ * - Prefix triggers ("phrase + speech"): the utterance starts with the phrase
+ *   (exact or fuzzy). Mid-sentence use ("…so google the movie") is supported for
+ *   multi-word phrases, or after a sentence break for single words, so that
+ *   dictating "I'll google it later" doesn't launch a search.
+ * - Longest matching phrase wins (prevents "go" from beating "google").
  */
-export function matchTrigger(
-  transcription: string,
-  triggers: Trigger[]
-): TriggerMatch | null {
-  const input = normalizeTranscription(transcription)
-  if (!input) return null
-
-  const enabledTriggers = triggers.filter((t) => t.enabled)
-  if (enabledTriggers.length === 0) return null
+export function matchTrigger(transcription: string, triggers: Trigger[]): TriggerMatch | null {
+  const tokens = tokenize(transcription)
+  if (tokens.length === 0) return null
+  const input = tokens.map((t) => t.norm).join(' ')
 
   let bestMatch: TriggerMatch | null = null
-  let bestPhraseLength = 0
+  let bestScore = 0
 
-  for (const trigger of enabledTriggers) {
+  for (const trigger of triggers) {
+    if (!trigger.enabled) continue
     const phrase = normalizeTranscription(trigger.triggerPhrase)
     if (!phrase) continue
 
-    // 1. Try exact match at the start of input (highest priority)
-    const exactResult = tryStartMatch(input, phrase, trigger, transcription)
-    if (exactResult && phrase.length > bestPhraseLength) {
-      bestMatch = exactResult
-      bestPhraseLength = phrase.length
-      continue
-    }
+    const result =
+      trigger.triggerType === 'exact'
+        ? matchExact(input, phrase, trigger, transcription)
+        : matchPrefix(tokens, phrase, trigger)
+    if (!result) continue
 
-    // 2. Scan for the phrase anywhere in the transcription
-    const midResult = tryMidMatch(input, phrase, trigger, transcription)
-    if (midResult && phrase.length > bestPhraseLength) {
-      bestMatch = midResult
-      bestPhraseLength = phrase.length
-      continue
-    }
-
-    // 3. Fuzzy match on the start of input
-    const fuzzyResult = tryFuzzyMatch(input, phrase, trigger, transcription)
-    if (fuzzyResult && phrase.length > bestPhraseLength) {
-      bestMatch = fuzzyResult
-      bestPhraseLength = phrase.length
+    // Prefer longer phrases; break ties in favour of exact (non-fuzzy) hits
+    const score = phrase.length + (result.fuzzy ? 0 : 0.5)
+    if (score > bestScore) {
+      bestScore = score
+      bestMatch = result.match
     }
   }
 
   return bestMatch
 }
 
-/**
- * Try matching the trigger phrase at the very start of the normalized input.
- */
-function tryStartMatch(
+interface MatchResult {
+  match: TriggerMatch
+  fuzzy: boolean
+}
+
+function matchExact(
   input: string,
   phrase: string,
   trigger: Trigger,
   originalTranscription: string
-): TriggerMatch | null {
-  if (trigger.triggerType === 'exact') {
-    // Exact triggers pass the entire transcription to the action
-    if (input === phrase || input.startsWith(phrase + ' ')) {
-      return { trigger, speechInput: originalTranscription.trim(), prefixText: '' }
-    }
-    return null
+): MatchResult | null {
+  const speechInput = originalTranscription.trim()
+  if (input === phrase) {
+    return { match: { trigger, speechInput, prefixText: '' }, fuzzy: false }
   }
-
-  // Prefix trigger: transcription must start with the trigger phrase
-  if (input === phrase || input.startsWith(phrase + ' ')) {
-    const phraseWordCount = phrase.split(/\s+/).length
-    const originalWords = originalTranscription.trim().split(/\s+/)
-    const speechInput = originalWords.slice(phraseWordCount).join(' ')
-    return { trigger, speechInput, prefixText: '' }
+  if (
+    phrase.length >= MIN_FUZZY_PHRASE_CHARS &&
+    compareTwoStrings(input, phrase) >= EXACT_SIMILARITY_THRESHOLD
+  ) {
+    return { match: { trigger, speechInput, prefixText: '' }, fuzzy: true }
   }
-
   return null
 }
 
-/**
- * Scan for the trigger phrase anywhere in the input.
- *
- * - Prefix triggers: text before the phrase → prefixText (injected as dictation),
- *   text after the phrase → speechInput (passed to the action handler).
- *   e.g. "so google about the movie" → prefixText "so", speechInput "about the movie"
- *
- * - Exact triggers: the entire transcription → speechInput, no prefixText.
- *   e.g. "Could you google about this?" → speechInput is the full sentence
- */
-function tryMidMatch(
-  input: string,
-  phrase: string,
-  trigger: Trigger,
-  originalTranscription: string
-): TriggerMatch | null {
-  const inputWords = input.split(/\s+/)
-  const phraseWords = phrase.split(/\s+/)
-  const phraseWordCount = phraseWords.length
+function matchPrefix(tokens: Token[], phrase: string, trigger: Trigger): MatchResult | null {
+  const phraseWords = phrase.split(' ')
+  const n = phraseWords.length
+  if (tokens.length < n) return null
 
-  // Slide through input words looking for an exact match of the phrase
-  for (let i = 1; i <= inputWords.length - phraseWordCount; i++) {
-    const slice = inputWords.slice(i, i + phraseWordCount).join(' ')
-    if (slice === phrase) {
-      if (trigger.triggerType === 'exact') {
-        // Exact triggers pass the entire transcription to the action
-        return { trigger, speechInput: originalTranscription.trim(), prefixText: '' }
-      }
+  const sliceNorm = (start: number): string =>
+    tokens
+      .slice(start, start + n)
+      .map((t) => t.norm)
+      .join(' ')
 
-      // Prefix triggers split text around the trigger phrase
-      const originalWords = originalTranscription.trim().split(/\s+/)
-      const prefixText = originalWords.slice(0, i).join(' ')
-      const speechInput = originalWords.slice(i + phraseWordCount).join(' ')
-      return { trigger, speechInput, prefixText }
-    }
+  const build = (start: number, fuzzy: boolean): MatchResult => ({
+    match: {
+      trigger,
+      prefixText: joinOriginal(tokens.slice(0, start)),
+      speechInput: cleanSpeechInput(joinOriginal(tokens.slice(start + n)))
+    },
+    fuzzy
+  })
+
+  // 1. Phrase at the very start
+  if (sliceNorm(0) === phrase) return build(0, false)
+
+  // 2. Phrase mid-sentence — only where it plausibly starts a new command
+  for (let i = 1; i <= tokens.length - n; i++) {
+    if (sliceNorm(i) !== phrase) continue
+    const afterSentenceBreak = SENTENCE_END.test(tokens[i - 1].original)
+    if (n >= 2 || afterSentenceBreak) return build(i, false)
   }
 
-  return null
-}
-
-/**
- * Fuzzy match the trigger phrase against the first N words of the input.
- */
-function tryFuzzyMatch(
-  input: string,
-  phrase: string,
-  trigger: Trigger,
-  originalTranscription: string
-): TriggerMatch | null {
-  const phraseWords = phrase.split(/\s+/)
-  const inputWords = input.split(/\s+/)
-
-  if (inputWords.length < phraseWords.length) return null
-
-  // Take the same number of words from input as the phrase has
-  const inputSlice = inputWords.slice(0, phraseWords.length).join(' ')
-  const similarity = compareTwoStrings(inputSlice, phrase)
-
-  if (similarity >= SIMILARITY_THRESHOLD) {
-    if (trigger.triggerType === 'exact') {
-      // Exact triggers pass the entire transcription to the action
-      return { trigger, speechInput: originalTranscription.trim(), prefixText: '' }
-    }
-
-    const originalWords = originalTranscription.trim().split(/\s+/)
-    const speechInput = originalWords.slice(phraseWords.length).join(' ')
-    return { trigger, speechInput, prefixText: '' }
+  // 3. Fuzzy match at the start (STT misspellings like "googel")
+  if (
+    phrase.length >= MIN_FUZZY_PHRASE_CHARS &&
+    compareTwoStrings(sliceNorm(0), phrase) >= PREFIX_SIMILARITY_THRESHOLD
+  ) {
+    return build(0, true)
   }
 
   return null
