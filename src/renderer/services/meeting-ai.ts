@@ -117,13 +117,27 @@ function parseTitle(output: string): { title: string; summary: string } {
   return { title, summary }
 }
 
-/** Split a long transcript on line boundaries */
+/** A line longer than `maxChars` (one speaker talking for a long time), cut between words */
+function splitLine(line: string, maxChars: number): string[] {
+  const pieces: string[] = []
+  let rest = line
+  while (rest.length > maxChars) {
+    const space = rest.lastIndexOf(' ', maxChars)
+    const cut = space > maxChars / 2 ? space : maxChars
+    pieces.push(rest.slice(0, cut))
+    rest = rest.slice(cut).trimStart()
+  }
+  pieces.push(rest)
+  return pieces
+}
+
+/** Split a long transcript into chunks of at most `maxChars`, on line boundaries where possible */
 export function chunkTranscript(text: string, maxChars: number): string[] {
   if (text.length <= maxChars) return [text]
   const chunks: string[] = []
   let current = ''
-  for (const line of text.split('\n')) {
-    if (current.length + line.length > maxChars && current) {
+  for (const line of text.split('\n').flatMap((l) => splitLine(l, maxChars))) {
+    if (current && current.length + 1 + line.length > maxChars) {
       chunks.push(current)
       current = ''
     }
@@ -181,6 +195,8 @@ export async function generateMeetingSummary(
     material = partials.join('\n\n')
     condensed = true
   }
+  // Notes that still don't fit after every round are cut rather than rejected
+  material = clipStart(material, maxChars)
 
   const response = await processText({
     prompt: `${header}\n\n${SUMMARY_FORMAT}`,
@@ -225,8 +241,21 @@ export async function askMeeting(
   const limit = await getMaxInputChars()
   const summary = clipStart(ctx.summary?.trim() ?? '', limit / 4)
   const notes = clipStart(ctx.notes?.trim() ?? '', limit / 4)
+  const conversation = clipEnd(
+    history
+      .slice(-6)
+      .map((t) => `${t.role === 'user' ? 'Q' : 'A'}: ${t.content}`)
+      .join('\n'),
+    limit / 8
+  )
   // Most recent part wins when the meeting is longer than the model can read
-  const room = limit - summary.length - notes.length - PROMPT_ROOM_CHARS
+  const room =
+    limit -
+    summary.length -
+    notes.length -
+    conversation.length -
+    question.length -
+    PROMPT_ROOM_CHARS
   const context = [
     summary ? `SUMMARY:\n${summary}` : '',
     notes ? `NOTE-TAKER'S NOTES:\n${notes}` : '',
@@ -234,10 +263,6 @@ export async function askMeeting(
   ]
     .filter(Boolean)
     .join('\n\n')
-  const conversation = history
-    .slice(-6)
-    .map((t) => `${t.role === 'user' ? 'Q' : 'A'}: ${t.content}`)
-    .join('\n')
 
   const response = await processText({
     prompt: `${conversation ? `Earlier in this conversation:\n${conversation}\n\n` : ''}Question: ${question}\n\nAnswer from the meeting material only. Quote timestamps like [12:03] when useful. If the answer isn't in the material, say so. ${speakerNote(ctx.speakerNames)} Answer in the language of the question.`,

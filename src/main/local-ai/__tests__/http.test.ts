@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { assertOk, readChatReply, transcriptionForm } from '../http'
+import { assertOk, readChatReply, readTranscript, transcriptionForm } from '../http'
 import { LocalAiError, toFailure } from '../errors'
 
 function json(body: unknown, status = 200): Response {
@@ -18,6 +18,13 @@ describe('assertOk', () => {
       await expect(assertOk(new Response('nope', { status }))).rejects.toMatchObject({ code })
     }
   })
+
+  it('recognises a request longer than the context', async () => {
+    const body = JSON.stringify({ error: { type: 'exceed_context_size_error', code: 400 } })
+    await expect(assertOk(new Response(body, { status: 400 }))).rejects.toMatchObject({
+      code: 'input-too-long'
+    })
+  })
 })
 
 describe('readChatReply', () => {
@@ -30,6 +37,27 @@ describe('readChatReply', () => {
     await expect(readChatReply(json({ choices: [] }))).rejects.toMatchObject({
       code: 'bad-response'
     })
+  })
+
+  it('rejects a reply cut off while the model was still reasoning', async () => {
+    const res = json({ choices: [{ message: { content: '<think>Okay, the user wants' } }] })
+    await expect(readChatReply(res)).rejects.toMatchObject({ code: 'bad-response' })
+  })
+})
+
+describe('readTranscript', () => {
+  it('returns the transcript text', async () => {
+    await expect(readTranscript(json({ text: ' Hello. ' }))).resolves.toBe('Hello.')
+  })
+
+  it('rejects answers that are not a transcript', async () => {
+    for (const res of [
+      json({ error: 'failed to read audio' }),
+      json({ detail: 'x' }),
+      new Response('<html>Sign in</html>', { status: 200 })
+    ]) {
+      await expect(readTranscript(res)).rejects.toMatchObject({ code: 'bad-response' })
+    }
   })
 })
 

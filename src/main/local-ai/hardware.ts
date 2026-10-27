@@ -39,11 +39,18 @@ const STATUS_ILLEGAL_INSTRUCTION = 0xc000001d
 
 const runtimeChecks = new Map<LocalRuntime, Promise<RuntimeCheck>>()
 
-/** Whether a bundled runtime can start here. Cached for the session */
+/**
+ * Whether a bundled runtime can start here. A working runtime is remembered for
+ * the session; a failing one is checked again next time, since the user may
+ * allow it in their security software meanwhile.
+ */
 export function checkRuntime(runtime: LocalRuntime): Promise<RuntimeCheck> {
   let check = runtimeChecks.get(runtime)
   if (!check) {
-    check = probeRuntime(runtime)
+    check = probeRuntime(runtime).then((result) => {
+      if (!result.available) runtimeChecks.delete(runtime)
+      return result
+    })
     runtimeChecks.set(runtime, check)
   }
   return check
@@ -158,11 +165,12 @@ export async function getDeviceProfile(): Promise<DeviceProfile> {
   const cpuModel = cpus[0]?.model.trim() ?? ''
   const appleSilicon = isAppleSilicon(cpuModel)
   const dir = modelsDir()
-  const [gpu, freeBytes, warning, stt, llm] = await Promise.all([
+  const [gpu, freeBytes, warning, whisper, parakeet, llama] = await Promise.all([
     detectGpu(),
     freeDiskBytes(dir),
     modelsDirWarning(dir),
     checkRuntime('whisper'),
+    checkRuntime('parakeet'),
     checkRuntime('llama')
   ])
   return {
@@ -176,7 +184,7 @@ export async function getDeviceProfile(): Promise<DeviceProfile> {
     emulated: emulated(),
     gpuName: gpu.name,
     accel: accelerationFor(gpu, appleSilicon),
-    runtimes: { stt, llm },
+    runtimes: { whisper, parakeet, llama },
     modelsDir: dir,
     modelsDirWarning: warning
   }

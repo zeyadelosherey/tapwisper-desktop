@@ -9,6 +9,8 @@ import { rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
 import { LocalAiError } from './errors'
+import { transcriptionTimeout } from './http'
+import { SerialQueue } from './serial-queue'
 import type { TranscribeInput } from '../../shared/local-ai/types'
 
 export interface ParakeetOptions {
@@ -19,15 +21,18 @@ export interface ParakeetOptions {
 }
 
 /** One run at a time: two would each load the whole model */
-let queue: Promise<unknown> = Promise.resolve()
+const queue = new SerialQueue()
 
 export function parakeetTranscribe(
   options: ParakeetOptions,
   input: TranscribeInput
 ): Promise<string> {
-  const run = queue.then(() => transcribeOnce(options, input))
-  queue = run.catch(() => undefined)
-  return run
+  return queue.add(() => transcribeOnce(options, input))
+}
+
+/** A transcription is waiting or running, so the model file is (about to be) open */
+export function parakeetBusy(): boolean {
+  return queue.size > 0
 }
 
 async function transcribeOnce(o: ParakeetOptions, input: TranscribeInput): Promise<string> {
@@ -44,14 +49,15 @@ async function transcribeOnce(o: ParakeetOptions, input: TranscribeInput): Promi
           cwd: path.dirname(o.binary),
           windowsHide: true,
           // Model load plus CPU decoding of long clips
-          timeout: Math.max(60_000, input.seconds * 3000),
+          signal: transcriptionTimeout(input.seconds, 60_000),
           maxBuffer: 16 * 1024 * 1024
         },
         (err, stdout, stderr) => {
           if (!err) return resolve(stdout.replace(/\s+/g, ' ').trim())
-          const e = err as NodeJS.ErrnoException & { killed?: boolean }
+          const e = err as NodeJS.ErrnoException
           if (e.code === 'ENOENT') return reject(new LocalAiError('runtime-unavailable', e.message))
-          if (e.killed) return reject(new LocalAiError('timeout', 'parakeet-cli timed out'))
+          if (e.code === 'ABORT_ERR')
+            return reject(new LocalAiError('timeout', 'parakeet-cli timed out'))
           reject(new LocalAiError('server-failed', String(stderr).slice(-2000) || e.message))
         }
       )

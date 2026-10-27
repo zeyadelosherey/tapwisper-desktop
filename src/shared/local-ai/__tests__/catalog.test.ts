@@ -5,6 +5,7 @@ import {
   getModel,
   isInsecureKeyUse,
   isPrivateHost,
+  localEngineCheck,
   normalizeBaseUrl,
   rateModel,
   recommendedModelId,
@@ -25,7 +26,11 @@ function profile(overrides: Partial<DeviceProfile> = {}): DeviceProfile {
     emulated: false,
     gpuName: 'Apple M2',
     accel: 'metal',
-    runtimes: { stt: { available: true }, llm: { available: true } },
+    runtimes: {
+      whisper: { available: true },
+      parakeet: { available: true },
+      llama: { available: true }
+    },
     modelsDir: '/models',
     ...overrides
   }
@@ -94,6 +99,20 @@ describe('rateModel', () => {
     expect(rateModel(model('qwen3.5-4b'), profile(), [], false)).toBe('recommended')
   })
 
+  it('marks models whose program cannot start here', () => {
+    const noParakeet = profile({
+      runtimes: {
+        whisper: { available: true },
+        parakeet: { available: false, issue: 'blocked' },
+        llama: { available: true }
+      }
+    })
+    expect(rateModel(model('parakeet-tdt-0.6b-v3'), noParakeet, [], true)).toBe(
+      'runtime-unavailable'
+    )
+    expect(rateModel(model('whisper-base'), noParakeet, [], true)).not.toBe('runtime-unavailable')
+  })
+
   it('blocks models that do not fit in memory or on disk', () => {
     expect(rateModel(model('qwen3-8b'), lowEndPc, [], false)).toBe('insufficient-ram')
     expect(rateModel(model('gpt-oss-20b'), profile(), [], false)).toBe('slow')
@@ -142,6 +161,7 @@ describe('stripThinking', () => {
     expect(stripThinking('<think>\nhmm\n</think>\n\nHello there.')).toBe('Hello there.')
     expect(stripThinking('half a thought</think>Done.')).toBe('Done.')
     expect(stripThinking('No reasoning here.')).toBe('No reasoning here.')
+    expect(stripThinking('<think>Okay, the user wants')).toBe('')
   })
 })
 
@@ -177,5 +197,26 @@ describe('isPrivateHost / isInsecureKeyUse', () => {
     expect(isInsecureKeyUse('https://example.com', 'sk-1')).toBe(false)
     expect(isInsecureKeyUse('http://192.168.1.2:8000', 'sk-1')).toBe(false)
     expect(isInsecureKeyUse('http://example.com', '')).toBe(false)
+  })
+})
+
+describe('localEngineCheck', () => {
+  it('is available when any program for the kind starts', () => {
+    const onlyLlama = profile({
+      runtimes: {
+        whisper: { available: false, issue: 'missing-library' },
+        parakeet: { available: false, issue: 'missing-library' },
+        llama: { available: true }
+      }
+    })
+    expect(localEngineCheck('stt', onlyLlama)).toEqual({ available: true })
+    const none = profile({
+      runtimes: {
+        whisper: { available: false, issue: 'not-bundled' },
+        parakeet: { available: false, issue: 'not-bundled' },
+        llama: { available: false, issue: 'not-bundled' }
+      }
+    })
+    expect(localEngineCheck('llm', none)).toEqual({ available: false, issue: 'not-bundled' })
   })
 })

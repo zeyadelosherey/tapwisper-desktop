@@ -40,7 +40,9 @@ export function ensureAudioDirSync(): string {
  * Encode raw PCM float32 samples to WAV format (16kHz, mono, 16-bit)
  */
 export function encodeWav(samples: Float32Array, sampleRate: number = 16000): Buffer {
-  return Buffer.from(encodeWavBytes(samples, sampleRate))
+  const bytes = encodeWavBytes(samples, sampleRate)
+  // Wraps the encoded bytes instead of copying them
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 }
 
 /**

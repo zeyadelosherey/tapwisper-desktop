@@ -337,12 +337,20 @@ async function write(out: WriteStream, chunk: Uint8Array): Promise<void> {
 export async function deleteModel(id: string): Promise<LocalAiResult<void>> {
   const model = getModel(id)
   if (!model) return { ok: false, code: 'model-not-downloaded' }
-  cancelDownload(id)
-  await Promise.all(
-    localPaths(model).flatMap((file) => [
-      rm(file, { force: true }),
-      rm(`${file}.part`, { force: true })
-    ])
-  )
+  // A cancelled download still closes (or renames) its files; let it finish first
+  const running = downloads.get(id)
+  running?.controller.abort()
+  await running?.done
+  try {
+    await Promise.all(
+      localPaths(model).flatMap((file) => [
+        rm(file, { force: true }),
+        rm(`${file}.part`, { force: true })
+      ])
+    )
+  } catch {
+    // Windows can't delete a file another process has open
+    return { ok: false, code: 'model-in-use' }
+  }
   return { ok: true, data: undefined }
 }

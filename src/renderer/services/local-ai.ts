@@ -103,17 +103,16 @@ export async function chatOnDevice(engine: DeviceEngine, input: ChatInput): Prom
  * ready by the time the user stops talking. No-op for other engines.
  */
 export async function warmUpLocalModels(feature: 'dictation' | 'meeting'): Promise<void> {
-  const config = (await window.tapwisper.store.getAll()) as {
-    speechEngine?: AIEngine
-    llmEngine?: AIEngine
-    smartFormatting?: boolean
-    dictationTranslateTo?: string
-    meetingTranslateTo?: string
-  }
-  if (config.speechEngine === 'local') void window.tapwisper.localAi.warmUp('stt')
-  const usesLlm =
-    feature === 'dictation'
-      ? config.smartFormatting || !!config.dictationTranslateTo
-      : !!config.meetingTranslateTo
-  if (usesLlm && config.llmEngine === 'local') void window.tapwisper.localAi.warmUp('llm')
+  const { store, localAi } = window.tapwisper
+  const [speechEngine, llmEngine] = (await Promise.all([
+    store.get('speechEngine'),
+    store.get('llmEngine')
+  ])) as [AIEngine | undefined, AIEngine | undefined]
+  if (speechEngine === 'local') void localAi.warmUp('stt')
+  if (llmEngine !== 'local') return
+  // Only when this recording's text will go through the language model
+  const llmSettings =
+    feature === 'dictation' ? ['smartFormatting', 'dictationTranslateTo'] : ['meetingTranslateTo']
+  const values = await Promise.all(llmSettings.map((key) => store.get(key)))
+  if (values.some(Boolean)) void localAi.warmUp('llm')
 }

@@ -61,6 +61,14 @@ async function pidOf(baseUrl: string): Promise<number> {
 }
 
 describe('SidecarServer', () => {
+  it('loads the model ahead of time without reporting a request', async () => {
+    const statuses: SidecarStatus[] = []
+    const s = server(statuses)
+    await s.load(launch())
+    await s.load(launch())
+    expect(statuses.map((x) => x.state)).toEqual(['starting', 'ready'])
+  })
+
   it('starts on first use, reuses the process and stops it', async () => {
     const statuses: SidecarStatus[] = []
     const s = server(statuses)

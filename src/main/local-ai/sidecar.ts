@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync } from 'fs'
 import { createServer } from 'net'
 import path from 'path'
 import { LocalAiError, SidecarStartError } from './errors'
+import { SerialQueue } from './serial-queue'
 import type { LocalModelKind, SidecarState, SidecarStatus } from '../../shared/local-ai/types'
 
 export interface SidecarLaunch {
@@ -52,7 +53,8 @@ export class SidecarServer {
   private child: ChildProcess | null = null
   private baseUrl = ''
   private launchKey = ''
-  private queue: Promise<unknown> = Promise.resolve()
+  /** Everything that starts or stops the process goes through here, so they never overlap */
+  private readonly queue = new SerialQueue()
   private idleTimer: ReturnType<typeof setTimeout> | null = null
   private crashes: number[] = []
   private stderrTail = ''
@@ -77,7 +79,7 @@ export class SidecarServer {
 
   /** Run `task` against a ready server. Requests are served one at a time. */
   run<T>(launch: SidecarLaunch, task: (baseUrl: string) => Promise<T>): Promise<T> {
-    return this.enqueue(async () => {
+    return this.queue.add(async () => {
       const baseUrl = await this.ensure(launch)
       this.clearIdleTimer()
       this.setState('busy')
@@ -92,9 +94,17 @@ export class SidecarServer {
     })
   }
 
+  /** Start the server and load the model without running a request */
+  load(launch: SidecarLaunch): Promise<void> {
+    return this.queue.add(async () => {
+      await this.ensure(launch)
+      this.armIdleTimer(launch.idleUnloadMs)
+    })
+  }
+
   /** Stop the server once the requests ahead of this have finished */
   stop(): Promise<void> {
-    return this.enqueue(() => this.terminate())
+    return this.queue.add(() => this.terminate())
   }
 
   /** Stop now, without waiting for queued requests (app quit) */
@@ -106,13 +116,6 @@ export class SidecarServer {
   reset(): void {
     this.crashes = []
     if (this.status.state === 'failed') this.setState('stopped', { error: undefined })
-  }
-
-  /** Everything that starts or stops the process goes through here, so they never overlap */
-  private enqueue<T>(work: () => Promise<T>): Promise<T> {
-    const result = this.queue.then(work)
-    this.queue = result.catch(() => undefined)
-    return result
   }
 
   private async terminate(): Promise<void> {
@@ -153,11 +156,18 @@ export class SidecarServer {
     })
     this.stderrTail = ''
 
-    const child = spawn(launch.binary, launch.args(port), {
-      cwd: path.dirname(launch.binary),
-      windowsHide: true,
-      stdio: ['ignore', 'ignore', 'pipe']
-    })
+    let child: ChildProcess
+    try {
+      child = spawn(launch.binary, launch.args(port), {
+        cwd: path.dirname(launch.binary),
+        windowsHide: true,
+        stdio: ['ignore', 'ignore', 'pipe']
+      })
+    } catch (err) {
+      // Invalid arguments throw here; a missing binary is reported through 'error' below
+      this.setState('stopped', { error: 'server-failed' })
+      throw new SidecarStartError('server-failed', (err as Error).message)
+    }
     this.child = child
     this.launchKey = key
     this.baseUrl = `http://127.0.0.1:${port}`

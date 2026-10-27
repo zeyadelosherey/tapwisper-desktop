@@ -17,6 +17,7 @@ const repo = {
     file('Model-Q8_0.gguf'),
     file('Model-Q4_K_M.gguf'),
     file('Model-Q4_K_M-00001-of-00002.gguf'),
+    file('mmproj-Model-BF16.gguf'),
     file('mmproj-Model-Q8_0.gguf'),
     file('mmproj-Model-f16.gguf'),
     file('sub/Model-IQ4_XS.gguf')
@@ -44,7 +45,7 @@ describe('pickFiles', () => {
     expect(model.url).toMatch(/\/resolve\/c0ffee\/sub\/Model-IQ4_XS\.gguf$/)
   })
 
-  it('adds the f16 projector for audio models', () => {
+  it('adds the f16 projector (not bf16) for audio models', () => {
     const files = pickFiles({ repo: 'org/Model-GGUF', quant: ['Q8_0'], mmproj: true }, repo)
     expect(files.map((f) => f.role)).toEqual(['model', 'mmproj'])
     expect(files[1].url).toMatch(/mmproj-Model-f16\.gguf$/)

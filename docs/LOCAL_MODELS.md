@@ -67,7 +67,7 @@ Models    <userData>/models/{stt,llm}/     or a folder the user picks
 | May be slow | A big model without a GPU, or less memory than recommended. |
 | Needs N GB RAM | Below the model's minimum memory. Downloading asks for confirmation. |
 | Not enough disk space | Downloading is blocked. |
-| English only | A `.en` model while you dictate in other languages, or with auto-detect. |
+| Not for your languages | The model doesn't know a language you dictate in (for example a `.en` Whisper model), or knows only one with auto-detect on. |
 
 ## Models
 

@@ -79,7 +79,7 @@ export function LocalModelPanel({
               )
             : t(
                 'settings.localModels.confirmLanguage',
-                'This model only understands English, but you dictate in other languages.'
+                "This model doesn't support every language you dictate in."
               ),
         confirmLabel: t('settings.localModels.download', 'Download')
       })
@@ -206,8 +206,8 @@ function HardwareSummary({ profile }: { profile: DeviceProfile }): JSX.Element {
     profile.accel === 'cpu'
       ? t('settings.localModels.cpuOnly', 'CPU only')
       : profile.accel === 'metal'
-        ? 'Metal GPU'
-        : `${profile.gpuName ?? 'GPU'} (Vulkan)`
+        ? t('settings.localModels.metalGpu', 'Metal GPU')
+        : `${profile.gpuName ?? t('settings.localModels.gpu', 'GPU')} (Vulkan)`
   const parts = [
     profile.cpuModel,
     t('settings.localModels.ram', '{{gb}} GB RAM', { gb: profile.totalRamGB }),
@@ -311,6 +311,11 @@ function ratingBadge(
   model: LocalModelEntry
 ): { text: string; className: string } | null {
   switch (rating) {
+    case 'runtime-unavailable':
+      return {
+        text: t('settings.localModels.cantRun', "Can't run here"),
+        className: 'bg-danger-tint text-danger'
+      }
     case 'recommended':
       return {
         text: t('settings.localModels.recommended', 'Recommended'),
@@ -333,7 +338,7 @@ function ratingBadge(
       }
     case 'unsupported-language':
       return {
-        text: t('settings.localModels.englishOnly', 'English only'),
+        text: t('settings.localModels.unsupportedLanguage', 'Not for your languages'),
         className: 'bg-panel text-ink-muted'
       }
     default:
@@ -364,7 +369,8 @@ function ModelRow({
 }): JSX.Element {
   const { t } = useTranslation()
   const badge = ratingBadge(t, rating, model)
-  const downloading = progress?.state === 'downloading' || progress?.state === 'verifying'
+  const downloading = progress?.state === 'downloading'
+  const cantRun = rating === 'runtime-unavailable'
   const percent = progress?.total ? Math.floor((progress.received / progress.total) * 100) : 0
 
   let action: JSX.Element
@@ -381,22 +387,15 @@ function ModelRow({
         >
           <div className="h-full bg-signal transition-[width]" style={{ width: `${percent}%` }} />
         </div>
-        <span className="w-16 text-end text-[12px] tabular-nums text-ink-muted">
-          {progress?.state === 'verifying'
-            ? t('settings.localModels.verifying', 'Checking…')
-            : `${percent}%`}
-        </span>
-        {/* Checking the hash can't be interrupted */}
-        {progress?.state === 'downloading' && (
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label={t('settings.localModels.cancel', 'Cancel download')}
-            className="icon-btn h-7 w-7"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
+        <span className="w-16 text-end text-[12px] tabular-nums text-ink-muted">{percent}%</span>
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label={t('settings.localModels.cancel', 'Cancel download')}
+          className="icon-btn h-7 w-7"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
       </div>
     )
   } else if (installed) {
@@ -407,7 +406,7 @@ function ModelRow({
             {t('settings.localModels.inUse', 'In use')}
           </span>
         ) : (
-          <button type="button" onClick={onUse} className="btn-secondary btn-sm">
+          <button type="button" onClick={onUse} disabled={cantRun} className="btn-secondary btn-sm">
             {t('settings.localModels.use', 'Use')}
           </button>
         )}
@@ -428,7 +427,7 @@ function ModelRow({
       <button
         type="button"
         onClick={onDownload}
-        disabled={rating === 'insufficient-disk'}
+        disabled={cantRun || rating === 'insufficient-disk'}
         className={`${rating === 'recommended' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
       >
         <Download className="h-3.5 w-3.5" />

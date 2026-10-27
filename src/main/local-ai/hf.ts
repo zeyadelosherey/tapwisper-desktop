@@ -37,8 +37,11 @@ const MMPROJ = /(^|\/)mmproj[^/]*\.gguf$/i
 /** Projector precisions, best first */
 const MMPROJ_PREFERENCE = ['f16', 'bf16', 'q8_0']
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** "model-Q4_K_M.gguf" is precision Q4_K_M; "mmproj-bf16.gguf" is bf16, not f16 */
+function hasPrecision(file: Sibling, precision: string): boolean {
+  const name = file.rfilename.toLowerCase()
+  const suffix = `${precision.toLowerCase()}.gguf`
+  return name.endsWith(suffix) && '-._'.includes(name.charAt(name.length - suffix.length - 1))
 }
 
 /** Shallowest path first, so a repo-root file beats one in a subfolder */
@@ -53,8 +56,7 @@ function findModelFile(source: ModelSource, files: Sibling[]): Sibling | undefin
     .filter((f) => !SPLIT_GGUF.test(f.rfilename))
     .sort(byDepth)
   for (const quant of source.quant ?? []) {
-    const pattern = new RegExp(`[-._]${escapeRegExp(quant)}\\.gguf$`, 'i')
-    const match = candidates.find((f) => pattern.test(f.rfilename))
+    const match = candidates.find((f) => hasPrecision(f, quant))
     if (match) return match
   }
   return undefined
@@ -63,7 +65,7 @@ function findModelFile(source: ModelSource, files: Sibling[]): Sibling | undefin
 function findProjector(files: Sibling[]): Sibling | undefined {
   const projectors = files.filter((f) => MMPROJ.test(f.rfilename)).sort(byDepth)
   for (const precision of MMPROJ_PREFERENCE) {
-    const match = projectors.find((f) => f.rfilename.toLowerCase().includes(precision))
+    const match = projectors.find((f) => hasPrecision(f, precision))
     if (match) return match
   }
   return projectors[0]

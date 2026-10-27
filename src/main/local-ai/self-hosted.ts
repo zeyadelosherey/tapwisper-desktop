@@ -11,6 +11,7 @@ import {
   CHAT_TIMEOUT_MS,
   outputTokens,
   readChatReply,
+  readTranscript,
   transcriptionForm,
   transcriptionTimeout
 } from './http'
@@ -89,9 +90,7 @@ export async function selfHostedTranscribe(input: TranscribeInput): Promise<stri
     body: form,
     signal: transcriptionTimeout(input.seconds, 60_000)
   })
-  await assertOk(res)
-  const data = (await res.json()) as { text?: string }
-  return (data.text ?? '').trim()
+  return readTranscript(res)
 }
 
 export async function selfHostedChat(input: ChatInput): Promise<string> {

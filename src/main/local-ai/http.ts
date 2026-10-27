@@ -6,6 +6,9 @@ import type { ChatInput, LocalAiErrorCode, TranscribeInput } from '../../shared/
 /** CPU generation of a long answer can take minutes on older machines */
 export const CHAT_TIMEOUT_MS = 5 * 60_000
 
+/** llama-server, vLLM and OpenAI-style wording for a request longer than the context */
+const CONTEXT_EXCEEDED = /exceed_context|context (size|length|window)|too many tokens/i
+
 /** Throw a coded error for a non-2xx HTTP response */
 export async function assertOk(res: Response): Promise<void> {
   if (res.ok) return
@@ -15,8 +18,28 @@ export async function assertOk(res: Response): Promise<void> {
       ? 'unauthorized'
       : res.status === 404
         ? 'not-found'
-        : 'bad-response'
+        : CONTEXT_EXCEEDED.test(body)
+          ? 'input-too-long'
+          : 'bad-response'
   throw new LocalAiError(code, `HTTP ${res.status} ${body}`.trim())
+}
+
+/** The JSON body of a successful response; anything else (an HTML proxy page) is a bad response */
+async function readJson<T>(res: Response): Promise<T> {
+  await assertOk(res)
+  try {
+    return (await res.json()) as T
+  } catch {
+    throw new LocalAiError('bad-response', 'not JSON')
+  }
+}
+
+/** The text of a Whisper-style transcription response */
+export async function readTranscript(res: Response): Promise<string> {
+  const data = await readJson<{ text?: unknown; error?: unknown }>(res)
+  if (data.error) throw new LocalAiError('bad-response', String(data.error))
+  if (typeof data.text !== 'string') throw new LocalAiError('bad-response', 'no transcript')
+  return data.text.trim()
 }
 
 /** Multipart body for Whisper-style transcription endpoints */
@@ -48,9 +71,11 @@ export function outputTokens(input: ChatInput): number {
 
 /** The assistant text of an OpenAI-style chat completion */
 export async function readChatReply(res: Response): Promise<string> {
-  await assertOk(res)
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+  const data = await readJson<{ choices?: Array<{ message?: { content?: unknown } }> }>(res)
   const content = data.choices?.[0]?.message?.content
   if (typeof content !== 'string') throw new LocalAiError('bad-response', 'no message content')
-  return stripThinking(content)
+  const reply = stripThinking(content)
+  // The answer ran out of tokens while the model was still reasoning
+  if (!reply && content.trim()) throw new LocalAiError('bad-response', 'only reasoning, no answer')
+  return reply
 }

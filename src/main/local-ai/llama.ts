@@ -3,12 +3,11 @@
  * models and transcription for audio models (Qwen3-ASR, Voxtral)
  */
 import { randomUUID } from 'crypto'
-import { LocalAiError } from './errors'
 import {
-  assertOk,
   CHAT_TIMEOUT_MS,
   outputTokens,
   readChatReply,
+  readTranscript,
   transcriptionForm,
   transcriptionTimeout
 } from './http'
@@ -85,8 +84,5 @@ export async function llamaTranscribe(baseUrl: string, input: TranscribeInput): 
     body: form,
     signal: transcriptionTimeout(input.seconds, 60_000)
   })
-  await assertOk(res)
-  const data = (await res.json()) as { text?: unknown }
-  if (typeof data.text !== 'string') throw new LocalAiError('bad-response', 'no transcript')
-  return data.text.trim()
+  return readTranscript(res)
 }

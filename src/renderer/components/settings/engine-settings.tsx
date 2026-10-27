@@ -6,6 +6,7 @@ import { LocalModelPanel } from './local-model-panel'
 import { SelfHostedPanel } from './self-hosted-panel'
 import { useLocalAi } from '../../hooks/use-local-ai'
 import type { AIEngine, LocalModelKind } from '../../../shared/local-ai/types'
+import { localEngineCheck } from '../../../shared/local-ai/catalog'
 
 type LocalModels = Record<LocalModelKind, string | null>
 
@@ -66,7 +67,7 @@ export function EngineSettings({
         <EnginePicker
           value={engine}
           onChange={changeEngine}
-          localCheck={local.profile?.runtimes[kind]}
+          localCheck={local.profile ? localEngineCheck(kind, local.profile) : undefined}
         />
       </Section>
       {engine === 'cloud' && cloud}

@@ -74,6 +74,29 @@ describe('generateMeetingSummary', () => {
     for (const text of texts) expect(text.length).toBeLessThanOrEqual(2100)
   })
 
+  it('splits one long monologue so each part fits the model', async () => {
+    maxInputChars = 2000
+    processText.mockResolvedValue({ result: 'note', provider: 'local', model: 'm' })
+    const monologue = Array.from({ length: 100 }, (_, i) =>
+      seg('you', i * 5000, 'word '.repeat(20))
+    )
+    await generateMeetingSummary({ segments: monologue })
+    const texts = processText.mock.calls.map((c) => (c[0] as { text: string }).text)
+    expect(texts.length).toBeGreaterThan(2)
+    for (const text of texts) expect(text.length).toBeLessThanOrEqual(2100)
+  })
+
+  it('cuts notes that never get short enough instead of sending too much', async () => {
+    maxInputChars = 2000
+    processText.mockResolvedValue({ result: 'note '.repeat(400), provider: 'local', model: 'm' })
+    const long = Array.from({ length: 200 }, (_, i) =>
+      seg(i % 2 ? 'you' : 'others', i * 5000, 'word '.repeat(20))
+    )
+    await generateMeetingSummary({ segments: long })
+    const final = processText.mock.calls.at(-1)![0] as { text: string }
+    expect(final.text.length).toBeLessThanOrEqual(2100)
+  })
+
   it('rejects an empty meeting', async () => {
     await expect(generateMeetingSummary({ segments: [] })).rejects.toThrow('empty-meeting')
   })
@@ -100,6 +123,19 @@ describe('askMeeting', () => {
     await askMeeting('Q?', { segments: long, summary: 's'.repeat(8000), notes: 'n'.repeat(7000) })
     const sent = processText.mock.calls[0][0].text as string
     expect(sent.length).toBeLessThanOrEqual(5000)
+  })
+
+  it('leaves room for the question and earlier answers', async () => {
+    maxInputChars = 5000
+    processText.mockResolvedValue({ result: 'answer', provider: 'local', model: 'm' })
+    const long = Array.from({ length: 300 }, (_, i) => seg('others', i * 5000, `line ${i} here`))
+    const history = Array.from({ length: 6 }, (_, i) => ({
+      role: i % 2 ? ('assistant' as const) : ('user' as const),
+      content: 'x'.repeat(2000)
+    }))
+    await askMeeting('Q?'.repeat(200), { segments: long }, history)
+    const { prompt, text } = processText.mock.calls[0][0] as { prompt: string; text: string }
+    expect(prompt.length + text.length).toBeLessThanOrEqual(5000)
   })
 
   it('sends only the most recent transcript that fits the model', async () => {

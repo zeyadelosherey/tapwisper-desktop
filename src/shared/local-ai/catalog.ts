@@ -12,7 +12,9 @@ import type {
   LocalAiSettings,
   LocalModelEntry,
   LocalModelKind,
+  LocalRuntime,
   ModelRating,
+  RuntimeCheck,
   SelfHostedSettings
 } from './types'
 
@@ -85,8 +87,9 @@ export const LOCAL_LLM_MAX_OUTPUT_TOKENS = 2048
 
 /**
  * Characters of input a local or self-hosted model can take in one request:
- * the context minus room for the answer and the prompt, at ~3 chars per token
- * (conservative for non-English text).
+ * the context minus room for the answer and the prompt, at ~3 chars per token.
+ * Chinese or Japanese text can take a token per character; the server's
+ * context error is then reported as input-too-long as well.
  */
 export const LOCAL_LLM_MAX_INPUT_CHARS =
   (LOCAL_LLM_CONTEXT_TOKENS - LOCAL_LLM_MAX_OUTPUT_TOKENS - 512) * 3
@@ -117,6 +120,18 @@ function hasFastAccel(profile: DeviceProfile): boolean {
   return profile.accel !== 'cpu' && !profile.emulated
 }
 
+/** The bundled programs that run each kind of model */
+const KIND_RUNTIMES: Record<LocalModelKind, LocalRuntime[]> = {
+  stt: ['whisper', 'parakeet', 'llama'],
+  llm: ['llama']
+}
+
+/** Whether the local engine can run models of `kind`: one working runtime is enough */
+export function localEngineCheck(kind: LocalModelKind, profile: DeviceProfile): RuntimeCheck {
+  const checks = KIND_RUNTIMES[kind].map((runtime) => profile.runtimes[runtime])
+  return checks.find((check) => check.available) ?? checks[0]
+}
+
 /**
  * Best default for this device. Speech models are always multilingual so
  * changing the dictation language never silently breaks recognition.
@@ -142,6 +157,7 @@ export function rateModel(
   languages: string[],
   installed: boolean
 ): ModelRating {
+  if (!profile.runtimes[model.runtime].available) return 'runtime-unavailable'
   if (!supportsLanguages(model, languages)) return 'unsupported-language'
   if (profile.totalRamGB < model.minRamGB) return 'insufficient-ram'
   if (
@@ -158,11 +174,15 @@ export function rateModel(
   return 'ok'
 }
 
-/** Remove reasoning blocks some models emit even when asked not to */
+/**
+ * Remove reasoning blocks some models emit even when asked not to: complete
+ * ones, one whose opening tag is in the template, and one cut off by the token limit
+ */
 export function stripThinking(text: string): string {
   return text
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/^[\s\S]*?<\/think>/i, '')
+    .replace(/<think>[\s\S]*$/i, '')
     .trim()
 }
 

@@ -173,8 +173,10 @@ function migrateTriggerProviders(): void {
   const global = store.get('aiProvider') || 'gemini'
   const triggers = store.get('triggers') ?? []
   const migrated = triggers.map((trigger) => {
-    const config = trigger.actionConfig as { type?: string; provider?: string; model?: string }
-    const followsGlobal = config.type === 'ai-chat' && config.provider === global && !config.model
+    const config = trigger.actionConfig as
+      | { type?: string; provider?: string; model?: string }
+      | undefined
+    const followsGlobal = config?.type === 'ai-chat' && config.provider === global && !config.model
     return followsGlobal
       ? { ...trigger, actionConfig: { ...config, provider: 'default' } }
       : trigger

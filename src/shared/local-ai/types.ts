@@ -94,12 +94,14 @@ export interface DeviceProfile {
   emulated: boolean
   gpuName: string | null
   accel: GpuAcceleration
-  runtimes: Record<LocalModelKind, RuntimeCheck>
+  /** Whether each bundled program starts on this computer */
+  runtimes: Record<LocalRuntime, RuntimeCheck>
   modelsDir: string
   modelsDirWarning?: ModelsDirWarning
 }
 
 export type ModelRating =
+  | 'runtime-unavailable'
   | 'recommended'
   | 'ok'
   | 'slow'
@@ -107,7 +109,7 @@ export type ModelRating =
   | 'insufficient-ram'
   | 'insufficient-disk'
 
-export type DownloadState = 'downloading' | 'verifying' | 'done' | 'error' | 'cancelled'
+export type DownloadState = 'downloading' | 'done' | 'error' | 'cancelled'
 
 export interface DownloadProgress {
   id: string

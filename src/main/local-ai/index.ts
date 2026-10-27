@@ -32,8 +32,8 @@ import {
   testServer,
   type SelfHostedTarget
 } from './self-hosted'
-import { parakeetTranscribe } from './parakeet'
-import { PidFile, SidecarServer, type RuntimeOptions } from './sidecar'
+import { parakeetBusy, parakeetTranscribe } from './parakeet'
+import { PidFile, SidecarServer, type RuntimeOptions, type SidecarLaunch } from './sidecar'
 import { whisperLaunch, whisperTranscribe } from './whisper'
 import { DEFAULT_LOCAL_AI_SETTINGS, getModel } from '../../shared/local-ai/catalog'
 import type {
@@ -48,8 +48,11 @@ import type {
 
 const KINDS: LocalModelKind[] = ['stt', 'llm']
 
-/** Server-based runtimes and how to launch them (parakeet runs per request) */
-const LAUNCHERS = { whisper: whisperLaunch, llama: llamaLaunch }
+/** Server-based runtimes and how to launch them (Parakeet runs once per request) */
+const LAUNCHERS: Partial<Record<LocalRuntime, (options: RuntimeOptions) => SidecarLaunch>> = {
+  whisper: whisperLaunch,
+  llama: llamaLaunch
+}
 
 let servers: Record<LocalModelKind, SidecarServer> | null = null
 /** Runtimes whose GPU start failed this session; they run on the CPU from then on */
@@ -114,52 +117,69 @@ async function withGpuFallback<T>(
       err instanceof SidecarStartError ||
       (model.runtime === 'parakeet' && err instanceof LocalAiError && err.code === 'server-failed')
     if (!useGpu || !startFailed || (err as LocalAiError).code === 'timeout') return toFailure(err)
-    gpuFailed.add(model.runtime)
     try {
-      return ok(await attempt(false))
+      const result = await attempt(false)
+      // Only a failure the CPU doesn't share is the GPU's, so stop using it this session
+      gpuFailed.add(model.runtime)
+      return ok(result)
     } catch (cpuErr) {
       return toFailure(cpuErr)
     }
   }
 }
 
-/** Run a request on the active model's server for `kind` */
-async function runOnServer<T>(
-  kind: LocalModelKind,
-  task: (baseUrl: string, model: LocalModelEntry) => Promise<T>
+/** Use the server of a prepared model: run a request on it, or just load it */
+async function onServer<T>(
+  prepared: Prepared,
+  use: (server: SidecarServer, launch: SidecarLaunch) => Promise<T>
 ): Promise<LocalAiResult<T>> {
-  if (!servers) return { ok: false, code: 'runtime-unavailable' }
-  const server = servers[kind]
-  const prepared = await prepare(kind)
-  if (!prepared.ok) return prepared
-  const { model, options, gpuWanted } = prepared.data
-  if (model.runtime === 'parakeet') return { ok: false, code: 'runtime-unavailable' }
-  const launch = LAUNCHERS[model.runtime]
-  return withGpuFallback(prepared.data, (useGpu) =>
-    server.run({ ...launch(options(useGpu)), cpuFallback: gpuWanted && !useGpu }, (baseUrl) =>
-      task(baseUrl, model)
-    )
+  const { model, options, gpuWanted } = prepared
+  const launcher = LAUNCHERS[model.runtime]
+  if (!servers || !launcher) return { ok: false, code: 'runtime-unavailable' }
+  const server = servers[model.kind]
+  const result = await withGpuFallback(prepared, (useGpu) =>
+    use(server, { ...launcher(options(useGpu)), cpuFallback: gpuWanted && !useGpu })
   )
+  // The connection to our own server dropped: it crashed, there's no address to check
+  return !result.ok && result.code === 'unreachable' ? { ...result, code: 'server-failed' } : result
 }
 
 async function transcribe(input: TranscribeInput): Promise<LocalAiResult<string>> {
   const prepared = await prepare('stt')
   if (!prepared.ok) return prepared
   const { model, options } = prepared.data
-  if (model.runtime === 'parakeet') {
-    // A server-based speech model that is still loaded only holds memory now
-    void servers?.stt.stop()
-    return withGpuFallback(prepared.data, (useGpu) => parakeetTranscribe(options(useGpu), input))
+  switch (model.runtime) {
+    case 'parakeet':
+      // A server-based speech model that is still loaded only holds memory now
+      void servers?.stt.stop()
+      return withGpuFallback(prepared.data, (useGpu) => parakeetTranscribe(options(useGpu), input))
+    case 'whisper':
+      return onServer(prepared.data, (server, launch) =>
+        server.run(launch, (baseUrl) => whisperTranscribe(baseUrl, input))
+      )
+    case 'llama':
+      return onServer(prepared.data, (server, launch) =>
+        server.run(launch, (baseUrl) => llamaTranscribe(baseUrl, input))
+      )
   }
-  return runOnServer('stt', (baseUrl, m) =>
-    m.runtime === 'whisper' ? whisperTranscribe(baseUrl, input) : llamaTranscribe(baseUrl, input)
+}
+
+async function chat(input: ChatInput): Promise<LocalAiResult<string>> {
+  const prepared = await prepare('llm')
+  if (!prepared.ok) return prepared
+  const { model } = prepared.data
+  return onServer(prepared.data, (server, launch) =>
+    server.run(launch, (baseUrl) => llamaChat(baseUrl, input, model))
   )
 }
 
-/** Load the active model ahead of the first request (Parakeet loads per request) */
+/** Load the active model ahead of the first request */
 async function warmUp(kind: LocalModelKind): Promise<LocalAiResult<void>> {
-  if (getModel(activeModelId(kind))?.runtime === 'parakeet') return ok(undefined)
-  return runOnServer(kind, async () => undefined)
+  const prepared = await prepare(kind)
+  if (!prepared.ok) return prepared
+  // Parakeet has no server to load; each request starts it
+  if (prepared.data.model.runtime === 'parakeet') return ok(undefined)
+  return onServer(prepared.data, (server, launch) => server.load(launch))
 }
 
 async function guarded<T>(work: () => Promise<T>): Promise<LocalAiResult<T>> {
@@ -192,6 +212,9 @@ export function registerLocalAi(windowManager: WindowManager): void {
     cancelDownload(id)
   )
   ipcMain.handle('localAi:delete', async (_e: IpcMainInvokeEvent, id: string) => {
+    if (getModel(id)?.runtime === 'parakeet' && parakeetBusy()) {
+      return { ok: false, code: 'model-in-use' } satisfies LocalAiResult<void>
+    }
     for (const server of Object.values(servers ?? {})) {
       const status = server.getStatus()
       if (status.modelId !== id) continue
@@ -211,9 +234,7 @@ export function registerLocalAi(windowManager: WindowManager): void {
   ipcMain.handle('localAi:transcribe', (_e: IpcMainInvokeEvent, input: TranscribeInput) =>
     transcribe(input)
   )
-  ipcMain.handle('localAi:chat', (_e: IpcMainInvokeEvent, input: ChatInput) =>
-    runOnServer('llm', (baseUrl, model) => llamaChat(baseUrl, input, model))
-  )
+  ipcMain.handle('localAi:chat', (_e: IpcMainInvokeEvent, input: ChatInput) => chat(input))
 
   ipcMain.handle('localAi:choose-models-dir', async () => {
     const result = await dialog.showOpenDialog({
