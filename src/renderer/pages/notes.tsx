@@ -205,17 +205,23 @@ export function Notes(): JSX.Element {
   const handleStopRecording = useCallback(async () => {
     if (!isRecording) return
 
+    const durationSeconds = (Date.now() - recordingStartRef.current) / 1000
     setIsRecording(false)
+    // Show the busy state right away so Record can't be pressed mid-stop
+    setIsTranscribing(true)
     let blob: Blob | null = null
     try {
       blob = await stopRecording()
     } catch (err) {
+      setIsTranscribing(false)
       setRecordingError({ message: errorMessage(err), canRetry: false })
       return
     }
-    if (!blob) return
+    if (!blob) {
+      setIsTranscribing(false)
+      return
+    }
 
-    const durationSeconds = (Date.now() - recordingStartRef.current) / 1000
     await transcribeAndSave({ blob, durationSeconds })
   }, [isRecording, stopRecording, transcribeAndSave])
 
