@@ -41,7 +41,11 @@ export interface TranscriptionResponse {
  * Route AI text processing to the configured provider
  */
 export async function processText(request: AIRequest): Promise<AIResponse> {
-  const config = await window.tapwisper.store.getAll() as any
+  const config = (await window.tapwisper.store.getAll()) as {
+    aiProvider?: LLMProvider
+    apiKeys?: Record<string, string>
+    models?: Record<string, string>
+  }
   const provider: LLMProvider = request.providerOverride || config.aiProvider || 'gemini'
   const apiKey = config.apiKeys?.[provider] || ''
   const model = request.modelOverride || config.models?.[provider] || ''

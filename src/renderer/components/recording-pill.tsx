@@ -230,13 +230,14 @@ export function RecordingPill(): JSX.Element {
     document.documentElement.classList.add('transparent')
 
     const unsubShow = window.tapwisper.on('recording-pill:show', () => {
-      setState('recording')
+      // A show can be delivered just after an error notice — don't replace it
+      setState((s) => (s === 'transient-error' ? s : 'recording'))
     })
 
     const unsubHide = window.tapwisper.on('recording-pill:hide', () => {
       setState('done')
       resetAll()
-      setTimeout(() => setState('hidden'), 250)
+      setTimeout(() => setState((s) => (s === 'done' ? 'hidden' : s)), 250)
     })
 
     const unsubStart = window.tapwisper.on('recording:start', () => {
@@ -256,7 +257,7 @@ export function RecordingPill(): JSX.Element {
     const unsubCancel = window.tapwisper.on('recording:cancel', () => {
       setState('done')
       resetAll()
-      setTimeout(() => setState('hidden'), 250)
+      setTimeout(() => setState((s) => (s === 'done' ? 'hidden' : s)), 250)
     })
 
     const unsubWaveform = window.tapwisper.on('waveform:data', (data: unknown) => {

@@ -56,8 +56,11 @@ function isLikelyHallucination(text: string, voicedMs: number): boolean {
 
 /** Show a short error in the recording pill (auto-dismisses) */
 function showPillError(message: string): void {
-  window.tapwisper.recordingPill.show()
-  window.tapwisper.window.send('recordingPill', 'recording:error', message)
+  // Send the error only after the pill's own show event, so it isn't overwritten
+  void window.tapwisper.recordingPill
+    .show()
+    .catch(() => {})
+    .then(() => window.tapwisper.window.send('recordingPill', 'recording:error', message))
 }
 
 function friendlyError(err: unknown): string {
@@ -203,7 +206,7 @@ export function PinnedPanel(): JSX.Element {
 
               try {
                 const execResult = await executeTrigger(triggerMatch)
-                if (!execResult.success) {
+                if (!execResult.success && !execResult.errorShown) {
                   showPillError(
                     i18n.t('errors.triggerFailed', '“{{name}}” failed: {{error}}', {
                       name: triggerMatch.trigger.name,
@@ -222,8 +225,8 @@ export function PinnedPanel(): JSX.Element {
               return
             }
           }
-        } catch (err) {
-          console.error('[PinnedPanel] Trigger matching failed:', err)
+        } catch {
+          // Matching failed — fall through to normal dictation so nothing is lost
         }
       }
 

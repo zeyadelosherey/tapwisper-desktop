@@ -17,6 +17,8 @@ export interface ExecutionResult {
   success: boolean
   output?: string
   error?: string
+  /** True when the executor already displayed the error itself */
+  errorShown?: boolean
 }
 
 /**
@@ -46,11 +48,12 @@ export async function executeTrigger(match: TriggerMatch): Promise<ExecutionResu
       default:
         return { success: false, error: `Unknown action type: ${(config as TriggerActionConfig).type}` }
     }
-  } catch (err: any) {
-    console.error('[TriggerExecutor] Execution failed:', err)
+  } catch (err: unknown) {
     return {
       success: false,
-      error: err.message || i18n.t('errors.triggerExecutionFailed', 'Trigger execution failed')
+      error:
+        (err instanceof Error && err.message) ||
+        i18n.t('errors.triggerExecutionFailed', 'Trigger execution failed')
     }
   }
 }
@@ -110,14 +113,16 @@ async function executeAIChat(config: AIChatConfig, speechInput: string): Promise
         })
         return { success: true, output: result }
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message =
+      (err instanceof Error && err.message) || i18n.t('errors.aiFailed', 'AI processing failed')
     // Show error in the pill for all modes since we always show the loading state
     window.tapwisper.window.send(
       'recordingPill',
       'result-panel:error',
-      err.message || i18n.t('errors.aiFailed', 'AI processing failed')
+      message
     )
-    return { success: false, error: err.message }
+    return { success: false, error: message, errorShown: true }
   }
 }
 

@@ -727,7 +727,7 @@ export function Settings(): JSX.Element {
         applyTheme(th as Theme)
       }
       if (auto !== undefined) setAutoLaunch(auto as boolean)
-      setPlatformInfo(platform as any)
+      setPlatformInfo(platform as { platform: string; isMac: boolean; version: string })
       if (sc) setShortcuts({ ...DEFAULT_SHORTCUTS, ...sc } as ShortcutsConfig)
       if (llm) setSelectedLLM(llm as LLMProvider)
       if (voice) setSelectedVoice(voice as VoiceProvider)

@@ -4,14 +4,30 @@
  */
 
 import { getStore, migrateApiKeysToSafeStorage } from './store'
+
+/** Untyped view of the store for keys that predate the current AppConfig schema */
+// Legacy JSON shapes are loosely typed; numbers/strings are coerced below
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type LegacyRecord = Record<string, any>
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+function legacyStore(): {
+  get: (key: string) => unknown
+  delete: (key: string) => void
+} {
+  return getStore() as unknown as {
+    get: (key: string) => unknown
+    delete: (key: string) => void
+  }
+}
 import * as db from './database'
 
 /**
  * Migrate stats data from electron-store to database
  */
 function migrateStats(): void {
-  const store = getStore()
-  const oldStats = store.get('stats' as any)
+  const legacy = legacyStore()
+  const oldStats = legacy.get('stats') as LegacyRecord | undefined
   
   if (!oldStats) {
     return
@@ -34,7 +50,7 @@ function migrateStats(): void {
     })
     
     // Remove old data to avoid re-migration
-    store.delete('stats' as any)
+    legacy.delete('stats')
   } catch {
     // Migration failure is non-fatal — old data stays in electron-store
   }
@@ -44,8 +60,8 @@ function migrateStats(): void {
  * Migrate activity records from electron-store to database
  */
 function migrateActivityRecords(): void {
-  const store = getStore()
-  const oldRecords = store.get('activityRecords' as any)
+  const legacy = legacyStore()
+  const oldRecords = legacy.get('activityRecords')
   
   if (!oldRecords || !Array.isArray(oldRecords)) {
     return
@@ -71,7 +87,7 @@ function migrateActivityRecords(): void {
     }
     
     // Remove old data to avoid re-migration
-    store.delete('activityRecords' as any)
+    legacy.delete('activityRecords')
   } catch {
     // Migration failure is non-fatal — old data stays in electron-store
   }

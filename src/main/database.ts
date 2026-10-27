@@ -194,7 +194,7 @@ export function updateStats(data: Partial<StatsData>): void {
   const database = getDatabase()
   
   const updates: string[] = []
-  const values: any[] = []
+  const values: Array<string | number> = []
   
   // Build dynamic UPDATE query
   for (const [key, value] of Object.entries(data)) {
@@ -386,7 +386,7 @@ export function getActivityStats(startDate: number, endDate: number): {
     WHERE timestamp >= ? AND timestamp <= ?
   `)
   
-  return stmt.get(startDate, endDate) as any
+  return stmt.get(startDate, endDate) as ReturnType<typeof getActivityStats>
 }
 
 /**
