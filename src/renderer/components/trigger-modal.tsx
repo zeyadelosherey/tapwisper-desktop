@@ -763,9 +763,13 @@ function TerminalConfigForm({
             config.showOutput ? 'bg-sky-accent' : 'bg-theme-surface/60'
           }`}
         >
-          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-            config.showOutput ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
-          }`} />
+          <div
+            className={`absolute top-1 start-0 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+              config.showOutput
+                ? 'ltr:translate-x-5 rtl:-translate-x-5'
+                : 'ltr:translate-x-1 rtl:-translate-x-1'
+            }`}
+          />
         </button>
       </div>
 

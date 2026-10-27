@@ -851,7 +851,7 @@ export function Settings(): JSX.Element {
               <div
                 className={`
                   w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all
-                  ${keepMicWarm ? 'ltr:left-[22px] rtl:right-[22px]' : 'ltr:left-0.5 rtl:right-0.5'}
+                  ${keepMicWarm ? 'start-[22px]' : 'start-0.5'}
                 `}
               />
             </button>
@@ -916,7 +916,7 @@ export function Settings(): JSX.Element {
             <div
               className={`
                 w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all
-                ${autoLaunch ? 'ltr:left-[22px] rtl:right-[22px]' : 'ltr:left-0.5 rtl:right-0.5'}
+                ${autoLaunch ? 'start-[22px]' : 'start-0.5'}
               `}
             />
           </button>

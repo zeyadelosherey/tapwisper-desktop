@@ -394,14 +394,14 @@ export function PinnedPanel(): JSX.Element {
       <div
         key={animKey}
         className={`
-          flex items-center gap-3 pl-1.5 pr-1.5 py-1.5
+          flex items-center gap-3 px-1.5 py-1.5
           bg-[#0A0A0A]/95 rounded-full pill-shadow
           opacity-100 scale-100 animate-scale-up
           transition-all duration-300 ease-out
         `}
         style={{ height: 44 }}
       >
-        {/* Cancel (X) button — left side (invisible placeholder when transcribing) */}
+        {/* Cancel (X) button — start side (invisible placeholder when transcribing) */}
         {!isTranscribing ? (
           <button
             onClick={handleCancel}
@@ -428,7 +428,7 @@ export function PinnedPanel(): JSX.Element {
           />
         </div>
 
-        {/* Right side: stop button (recording) or spinner (transcribing) */}
+        {/* End side: stop button (recording) or spinner (transcribing) */}
         {state === 'recording' ? (
           <button
             onClick={handleStop}
