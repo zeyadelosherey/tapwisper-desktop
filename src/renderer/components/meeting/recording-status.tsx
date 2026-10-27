@@ -90,7 +90,7 @@ export const RecordingClock = memo(function RecordingClock({
       <span
         aria-hidden="true"
         className={`h-2 w-2 shrink-0 rounded-full ${
-          paused ? 'bg-ink-faint' : 'bg-ember motion-safe:animate-live-pulse'
+          paused ? 'bg-ink-faint' : 'bg-ember'
         }`}
       />
       <time className="text-[12.5px] font-semibold text-ink tabular" dir="ltr">

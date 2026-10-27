@@ -73,6 +73,11 @@ export interface MeetingRecorder {
 
 // ── Implementation ─────────────────────────────────────────────────
 
+/**
+ * How often the timer/meters state updates. Each update re-renders the
+ * notepad header; 5Hz keeps meters lively at half the work of 10Hz.
+ */
+const UI_TICK_MS = 200
 /** How often the running duration is persisted (crash recovery) */
 const PERSIST_EVERY_MS = 30_000
 /** Chunks with less speech than this aren't sent for transcription */
@@ -289,7 +294,7 @@ export function useMeetingRecorder(): MeetingRecorder {
         lastPersistRef.current = Date.now()
         void window.tapwisper.meetings.update(m.id, { durationSeconds: ms / 1000 }).catch(() => {})
       }
-    }, 100)
+    }, UI_TICK_MS)
     return () => clearInterval(id)
   }, [status, clock])
 

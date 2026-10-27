@@ -530,7 +530,7 @@ export function PinnedPanel(): JSX.Element {
           <span
             aria-hidden="true"
             className={`w-2 h-2 rounded-full transition-colors duration-200 ${
-              isTranscribing ? 'bg-white/25' : 'bg-ember animate-live-pulse'
+              isTranscribing ? 'bg-white/25' : 'bg-ember'
             }`}
           />
           <WaveformBars

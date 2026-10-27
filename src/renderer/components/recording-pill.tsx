@@ -451,7 +451,7 @@ export function RecordingPill(): JSX.Element {
         ) : (
           <div className="flex items-center gap-2.5">
             {state === 'recording' && (
-              <span aria-hidden="true" className="w-2 h-2 rounded-full bg-ember animate-live-pulse" />
+              <span aria-hidden="true" className="w-2 h-2 rounded-full bg-ember" />
             )}
             <WaveformBars
               data={waveformData}

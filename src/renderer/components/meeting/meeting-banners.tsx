@@ -80,7 +80,7 @@ const RecordingBanner = memo(function RecordingBanner({
       <span
         aria-hidden="true"
         className={`h-2 w-2 shrink-0 rounded-full ${
-          paused ? 'bg-ink-faint' : 'bg-ember motion-safe:animate-live-pulse'
+          paused ? 'bg-ink-faint' : 'bg-ember'
         }`}
       />
       <span className="min-w-0 truncate font-medium text-ink">

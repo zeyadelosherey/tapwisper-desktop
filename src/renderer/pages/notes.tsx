@@ -258,7 +258,7 @@ export function Notes(): JSX.Element {
         {isRecording ? (
           <div className="card flex items-center gap-4 border-ember/30 px-3.5 py-2.5">
             <div className="flex flex-1 items-center gap-4">
-              <span className="ember-dot animate-live-pulse" aria-hidden="true" />
+              <span className="ember-dot" aria-hidden="true" />
               <div className="flex-1">
                 <p className="text-[14px] font-medium text-ink">
                   {t('notes.recording', 'Recording...')}
