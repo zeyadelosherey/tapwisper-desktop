@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Sparkles, Search, MessageCircle, ChevronRight, X } from 'lucide-react'
+import { Search, MessageCircle, ChevronRight, X } from 'lucide-react'
 import { BUILT_IN_CATEGORIES, type ActionCategory, type ActionItem } from '../models/actions-config'
 import { CATEGORY_COLORS } from '../constants/colors'
 import { CategoryIcon } from './icon-map'
@@ -134,10 +134,7 @@ export function CommandPopup(): JSX.Element {
       <div className="glass rounded-2xl popup-shadow w-full max-h-full flex flex-col overflow-hidden animate-scale-up border border-theme-border/40">
         {/* Header — clean title, optional text preview */}
         <div className="drag-region flex items-center gap-3 px-4 pt-3 pb-2">
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-sky-accent/15">
-              <Sparkles className="w-4 h-4 text-sky-accent" />
-            </div>
+          <div className="flex h-8 items-center gap-2 shrink-0">
             <span className="font-display text-[16px] leading-none text-theme-text">
               {t('commandPopup.title', 'AI Actions')}
             </span>
