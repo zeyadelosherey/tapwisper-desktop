@@ -69,12 +69,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y glslc libvulkan-dev spirv-headers mesa-vulkan-drivers
 
+      # The full LunarG SDK, as llama.cpp's CI installs it: ggml's Vulkan backend also
+      # needs the SDK's SPIRV-Headers CMake package
       - name: Install Vulkan SDK
         if: matrix.vulkan && runner.os == 'Windows'
-        uses: humbletim/install-vulkan-sdk@v1.2
-        with:
-          version: 1.4.309.0
-          cache: true
+        shell: pwsh
+        env:
+          VULKAN_VERSION: 1.4.357.0
+        run: |
+          curl.exe -o "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" -L "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\bin"
 
       - name: Build local AI runtimes
         run: npm run build:runtimes -- ${{ matrix.vulkan && '--vulkan' || '' }}
