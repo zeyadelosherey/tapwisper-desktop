@@ -1,11 +1,11 @@
-import { app, globalShortcut, systemPreferences } from 'electron'
+import { globalShortcut, systemPreferences } from 'electron'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { existsSync } from 'fs'
-import path from 'path'
 import { uIOhook, UiohookKey, type UiohookKeyboardEvent } from 'uiohook-napi'
 import { WindowManager } from './windows'
 import { ClipboardManager } from './clipboard'
 import { getStore } from './store'
+import { bundledBinaryPath } from './bundled-binary'
 import { trackKeyDown, trackKeyUp } from './key-state'
 import {
   HOLD_THRESHOLD_MS,
@@ -541,11 +541,7 @@ function onModifierUp(keycode: number): void {
 let fnMonitor: ChildProcessWithoutNullStreams | null = null
 
 function fnMonitorPath(): string {
-  const relative = path.join('resources', 'bin', 'fn-monitor')
-  // Packaged: resources are unpacked next to app.asar (see asarUnpack)
-  return app.isPackaged
-    ? path.join(process.resourcesPath, 'app.asar.unpacked', relative)
-    : path.join(app.getAppPath(), relative)
+  return bundledBinaryPath('fn-monitor')
 }
 
 /** Whether the fn/Globe shortcut can work here (macOS with the helper installed) */
