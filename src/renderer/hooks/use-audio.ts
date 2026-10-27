@@ -5,6 +5,10 @@ import i18n from '../i18n'
 // Module-level constants to avoid repeated allocations
 const EMPTY_WAVEFORM: number[] = [0, 0, 0, 0, 0, 0, 0]
 const IPC_THROTTLE_MS = 66 // ~15fps for IPC sends (visually sufficient for waveform)
+// Audio analysis runs on a timer, not requestAnimationFrame: a rAF loop makes
+// the (visible) recording panel produce a frame every vsync, which measured
+// ~15% CPU on its own. 25Hz is plenty for VAD and a 15fps meter.
+const ANALYSIS_INTERVAL_MS = 40
 
 
 // Voice activity detection. RMS of the raw waveform (−1..1). With noise
@@ -136,12 +140,12 @@ export function useAudio(): UseAudioReturn {
     if (now - lastIpcSendTimeRef.current >= IPC_THROTTLE_MS) {
       lastIpcSendTimeRef.current = now
       setState((prev) => ({ ...prev, waveformData: newData }))
+      // The pill is another window; this window reads `state` directly (no IPC round trip)
       window.tapwisper.window.send('recordingPill', 'waveform:data', newData)
-      window.tapwisper.window.send('pinnedPanel', 'waveform:data', newData)
     }
 
     if (isRecordingRef.current) {
-      animFrameRef.current = requestAnimationFrame(updateWaveform)
+      animFrameRef.current = window.setTimeout(updateWaveform, ANALYSIS_INTERVAL_MS)
     }
   }, [])
 
@@ -292,7 +296,7 @@ export function useAudio(): UseAudioReturn {
       setState((prev) => ({ ...prev, isRecording: true, duration: 0 }))
 
       // Start waveform updates
-      animFrameRef.current = requestAnimationFrame(updateWaveform)
+      animFrameRef.current = window.setTimeout(updateWaveform, ANALYSIS_INTERVAL_MS)
     } catch (error) {
       const name = error instanceof DOMException ? error.name : ''
       if (name === 'NotAllowedError' || name === 'SecurityError') {
@@ -396,7 +400,7 @@ export function useAudio(): UseAudioReturn {
    */
   const cleanupRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+    if (animFrameRef.current) clearTimeout(animFrameRef.current)
     if (audioContextRef.current) {
       audioContextRef.current.close()
     }

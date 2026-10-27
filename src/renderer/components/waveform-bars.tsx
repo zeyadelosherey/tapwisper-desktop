@@ -18,6 +18,8 @@ const SPRING_MASS = 1
 const MIN_HEIGHT = 4
 const REST_DISPLACEMENT = 0.1
 const REST_VELOCITY = 0.5
+/** Bars update at ~20fps — smooth for a level meter, a third of the frames of 60fps */
+const FRAME_INTERVAL_MS = 50
 
 export function WaveformBars({
   data,
@@ -33,6 +35,7 @@ export function WaveformBars({
   const targetRef = useRef<number[]>(Array(barCount).fill(MIN_HEIGHT))
   const velocityRef = useRef<number[]>(Array(barCount).fill(0))
   const rafRef = useRef<number | null>(null)
+  const timeoutRef = useRef<number | null>(null)
   const lastTimeRef = useRef<number>(0)
   const barRefsArr = useRef<(HTMLDivElement | null)[]>([])
   const isAnimatingRef = useRef(false)
@@ -45,8 +48,8 @@ export function WaveformBars({
   // Spring animation loop — uses direct DOM manipulation instead of setState
   const animate = useCallback(
     (time: number) => {
-      if (!lastTimeRef.current) lastTimeRef.current = time
-      const dt = Math.min((time - lastTimeRef.current) / 1000, 0.032) // cap at ~30fps delta
+      if (!lastTimeRef.current) lastTimeRef.current = time - FRAME_INTERVAL_MS
+      const dt = Math.min((time - lastTimeRef.current) / 1000, 0.05)
       lastTimeRef.current = time
 
       let needsUpdate = false
@@ -69,10 +72,12 @@ export function WaveformBars({
 
         const clampedHeight = Math.max(MIN_HEIGHT, Math.min(maxHeight, newPosition))
 
-        // Direct DOM update — avoids React re-render entirely
+        // Direct DOM update — avoids React re-render entirely. scaleY is
+        // compositor-only: no layout, and no repaint of the surrounding
+        // (shadowed) capsule on every frame like a height change would cause
         const barEl = barRefsArr.current[i]
         if (barEl) {
-          barEl.style.height = `${clampedHeight}px`
+          barEl.style.transform = `scaleY(${(clampedHeight / maxHeight).toFixed(3)})`
         }
 
         // Check if still animating (not at rest)
@@ -81,10 +86,15 @@ export function WaveformBars({
         }
       }
 
-      // Only continue rAF if bars are still moving toward targets
-      // This stops the loop entirely when bars are at rest, saving CPU
+      // Only continue while bars are still moving toward targets (stops
+      // entirely at rest). Wait with a timer and request a single frame when
+      // the next update is due — re-requesting rAF every vsync to skip
+      // frames would still make the window produce a frame each vsync.
       if (needsUpdate) {
-        rafRef.current = requestAnimationFrame(animate)
+        timeoutRef.current = window.setTimeout(() => {
+          timeoutRef.current = null
+          rafRef.current = requestAnimationFrame(animate)
+        }, FRAME_INTERVAL_MS)
       } else {
         isAnimatingRef.current = false
         rafRef.current = null
@@ -128,6 +138,10 @@ export function WaveformBars({
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
       }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
       isAnimatingRef.current = false
     }
   }, [])
@@ -135,7 +149,13 @@ export function WaveformBars({
   return (
     <div
       className={`flex items-center gap-[2.5px] ${className}`}
-      style={{ height: maxHeight }}
+      // Own compositing layer + containment: bar updates never invalidate the parent
+      style={{
+        height: maxHeight,
+        contain: 'strict',
+        width: barCount * (barWidth + 2.5) - 2.5,
+        willChange: 'transform'
+      }}
     >
       {Array.from({ length: barCount }, (_, i) => (
         <div
@@ -146,9 +166,11 @@ export function WaveformBars({
           className="rounded-full"
           style={{
             width: barWidth,
-            height: `${MIN_HEIGHT}px`,
+            height: maxHeight,
             backgroundColor: color,
-            willChange: 'height'
+            transform: `scaleY(${(MIN_HEIGHT / maxHeight).toFixed(3)})`,
+            transformOrigin: 'center',
+            willChange: 'transform'
           }}
         />
       ))}
