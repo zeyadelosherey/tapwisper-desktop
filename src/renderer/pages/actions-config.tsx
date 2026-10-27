@@ -18,6 +18,7 @@ import type { ConfirmDialogOptions } from '../components/confirm-dialog'
 import type { ActionCategory, ActionItem } from '../models/actions-config'
 import { BUILT_IN_CATEGORIES } from '../models/actions-config'
 import { actionLabel, categoryLabel } from '../utils/action-labels'
+import { Page, PageHeader } from '../components/ui/primitives'
 
 const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-sky-accent/60'
 const ICON_BUTTON = `w-8 h-8 rounded-lg flex items-center justify-center text-theme-text-tertiary transition-all disabled:opacity-30 disabled:pointer-events-none ${FOCUS_RING}`
@@ -478,20 +479,15 @@ export function ActionsConfig(): JSX.Element {
     t('actions.actionCount', '{{count}} actions', { count })
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="drag-region mb-8">
-        <h1 className="text-2xl font-bold text-theme-text">{t('nav.actions')}</h1>
-        <p className="text-sm text-theme-text-secondary mt-1">
-          {t('actions.manageCategories', 'Manage your AI action categories and toolbar')}
-        </p>
-      </div>
+    <Page>
+      <PageHeader
+        title={t('nav.actions')}
+        description={t('actions.manageCategories', 'Manage your AI action categories and toolbar')}
+      />
 
       {/* Toolbar Preview */}
       <section className="mb-8">
-        <h2 className="text-sm font-semibold text-theme-text-secondary uppercase tracking-wider mb-3">
-          {t('actions.toolbarPreview')}
-        </h2>
+        <h2 className="section-label mb-3">{t('actions.toolbarPreview')}</h2>
         <div className="flex gap-2 p-4 bg-theme-card rounded-xl border border-theme-border/50 overflow-x-auto">
           {sortedCategories
             .filter((c) => c.isVisible)
@@ -513,9 +509,7 @@ export function ActionsConfig(): JSX.Element {
 
       {/* Categories List */}
       <section className="mb-6">
-        <h2 className="text-sm font-semibold text-theme-text-secondary uppercase tracking-wider mb-3">
-          {t('actions.categories', 'Categories')}
-        </h2>
+        <h2 className="section-label mb-3">{t('actions.categories', 'Categories')}</h2>
         <ul>
           {sortedCategories.map((category, index) => {
             if (editor === category.id && !category.isBuiltIn) {
@@ -715,6 +709,6 @@ export function ActionsConfig(): JSX.Element {
         </button>
       )}
       {dialog}
-    </div>
+    </Page>
   )
 }

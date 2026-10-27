@@ -407,17 +407,17 @@ export function RecordingPill(): JSX.Element {
         }
         className={`
           shrink-0 flex items-center justify-center gap-3 px-4 py-1.5
-          bg-[#0A0A0A]/95 rounded-full pill-shadow
+          bg-capsule/95 border border-white/[0.08] rounded-full pill-shadow
           transition-all duration-300 ease-out
-          ${state === 'post-recording' || isTransientError ? 'cursor-pointer hover:bg-[#1A1A1A]/95' : ''}
-          ${isTransientError ? 'border border-red-500/40' : ''}
+          ${state === 'post-recording' || isTransientError ? 'cursor-pointer hover:bg-capsule' : ''}
+          ${isTransientError ? 'border border-[#F2857A]/40' : ''}
           ${isExiting ? 'opacity-0 scale-75' : 'opacity-100 scale-100 animate-scale-up'}
         `}
         style={{ height: 44 }}
       >
         {state === 'post-recording' ? (
           <div className="flex items-center gap-2 px-1">
-            <svg className="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-capsule-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
             <span className="text-[11px] text-white/60 font-medium">
@@ -434,11 +434,11 @@ export function RecordingPill(): JSX.Element {
         ) : (state === 'result' || state === 'error' || isTransientError) ? (
           <div className="flex items-center gap-2 px-1">
             {state === 'result' ? (
-              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="w-4 h-4 text-[#6FCF9C]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="w-4 h-4 text-[#F2857A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
               </svg>
             )}
@@ -449,15 +449,20 @@ export function RecordingPill(): JSX.Element {
             </span>
           </div>
         ) : (
-          <WaveformBars
-            data={waveformData}
-            barCount={7}
-            barWidth={3}
-            maxHeight={22}
-            color={state === 'transcribing' ? 'rgba(255,255,255,0.4)' : '#FFFFFF'}
-            animated={state === 'recording'}
-            settled={state === 'transcribing'}
-          />
+          <div className="flex items-center gap-2.5">
+            {state === 'recording' && (
+              <span aria-hidden="true" className="w-2 h-2 rounded-full bg-ember animate-live-pulse" />
+            )}
+            <WaveformBars
+              data={waveformData}
+              barCount={7}
+              barWidth={3}
+              maxHeight={22}
+              color={state === 'transcribing' ? 'rgba(255,255,255,0.4)' : 'rgb(var(--capsule-signal))'}
+              animated={state === 'recording'}
+              settled={state === 'transcribing'}
+            />
+          </div>
         )}
       </div>
 
@@ -467,13 +472,13 @@ export function RecordingPill(): JSX.Element {
           ref={panelRef}
           role="alert"
           onClick={dismissTransientError}
-          className="mt-2 w-[340px] max-w-[calc(100%-16px)] flex items-start gap-2.5 px-4 py-3 bg-[#0A0A0A]/95 rounded-2xl pill-shadow border border-red-500/30 cursor-pointer animate-slide-down"
+          className="mt-2 w-[340px] max-w-[calc(100%-16px)] flex items-start gap-2.5 px-4 py-3 bg-capsule/95 border border-white/[0.08] rounded-2xl pill-shadow border border-[#F2857A]/30 cursor-pointer animate-slide-down"
         >
-          <svg className="w-4 h-4 mt-0.5 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+          <svg className="w-4 h-4 mt-0.5 shrink-0 text-[#F2857A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
           </svg>
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-red-300 leading-relaxed line-clamp-4 break-words">{errorText}</p>
+            <p className="text-xs text-[#F5A39A] leading-relaxed line-clamp-4 break-words">{errorText}</p>
             <p className="mt-1 text-[10px] text-white/30">
               {t('recordingPill.clickToDismiss', 'Click to dismiss')}
             </p>
@@ -486,7 +491,7 @@ export function RecordingPill(): JSX.Element {
         <div
           ref={panelRef}
           className={`
-            mt-2 bg-[#0A0A0A]/95 rounded-2xl pill-shadow
+            mt-2 bg-capsule/95 border border-white/[0.08] rounded-2xl pill-shadow
             transition-all duration-300 ease-out
             animate-slide-down overflow-hidden flex flex-col
             ${isFullExpanded ? 'w-full max-w-[500px]' : 'w-[380px]'}
@@ -500,7 +505,7 @@ export function RecordingPill(): JSX.Element {
               {state === 'result' && actionLabel ? (
                 <div className="flex items-center gap-1.5">
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/8 border border-white/10">
-                    <svg className="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-3 h-3 text-capsule-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <span className="text-[11px] font-medium text-white/60">
@@ -555,7 +560,7 @@ export function RecordingPill(): JSX.Element {
               <div className="flex flex-col items-center justify-center py-6 gap-3">
                 {actionLabel && (
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/8 border border-white/10">
-                    <svg className="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-3 h-3 text-capsule-signal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <span className="text-[11px] font-medium text-white/60">
@@ -593,7 +598,7 @@ export function RecordingPill(): JSX.Element {
                           </span>
                           <button
                             onClick={() => handleRevert(idx)}
-                            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[10px] text-sky-400 hover:text-sky-300 transition-all"
+                            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[10px] text-capsule-signal hover:text-capsule-signal/80 transition-all"
                           >
                             {t('recordingPill.revert', 'Revert')}
                           </button>
@@ -608,20 +613,20 @@ export function RecordingPill(): JSX.Element {
 
             {state === 'error' && (
               <div className="py-2" role="alert">
-                <p className="text-xs text-red-400/90 leading-relaxed">{errorText}</p>
+                <p className="text-xs text-[#F2857A] leading-relaxed">{errorText}</p>
               </div>
             )}
 
             {state === 'result' && actionError && (
               <div
                 role="alert"
-                className="mt-2.5 flex items-start gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/25"
+                className="mt-2.5 flex items-start gap-2 px-3 py-2 rounded-xl bg-[#F2857A]/10 border border-[#F2857A]/25"
               >
-                <p className="flex-1 text-[11px] text-red-300 leading-relaxed break-words">{actionError}</p>
+                <p className="flex-1 text-[11px] text-[#F5A39A] leading-relaxed break-words">{actionError}</p>
                 <button
                   onClick={() => setActionError('')}
                   aria-label={t('recordingPill.dismissError', 'Dismiss error')}
-                  className="shrink-0 text-red-300/60 hover:text-red-300 transition-colors cursor-pointer"
+                  className="shrink-0 text-[#F5A39A]/60 hover:text-[#F5A39A] transition-colors cursor-pointer"
                 >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -692,7 +697,7 @@ export function RecordingPill(): JSX.Element {
                   <>
                     <button
                       onClick={handleAccept}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-full bg-white/90 hover:bg-white text-black text-xs font-semibold transition-all cursor-pointer"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-full bg-white hover:bg-white/90 text-capsule text-xs font-semibold transition-all cursor-pointer"
                     >
                       {t('common.confirm', 'Confirm')}
                     </button>
@@ -703,7 +708,7 @@ export function RecordingPill(): JSX.Element {
                     >
                       {copied ? (
                         <>
-                          <svg className="w-3.5 h-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <svg className="w-3.5 h-3.5 text-[#6FCF9C]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
                           {t('aiPanel.copied', 'Copied')}

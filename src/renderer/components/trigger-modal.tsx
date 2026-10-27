@@ -68,16 +68,6 @@ const ACTION_ICONS: Record<TriggerActionType, React.ReactNode> = {
   'launch-app': <Rocket className="w-5 h-5" />
 }
 
-const ACTION_COLORS: Record<TriggerActionType, string> = {
-  'web-search': '#7EB6E0',
-  'ai-chat': '#B07CD8',
-  'terminal': '#4DC778',
-  'keyboard': '#E8A838',
-  'apple-shortcut': '#E86B6B',
-  'window': '#6BB5E8',
-  'launch-app': '#E8A838'
-}
-
 // ── Main Component ──────────────────────────────────────────────
 
 export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): JSX.Element {
@@ -145,17 +135,17 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
   const isValid = triggerPhrase.trim().length >= 2
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(18_17_16/0.38)] backdrop-blur-[3px] animate-fade-in">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="trigger-modal-title"
-        className="bg-theme-card border border-theme-border/60 rounded-2xl shadow-2xl w-[580px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col overflow-hidden"
+        className="shadow-pop bg-raised border border-hairline rounded-2xl w-[600px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col overflow-hidden animate-scale-up"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-theme-border/40">
           <div>
-            <h2 id="trigger-modal-title" className="text-lg font-semibold text-theme-text">
+            <h2 id="trigger-modal-title" className="font-display text-[22px] leading-tight text-ink">
               {isEditing
                 ? t('triggerModal.editTitle', 'Edit Trigger')
                 : t('triggerModal.newTitle', 'New Trigger')}
@@ -173,9 +163,9 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
             onClick={onClose}
             aria-label={t('common.close', 'Close')}
             title={t('common.close', 'Close')}
-            className="w-8 h-8 rounded-lg hover:bg-theme-surface flex items-center justify-center"
+            className="icon-btn"
           >
-            <X className="w-4 h-4 text-theme-text-tertiary" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -233,7 +223,7 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
           {step === 'configure' && (
             <button
               onClick={handleNext}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-theme-text text-theme-bg text-sm font-semibold hover:bg-theme-text/90 transition-all"
+              className="btn-primary"
             >
               {t('common.continue', 'Continue')}
               <ChevronRight className="w-4 h-4 rtl-flip" />
@@ -277,7 +267,6 @@ function ActionTypeStep({
       <div className="grid grid-cols-3 gap-2.5">
         {getAvailableActionTypes(window.tapwisper.platform.os).map((meta) => {
           const isActive = selected === meta.id
-          const color = ACTION_COLORS[meta.id]
           const text = actionTypeText(t, meta)
           return (
             <button
@@ -286,8 +275,8 @@ function ActionTypeStep({
               className={`
                 relative flex flex-col items-center text-center p-4 rounded-xl border transition-all
                 ${isActive
-                  ? 'border-sky-accent/50 bg-theme-surface/60'
-                  : 'border-theme-border/30 bg-theme-bg hover:border-theme-border/60 hover:bg-theme-surface/40'
+                  ? 'border-signal bg-signal-tint/40 ring-4 ring-signal/10'
+                  : 'border-hairline bg-raised hover:border-hairline-strong'
                 }
               `}
             >
@@ -297,16 +286,19 @@ function ActionTypeStep({
                 </div>
               )}
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center mb-2.5"
-                style={{ backgroundColor: `${color}15` }}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2.5 border ${
+                  isActive
+                    ? 'border-signal/30 bg-signal-tint text-signal'
+                    : 'border-hairline bg-panel text-ink-muted'
+                }`}
               >
-                <span style={{ color }}>{ACTION_ICONS[meta.id]}</span>
+                {ACTION_ICONS[meta.id]}
               </div>
               <p className="text-[13px] font-semibold text-theme-text">{text.label}</p>
               <p className="text-[11px] text-theme-text-tertiary mt-1 leading-tight line-clamp-2">
                 {text.description}
               </p>
-              <p className="text-[10px] mt-2 font-mono leading-tight" style={{ color: `${color}99` }}>
+              <p className="text-[10px] mt-2 font-mono leading-tight text-ink-soft">
                 {text.example}
               </p>
             </button>
@@ -931,9 +923,9 @@ function TerminalConfigForm({
                   onClick={() => removeCommand(idx)}
                   aria-label={t('triggerModal.removeCommand', 'Remove command')}
                   title={t('triggerModal.removeCommand', 'Remove command')}
-                  className="w-9 h-9 rounded-lg hover:bg-red-500/10 flex items-center justify-center shrink-0 self-center"
+                  className="icon-btn h-9 w-9 shrink-0 self-center hover:!text-danger"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>

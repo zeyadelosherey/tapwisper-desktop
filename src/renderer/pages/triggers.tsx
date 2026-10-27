@@ -10,8 +10,10 @@ import {
   Keyboard,
   Smartphone,
   AppWindow,
-  Rocket
+  Rocket,
+  AudioLines
 } from 'lucide-react'
+import { Page, PageHeader, Switch } from '../components/ui/primitives'
 import type { Trigger, TriggerActionType } from '../models/trigger'
 import { ACTION_TYPE_META } from '../models/trigger'
 import { TriggerModal } from '../components/trigger-modal'
@@ -26,18 +28,6 @@ const ACTION_ICONS: Record<TriggerActionType, React.ReactNode> = {
   window: <AppWindow className="w-4 h-4" />,
   'launch-app': <Rocket className="w-4 h-4" />
 }
-
-const ACTION_COLORS: Record<TriggerActionType, string> = {
-  'web-search': '#7EB6E0',
-  'ai-chat': '#B07CD8',
-  terminal: '#4DC778',
-  keyboard: '#E8A838',
-  'apple-shortcut': '#E86B6B',
-  window: '#6BB5E8',
-  'launch-app': '#E8A838'
-}
-
-const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-sky-accent/60'
 
 /**
  * Normalize a trigger phrase for duplicate detection:
@@ -185,90 +175,70 @@ export function Triggers(): JSX.Element {
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="drag-region mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-theme-text">{t('nav.triggers', 'Triggers')}</h1>
-          <p className="text-sm text-theme-text-secondary mt-1">
-            {t(
-              'triggers.subtitle',
-              'Create voice-activated triggers to perform actions when you say specific phrases'
-            )}
-          </p>
-        </div>
-        <button
-          onClick={handleNewTrigger}
-          className={`btn-primary flex items-center gap-2 shrink-0 no-drag ${FOCUS_RING}`}
-        >
-          <Plus className="w-4 h-4" />
-          {t('triggers.newTrigger', 'New Trigger')}
-        </button>
-      </div>
+    <Page>
+      <PageHeader
+        title={t('nav.triggers', 'Triggers')}
+        description={t(
+          'triggers.subtitle',
+          'Create voice-activated triggers to perform actions when you say specific phrases'
+        )}
+        actions={
+          <button onClick={handleNewTrigger} className="btn-primary">
+            <Plus className="h-4 w-4" />
+            {t('triggers.newTrigger', 'New Trigger')}
+          </button>
+        }
+      />
 
       {/* Triggers List */}
       {triggers.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-2xl bg-theme-surface/50 flex items-center justify-center mx-auto mb-4">
-            <Search className="w-7 h-7 text-theme-text-muted" />
-          </div>
-          <p className="text-sm font-medium text-theme-text-muted">
+        <div className="flex flex-col items-center rounded-2xl border border-dashed border-hairline-strong px-6 py-14 text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-signal-tint text-signal">
+            <AudioLines className="h-5 w-5" />
+          </span>
+          <p className="font-display mt-4 text-[20px] text-ink">
             {t('triggers.noTriggers', 'No triggers yet')}
           </p>
-          <p className="text-xs text-theme-text-muted mt-1.5 max-w-sm mx-auto">
+          <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-ink-muted">
             {t(
               'triggers.noTriggersHint',
               'Create a trigger to perform actions like web searches, AI chat, terminal commands, and more — just by speaking a phrase.'
             )}
           </p>
-          <button onClick={handleNewTrigger} className={`mt-5 btn-primary ${FOCUS_RING}`}>
+          <button onClick={handleNewTrigger} className="btn-primary mt-5">
             {t('triggers.createFirst', 'Create Your First Trigger')}
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="card divide-y divide-hairline overflow-hidden">
           {triggers.map((trigger) => (
             <div
               key={trigger.id}
-              className={`
-                group flex items-center gap-4 p-4 rounded-xl border transition-all
-                ${
-                  trigger.enabled
-                    ? 'bg-theme-card border-theme-border/30 hover:border-theme-border/50'
-                    : 'bg-theme-surface/30 border-theme-border/20 opacity-60'
-                }
-              `}
+              className={`group flex items-center gap-4 px-5 py-4 transition-colors duration-200 hover:bg-panel ${
+                trigger.enabled ? '' : 'opacity-60'
+              }`}
             >
               {/* Action type icon */}
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: `${ACTION_COLORS[trigger.actionType]}20` }}
-              >
-                <span style={{ color: ACTION_COLORS[trigger.actionType] }}>
-                  {ACTION_ICONS[trigger.actionType]}
-                </span>
-              </div>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-hairline bg-panel text-ink-muted">
+                {ACTION_ICONS[trigger.actionType]}
+              </span>
 
               {/* Trigger info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-theme-text truncate">
-                    {trigger.name}
-                  </span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-theme-surface/60 text-theme-text-muted shrink-0">
-                    {getActionLabel(trigger.actionType)}
-                  </span>
+                  <span className="truncate text-[14px] font-medium text-ink">{trigger.name}</span>
+                  <span className="chip shrink-0">{getActionLabel(trigger.actionType)}</span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-theme-text-muted">
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-[12.5px] text-ink-muted">
                     {t('triggers.say', 'Say:')} &ldquo;
-                    <span className="font-medium text-theme-text-secondary">
+                    <span className="font-medium text-ink" dir="auto">
                       {trigger.triggerPhrase}
                     </span>
                     &rdquo;
                   </span>
                   {trigger.triggerType === 'prefix' && (
-                    <span className="text-xs text-theme-text-muted">
+                    <span className="text-[12.5px] text-ink-soft">
                       {t('triggers.plusSpeech', '+ your speech')}
                     </span>
                   )}
@@ -279,45 +249,34 @@ export function Triggers(): JSX.Element {
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => handleEdit(trigger)}
-                  className={`w-8 h-8 rounded-lg hover:bg-theme-surface/60 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ${FOCUS_RING}`}
+                  className="icon-btn opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
                   title={t('common.edit', 'Edit')}
                   aria-label={t('triggers.editTrigger', 'Edit trigger {{name}}', {
                     name: trigger.name
                   })}
                 >
-                  <Pencil className="w-3.5 h-3.5 text-theme-text-muted" />
+                  <Pencil className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => deleteTrigger(trigger)}
-                  className={`w-8 h-8 rounded-lg hover:bg-red-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ${FOCUS_RING}`}
+                  className="icon-btn opacity-0 transition-opacity hover:!text-danger group-focus-within:opacity-100 group-hover:opacity-100"
                   title={t('common.delete', 'Delete')}
                   aria-label={t('triggers.deleteTrigger', 'Delete trigger {{name}}', {
                     name: trigger.name
                   })}
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
 
-                {/* Toggle switch */}
-                <button
-                  role="switch"
-                  aria-checked={trigger.enabled}
-                  aria-label={t('triggers.toggleTrigger', 'Enable trigger {{name}}', {
-                    name: trigger.name
-                  })}
-                  onClick={() => toggleEnabled(trigger)}
-                  className={`
-                    relative w-10 h-6 rounded-full transition-colors shrink-0 ${FOCUS_RING}
-                    ${trigger.enabled ? 'bg-sky-accent' : 'bg-theme-surface/60'}
-                  `}
-                >
-                  <div
-                    className={`
-                      absolute top-1 start-0 w-4 h-4 rounded-full bg-white shadow-sm transition-transform
-                      ${trigger.enabled ? 'ltr:translate-x-5 rtl:-translate-x-5' : 'ltr:translate-x-1 rtl:-translate-x-1'}
-                    `}
+                <span className="ms-1">
+                  <Switch
+                    checked={trigger.enabled}
+                    onChange={() => toggleEnabled(trigger)}
+                    label={t('triggers.toggleTrigger', 'Enable trigger {{name}}', {
+                      name: trigger.name
+                    })}
                   />
-                </button>
+                </span>
               </div>
             </div>
           ))}
@@ -329,6 +288,6 @@ export function Triggers(): JSX.Element {
         <TriggerModal trigger={editingTrigger} onSave={handleSave} onClose={handleCloseModal} />
       )}
       {dialog}
-    </div>
+    </Page>
   )
 }

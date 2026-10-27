@@ -4,6 +4,7 @@ import { Search, Plus, Check, Trash2, Library } from 'lucide-react'
 import { CategoryIcon } from '../components/icon-map'
 import type { ActionCategory, ActionItem } from '../models/actions-config'
 import { BUILT_IN_CATEGORIES } from '../models/actions-config'
+import { Page, PageHeader } from '../components/ui/primitives'
 
 interface PromptTemplate {
   id: string
@@ -336,14 +337,8 @@ export function MiniAppStore(): JSX.Element {
   )
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="drag-region mb-6">
-        <h1 className="text-2xl font-bold text-theme-text">{t('miniApps.title')}</h1>
-        <p className="text-sm text-theme-text-secondary mt-1">
-          {t('miniApps.subtitle')}
-        </p>
-      </div>
+    <Page>
+      <PageHeader title={t('miniApps.title')} description={t('miniApps.subtitle')} />
 
       {/* Honest description of where these templates come from */}
       <div className="flex items-start gap-3 p-3 mb-6 rounded-xl bg-theme-surface/30 border border-theme-border/30">
@@ -484,6 +479,6 @@ export function MiniAppStore(): JSX.Element {
           <p className="text-theme-text-muted text-sm">{t('miniApps.noPrompts', 'No prompts found')}</p>
         </div>
       )}
-    </div>
+    </Page>
   )
 }

@@ -138,7 +138,7 @@ export function CommandPopup(): JSX.Element {
             <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-sky-accent/15">
               <Sparkles className="w-4 h-4 text-sky-accent" />
             </div>
-            <span className="text-sm font-semibold text-theme-text">
+            <span className="font-display text-[16px] leading-none text-theme-text">
               {t('commandPopup.title', 'AI Actions')}
             </span>
           </div>

@@ -376,12 +376,12 @@ export function AISuggestionPanel(): JSX.Element {
   const errorBox = aiError ? (
     <div
       role="alert"
-      className="flex flex-col gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/25"
+      className="flex flex-col gap-2 p-3 rounded-xl bg-danger-tint border border-danger/25"
     >
       <div className="flex items-start gap-2">
-        <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+        <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-red-400">
+          <p className="text-sm font-medium text-danger">
             {t('aiPanel.errorTitle', 'AI request failed')}
           </p>
           <p className="text-xs text-theme-text-secondary mt-0.5 break-words">{aiError}</p>
@@ -399,7 +399,7 @@ export function AISuggestionPanel(): JSX.Element {
         <button
           onClick={handleRetry}
           disabled={isProcessing}
-          className="no-drag flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 text-xs font-medium transition-all disabled:opacity-40"
+          className="no-drag flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 text-xs font-medium transition-all disabled:opacity-40"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           {t('aiPanel.retry', 'Retry')}
@@ -419,7 +419,7 @@ export function AISuggestionPanel(): JSX.Element {
           {/* Header */}
           <div className="drag-region no-select flex items-center gap-2 px-4 py-3 border-b border-theme-border/50">
             <Sparkles className="w-4 h-4 text-sky-accent no-drag" />
-            <span className="flex-1 text-sm font-medium text-theme-text">
+            <span className="font-display flex-1 text-[16px] leading-none text-theme-text">
               {mode === 'ask-question'
                 ? t('actions.askQuestion')
                 : actionName
@@ -627,7 +627,7 @@ export function AISuggestionPanel(): JSX.Element {
                         msg.role === 'user'
                           ? 'bg-sky-accent/10 text-sky-accent ms-8'
                           : msg.isError
-                            ? 'bg-red-500/10 border border-red-500/25 text-red-400 me-8'
+                            ? 'bg-danger-tint border border-danger/25 text-danger me-8'
                             : 'bg-theme-surface/40 text-theme-text me-8'
                       }`}
                     >

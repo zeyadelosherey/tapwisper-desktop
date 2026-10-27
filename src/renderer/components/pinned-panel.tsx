@@ -484,7 +484,7 @@ export function PinnedPanel(): JSX.Element {
         key={animKey}
         className={`
           flex items-center gap-3 px-1.5 py-1.5
-          bg-[#0A0A0A]/95 rounded-full pill-shadow
+          bg-capsule/95 border border-white/[0.08] rounded-full pill-shadow
           opacity-100 scale-100 animate-scale-up
           transition-all duration-300 ease-out
         `}
@@ -496,7 +496,7 @@ export function PinnedPanel(): JSX.Element {
             onClick={handleCancel}
             aria-label={t('pinnedPanel.cancelRecording', 'Cancel recording')}
             title={t('pinnedPanel.cancelRecording', 'Cancel recording')}
-            className="no-drag w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer shrink-0"
+            className="no-drag w-8 h-8 rounded-full bg-white/[0.08] hover:bg-white/[0.16] flex items-center justify-center transition-all cursor-pointer shrink-0"
           >
             <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -507,13 +507,19 @@ export function PinnedPanel(): JSX.Element {
         )}
 
         {/* Waveform — center (settled calm bars when transcribing) */}
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className={`w-2 h-2 rounded-full transition-colors duration-200 ${
+              isTranscribing ? 'bg-white/25' : 'bg-ember animate-live-pulse'
+            }`}
+          />
           <WaveformBars
             data={waveformData}
             barCount={7}
             barWidth={3}
             maxHeight={22}
-            color={isTranscribing ? 'rgba(255,255,255,0.4)' : '#FFFFFF'}
+            color={isTranscribing ? 'rgba(255,255,255,0.4)' : 'rgb(var(--capsule-signal))'}
             animated={state === 'recording'}
             settled={isTranscribing}
           />
@@ -525,9 +531,9 @@ export function PinnedPanel(): JSX.Element {
             onClick={handleStop}
             aria-label={t('pinnedPanel.stopRecording', 'Stop recording')}
             title={t('pinnedPanel.stopRecording', 'Stop recording')}
-            className="no-drag w-8 h-8 rounded-full bg-recording-red hover:bg-red-500 flex items-center justify-center transition-all cursor-pointer shrink-0"
+            className="no-drag w-8 h-8 rounded-full bg-white hover:bg-white/85 flex items-center justify-center transition-all cursor-pointer shrink-0"
           >
-            <div className="w-3 h-3 rounded-[2px] bg-white" />
+            <div className="w-3 h-3 rounded-[3px] bg-capsule" />
           </button>
         ) : (
           <div className="w-8 h-8 flex items-center justify-center shrink-0">
