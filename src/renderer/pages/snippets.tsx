@@ -199,7 +199,7 @@ export function Snippets(): JSX.Element {
                       {snippet.trigger}
                     </span>
                     <span
-                      className="text-theme-text-muted text-sm rtl:rotate-180"
+                      className="inline-block text-theme-text-muted text-sm rtl:rotate-180"
                       aria-hidden="true"
                     >
                       &rarr;
