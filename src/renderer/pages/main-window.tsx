@@ -1,7 +1,16 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Home as HomeIcon, Zap, Store, StickyNote, Code2, Settings as SettingsIcon, Crosshair
+  Home as HomeIcon,
+  BookA,
+  TextQuote,
+  Feather,
+  NotebookPen,
+  AudioLines,
+  Sparkles,
+  LayoutGrid,
+  Settings as SettingsIcon,
+  type LucideProps
 } from 'lucide-react'
 import appLogo from '../assets/logo.png'
 import { Home } from './home'
@@ -10,38 +19,98 @@ import { Triggers } from './triggers'
 import { MiniAppStore } from './mini-app-store'
 import { Notes } from './notes'
 import { Snippets } from './snippets'
-import { Settings } from './settings'
+import { Dictionary } from './dictionary'
+import { Style } from './style'
+import { Settings, type SettingsTab } from './settings'
 import { Onboarding } from './onboarding'
 import { useStatsStore } from '../store/stats'
+import { useRecordShortcut } from '../hooks/use-record-shortcut'
+import { ShortcutKeys } from '../components/ui/keycap'
+import { Spinner } from '../components/ui/primitives'
 
-type Page = 'home' | 'actions' | 'triggers' | 'mini-apps' | 'notes' | 'snippets' | 'settings'
+export type Page =
+  | 'home'
+  | 'dictionary'
+  | 'snippets'
+  | 'style'
+  | 'notes'
+  | 'triggers'
+  | 'actions'
+  | 'mini-apps'
+  | 'settings'
 
-const MAIN_NAV: { id: Page; labelKey: string; icon: React.ReactNode }[] = [
-  { id: 'home', labelKey: 'nav.home', icon: <HomeIcon className="w-5 h-5" /> },
-  { id: 'mini-apps', labelKey: 'nav.miniApps', icon: <Store className="w-5 h-5" /> },
-  { id: 'notes', labelKey: 'nav.notes', icon: <StickyNote className="w-5 h-5" /> }
+/** Switch page; for Settings, optionally open a specific tab */
+export type Navigate = (page: Page, settingsTab?: SettingsTab) => void
+
+interface NavItem {
+  id: Page
+  labelKey: string
+  icon: ComponentType<LucideProps>
+}
+
+const MAIN_NAV: NavItem[] = [
+  { id: 'home', labelKey: 'nav.home', icon: HomeIcon },
+  { id: 'dictionary', labelKey: 'nav.dictionary', icon: BookA },
+  { id: 'snippets', labelKey: 'nav.snippets', icon: TextQuote },
+  { id: 'style', labelKey: 'nav.style', icon: Feather },
+  { id: 'notes', labelKey: 'nav.notes', icon: NotebookPen }
 ]
 
-const CONFIG_NAV: { id: Page; labelKey: string; icon: React.ReactNode }[] = [
-  { id: 'actions', labelKey: 'nav.actions', icon: <Zap className="w-5 h-5" /> },
-  { id: 'triggers', labelKey: 'nav.triggers', icon: <Crosshair className="w-5 h-5" /> },
-  { id: 'snippets', labelKey: 'nav.snippets', icon: <Code2 className="w-5 h-5" /> }
+const AUTOMATION_NAV: NavItem[] = [
+  { id: 'triggers', labelKey: 'nav.triggers', icon: AudioLines },
+  { id: 'actions', labelKey: 'nav.actions', icon: Sparkles },
+  { id: 'mini-apps', labelKey: 'nav.miniApps', icon: LayoutGrid }
 ]
 
 // Window chrome differs per platform (see src/main/windows.ts):
-// - macOS: hidden inset title bar — traffic lights float over the sidebar
-// - Windows: hidden title bar + native controls overlay (40px) at the top end
+// - macOS: hidden inset title bar — traffic lights float at the top-left
+// - Windows: hidden title bar + native controls overlay (40px) at the top
 // - Linux: native window frame, nothing to make room for
 const OS = window.tapwisper.platform.os
 const IS_MAC = OS === 'darwin'
 const HAS_CONTROLS_OVERLAY = OS === 'win32'
 
-export function MainWindow(): JSX.Element {
+function NavButton({
+  item,
+  active,
+  onSelect
+}: {
+  item: NavItem
+  active: boolean
+  onSelect: (page: Page) => void
+}): JSX.Element {
   const { t } = useTranslation()
+  const Icon = item.icon
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(item.id)}
+      aria-current={active ? 'page' : undefined}
+      className={`group flex h-9 w-full items-center gap-3 rounded-[10px] border px-3 text-[13.5px] transition-[background-color,color,border-color] duration-200 ease-out ${
+        active
+          ? 'border-hairline bg-raised font-medium text-ink shadow-[0_1px_2px_rgb(27_26_23/0.06)]'
+          : 'border-transparent text-ink-muted hover:bg-ink/[0.045] hover:text-ink'
+      }`}
+    >
+      <Icon
+        className={`h-[17px] w-[17px] shrink-0 transition-colors duration-200 ${
+          active ? 'text-signal' : 'text-ink-soft group-hover:text-ink-muted'
+        }`}
+        strokeWidth={1.8}
+      />
+      <span className="truncate">{t(item.labelKey)}</span>
+    </button>
+  )
+}
+
+export function MainWindow(): JSX.Element {
+  const { t, i18n } = useTranslation()
   const [activePage, setActivePage] = useState<Page>('home')
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(undefined)
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
   const [appVersion, setAppVersion] = useState('')
   const loadStats = useStatsStore((s) => s.loadStats)
+  const { shortcut } = useRecordShortcut()
 
   useEffect(() => {
     window.tapwisper.app
@@ -97,10 +166,21 @@ export function MainWindow(): JSX.Element {
     setShowOnboarding(false)
   }, [])
 
+  const navigate: Navigate = useCallback((page, tab) => {
+    setSettingsTab(tab)
+    setActivePage(page)
+  }, [])
+
+  const selectPage = useCallback((page: Page) => navigate(page), [navigate])
+
   const renderPage = (): JSX.Element => {
     switch (activePage) {
       case 'home':
         return <Home />
+      case 'dictionary':
+        return <Dictionary />
+      case 'style':
+        return <Style onNavigate={navigate} />
       case 'actions':
         return <ActionsConfig />
       case 'triggers':
@@ -112,7 +192,7 @@ export function MainWindow(): JSX.Element {
       case 'snippets':
         return <Snippets />
       case 'settings':
-        return <Settings />
+        return <Settings onNavigate={navigate} initialTab={settingsTab} />
       default:
         return <Home />
     }
@@ -121,126 +201,104 @@ export function MainWindow(): JSX.Element {
   // Show a spinner while we check onboarding status
   if (showOnboarding === null) {
     return (
-      <div className="flex items-center justify-center h-screen bg-theme-bg">
-        <div className="w-6 h-6 border-2 border-theme-border border-t-sky-accent rounded-full animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-canvas text-ink-faint">
+        <Spinner className="h-5 w-5" />
       </div>
     )
   }
 
-  // Show onboarding if not yet completed
   if (showOnboarding) {
-    return (
-      <>
-        {/* Frameless title bar (macOS/Windows): keep the window draggable */}
-        {OS !== 'linux' && <div className="drag-region fixed top-0 inset-x-0 h-10 z-10" />}
-        <Onboarding onComplete={handleOnboardingComplete} />
-      </>
-    )
+    return <Onboarding onComplete={handleOnboardingComplete} />
   }
 
+  // macOS traffic lights sit at the top-left: in LTR the brand moves past them
+  const brandBesideTrafficLights = IS_MAC && i18n.dir() === 'ltr'
+
   return (
-    <div className="flex h-screen bg-theme-bg">
-      {/* Sidebar */}
-      <div
-        className={`w-56 bg-theme-card border-e border-theme-border/30 flex flex-col ${
-          IS_MAC ? 'pt-12' : ''
-        }`}
-      >
-        {/* Drag region / title bar area */}
-        <div className="drag-region h-12 flex items-center px-4 min-w-0 overflow-hidden">
-          <div className="flex items-center gap-2 no-drag min-w-0 flex-1">
-            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+    <div className="flex h-screen flex-col bg-canvas">
+      {/* Windows: room for (and drag area beside) the native window controls */}
+      {HAS_CONTROLS_OVERLAY && <div className="drag-region h-10 shrink-0" />}
+
+      <div className="flex min-h-0 flex-1">
+        {/* ── Sidebar ─────────────────────────────────────── */}
+        <aside className="flex w-[232px] shrink-0 flex-col">
+          <div
+            className={`drag-region flex shrink-0 items-center ${
+              IS_MAC ? 'h-[52px]' : 'h-14'
+            } ${brandBesideTrafficLights ? 'ps-[84px]' : 'ps-5'} pe-4`}
+          >
+            <div className="flex min-w-0 items-center gap-2">
               <img
                 src={appLogo}
                 alt=""
-                className="w-full h-full object-contain"
+                className="h-[22px] w-[22px] shrink-0 rounded-md object-contain"
               />
-            </div>
-            <span className="text-sm font-semibold text-theme-text truncate">{t('app.name')}</span>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-2 flex flex-col gap-4 min-h-0">
-          <div className="space-y-1">
-            {MAIN_NAV.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActivePage(item.id)}
-                aria-current={activePage === item.id ? 'page' : undefined}
-                className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
-                  ${activePage === item.id
-                    ? 'bg-sky-accent/12 text-sky-accent font-medium'
-                    : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/40'
-                  }
-                `}
-              >
-                {item.icon}
-                {t(item.labelKey)}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-1 flex-shrink-0">
-            <div className="px-3 py-1.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-theme-text-muted">
-                {t('nav.configuration')}
+              <span className="font-display truncate text-[18px] leading-none text-ink">
+                {t('app.name')}
               </span>
             </div>
-            {CONFIG_NAV.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActivePage(item.id)}
-                aria-current={activePage === item.id ? 'page' : undefined}
-                className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
-                  ${activePage === item.id
-                    ? 'bg-sky-accent/12 text-sky-accent font-medium'
-                    : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/40'
-                  }
-                `}
-              >
-                {item.icon}
-                {t(item.labelKey)}
-              </button>
-            ))}
           </div>
 
-          <div className="mt-auto pt-2 border-t border-theme-border/30 space-y-1">
-            <button
-              onClick={() => setActivePage('settings')}
-              aria-current={activePage === 'settings' ? 'page' : undefined}
-              className={`
-                w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
-                ${activePage === 'settings'
-                  ? 'bg-sky-accent/12 text-sky-accent font-medium'
-                  : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/40'
-                }
-              `}
-            >
-              <SettingsIcon className="w-5 h-5" />
-              {t('nav.settings')}
-            </button>
-          </div>
-        </nav>
+          <nav
+            aria-label={t('nav.label', 'Main')}
+            className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-3 pb-3 pt-3"
+          >
+            <div className="space-y-0.5">
+              {MAIN_NAV.map((item) => (
+                <NavButton
+                  key={item.id}
+                  item={item}
+                  active={activePage === item.id}
+                  onSelect={selectPage}
+                />
+              ))}
+            </div>
 
-        {/* Version / plan info */}
-        <div className="px-3 pb-3">
-          <div className="rounded-xl bg-theme-bg p-3 space-y-2">
-            <p className="text-xs font-medium text-theme-text">{t('app.name')} Desktop</p>
-            {appVersion && <p className="text-xs text-theme-text-muted">v{appVersion}</p>}
-          </div>
-        </div>
-      </div>
+            <div className="space-y-0.5">
+              <p className="section-label px-3 pb-1.5">{t('nav.automations', 'Automations')}</p>
+              {AUTOMATION_NAV.map((item) => (
+                <NavButton
+                  key={item.id}
+                  item={item}
+                  active={activePage === item.id}
+                  onSelect={selectPage}
+                />
+              ))}
+            </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        {/* Windows: room for (and drag area beside) the native window controls */}
-        {HAS_CONTROLS_OVERLAY && <div className="drag-region h-10 shrink-0" />}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {renderPage()}
-        </div>
+            <div className="mt-auto space-y-3">
+              <div className="rounded-xl border border-hairline/80 bg-raised/60 px-3 py-3">
+                <p className="text-[11.5px] leading-snug text-ink-muted">
+                  {t('nav.shortcutHint', 'Hold to dictate in any app')}
+                </p>
+                <ShortcutKeys accelerator={shortcut} size="sm" className="mt-2 flex-wrap" />
+              </div>
+              <NavButton
+                item={{ id: 'settings', labelKey: 'nav.settings', icon: SettingsIcon }}
+                active={activePage === 'settings'}
+                onSelect={selectPage}
+              />
+              {appVersion && (
+                <p className="px-3 text-[11px] text-ink-faint tabular">
+                  {t('nav.version', 'Version {{version}}', { version: appVersion })}
+                </p>
+              )}
+            </div>
+          </nav>
+        </aside>
+
+        {/* ── Main sheet ──────────────────────────────────── */}
+        <main
+          className={`sheet relative mb-2 me-2 min-w-0 flex-1 overflow-hidden rounded-sheet ${
+            HAS_CONTROLS_OVERLAY ? '' : 'mt-2'
+          }`}
+        >
+          {/* Frameless title bar (macOS): keep the window draggable from the top */}
+          {IS_MAC && <div className="drag-region absolute inset-x-0 top-0 z-10 h-7" />}
+          <div key={`${activePage}-${settingsTab ?? ''}`} className="h-full overflow-y-auto">
+            {renderPage()}
+          </div>
+        </main>
       </div>
     </div>
   )
