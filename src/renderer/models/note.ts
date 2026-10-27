@@ -1,9 +1,15 @@
+/**
+ * A note persisted in electron-store under the `notes` key.
+ * Optional fields are absent on notes created by older versions.
+ */
 export interface Note {
   id: string
   text: string
+  title?: string
   createdAt: string
-  updatedAt: string
+  updatedAt?: string
   isVoice: boolean
+  durationSeconds?: number
   audioPath?: string
   tags?: string[]
 }
@@ -14,7 +20,23 @@ export interface NoteGroup {
   notes: Note[]
 }
 
-export function groupNotesByDate(notes: Note[]): NoteGroup[] {
+/**
+ * Format a date with the given locale, falling back to the runtime default
+ * when the locale tag is not a valid BCP 47 tag (e.g. i18next's 'cimode').
+ */
+export function formatLocaleDate(
+  date: Date,
+  locale: string | undefined,
+  options: Intl.DateTimeFormatOptions
+): string {
+  try {
+    return date.toLocaleDateString(locale, options)
+  } catch {
+    return date.toLocaleDateString(undefined, options)
+  }
+}
+
+export function groupNotesByDate(notes: Note[], locale?: string): NoteGroup[] {
   const groups = new Map<string, Note[]>()
 
   for (const note of notes) {
@@ -36,13 +58,11 @@ export function groupNotesByDate(notes: Note[]): NoteGroup[] {
           ? 'Today'
           : date === yesterday
             ? 'Yesterday'
-            : new Date(date).toLocaleDateString('en-US', {
+            : formatLocaleDate(new Date(date), locale, {
                 month: 'long',
                 day: 'numeric'
               }),
-      notes: notes.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
+      notes: notes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     }))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 }
