@@ -13,6 +13,9 @@
  *             or glslc, libvulkan-dev and spirv-headers on Linux)
  *   --force   rebuild even if resources/bin already has this version
  *
+ * TAPWISPER_RUNTIMES_BUILD_DIR overrides where CMake builds (default: .cache/runtimes,
+ * or <drive>:\tw-rt on Windows to stay under MAX_PATH).
+ *
  * Needs git, CMake ≥ 3.21 and a C++17 compiler (Xcode CLT, MSVC or GCC/Clang).
  */
 import { execFileSync } from 'node:child_process'
@@ -28,11 +31,19 @@ import {
   writeFileSync
 } from 'node:fs'
 import { cpus } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, parse } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const CACHE = join(ROOT, '.cache', 'runtimes')
+/**
+ * Where CMake builds. On Windows a short folder at the drive root: ggml's Vulkan
+ * shader generator is a nested CMake build whose deepest paths otherwise pass
+ * the 260-character MAX_PATH that MSBuild's file tracker still enforces.
+ */
+const BUILD_ROOT =
+  process.env.TAPWISPER_RUNTIMES_BUILD_DIR ??
+  (process.platform === 'win32' ? join(parse(ROOT).root, 'tw-rt') : CACHE)
 const OUT = join(ROOT, 'resources', 'bin')
 const RUNTIMES = JSON.parse(readFileSync(join(ROOT, 'scripts', 'runtimes.json'), 'utf8'))
 
@@ -212,7 +223,7 @@ function build(name, spec) {
   // Kept between runs so CMake rebuilds only what changed; one directory per set of
   // options, so dropping e.g. --vulkan can't leave a stale backend library behind
   const optionsHash = createHash('sha1').update(stamp).digest('hex').slice(0, 8)
-  const buildDir = join(CACHE, `${name}-build-${target}-${optionsHash}`)
+  const buildDir = join(BUILD_ROOT, `${name}-build-${target}-${optionsHash}`)
   run('cmake', ['-S', src, '-B', buildDir, ...options])
   run('cmake', [
     '--build',

@@ -127,7 +127,7 @@ npm run build:runtimes            # whisper-server, parakeet-cli, llama-server f
 npm run build:runtimes -- --vulkan   # add the Vulkan GPU backend to every runtime (Windows/Linux)
 ```
 
-You need git, CMake 3.21 or newer, and a C++17 compiler (Xcode Command Line Tools, Visual Studio 2022, or GCC/Clang). For `--vulkan`, install the [Vulkan SDK](https://vulkan.lunarg.com) on Windows, or `glslc libvulkan-dev spirv-headers` on Ubuntu/Debian. The first build takes about 10 minutes. After that, builds are incremental, and the script skips a runtime whose version and options haven't changed.
+You need git, CMake 3.21 or newer, and a C++17 compiler (Xcode Command Line Tools, Visual Studio 2022, or GCC/Clang). For `--vulkan`, install the [Vulkan SDK](https://vulkan.lunarg.com) on Windows, or `glslc libvulkan-dev spirv-headers` on Ubuntu/Debian. On Windows the build goes to `<drive>:\tw-rt` to stay under the 260-character path limit; set `TAPWISPER_RUNTIMES_BUILD_DIR` to use another short folder. The first build takes about 10 minutes. After that, builds are incremental, and the script skips a runtime whose version and options haven't changed.
 
 **Development without runtimes.** You can develop without building them. The Local card then says the runtime isn't included in this build.
 
