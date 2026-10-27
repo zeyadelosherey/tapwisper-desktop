@@ -65,23 +65,12 @@ const RecordingBanner = memo(function RecordingBanner({
   state: MeetingRecorderState
 }): JSX.Element {
   const { t } = useTranslation()
-  const [startedAt, setStartedAt] = useState<number | null>(null)
   const paused = state.status === 'paused'
-
-  useEffect(() => {
-    setStartedAt(null)
-    if (!state.meetingId) return
-    let cancelled = false
-    window.tapwisper.meetings
-      .get(state.meetingId)
-      .then((m) => !cancelled && setStartedAt(m?.startedAt ?? null))
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [state.meetingId])
-
-  const seconds = useElapsedSince(startedAt, !paused)
+  // Recorded time excludes pauses: a virtual start that the clock counts from
+  const virtualStart = state.runningSince ? state.runningSince - state.elapsedMs : null
+  const runningSeconds = useElapsedSince(virtualStart, !paused)
+  const seconds = paused ? Math.floor(state.elapsedMs / 1000) : runningSeconds
+  const showTime = paused ? state.elapsedMs > 0 : virtualStart !== null
 
   return (
     <div
@@ -100,7 +89,7 @@ const RecordingBanner = memo(function RecordingBanner({
           : t('meetings.bannerRecording', 'Recording meeting notes')}
         {state.appName && <span className="font-normal text-ink-muted"> · {state.appName}</span>}
       </span>
-      {startedAt && !paused && (
+      {showTime && (
         <span className="text-ink-muted tabular" dir="ltr">
           {formatTimestamp(seconds * 1000)}
         </span>

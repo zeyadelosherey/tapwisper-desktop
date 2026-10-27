@@ -424,6 +424,7 @@ export class WindowManager {
 
   /** Show the notepad; `request` tells it what to do (open a meeting, start recording…) */
   showNotepad(request?: { meetingId?: string; start?: boolean; appName?: string }): void {
+    if (request) this.pendingNotepadRequest = request
     const notepad = this.ensureNotepad()
     const reveal = (): void => {
       if (notepad.isDestroyed()) return
@@ -434,6 +435,16 @@ export class WindowManager {
     const ready = this.windowReady.get('notepad')
     if (ready) ready.then(reveal)
     else reveal()
+  }
+
+  private pendingNotepadRequest: { meetingId?: string; start?: boolean; appName?: string } | null =
+    null
+
+  /** The last notepad request not yet collected (cleared when taken) */
+  takeNotepadRequest(): { meetingId?: string; start?: boolean; appName?: string } | null {
+    const request = this.pendingNotepadRequest
+    this.pendingNotepadRequest = null
+    return request
   }
 
   hideNotepad(): void {

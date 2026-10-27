@@ -941,6 +941,7 @@
     "errorStart": "Impossible de lancer l’enregistrement. Réessayez.",
     "showEarlier_one": "Afficher 1 intervention précédente",
     "showEarlier_many": "Afficher les précédentes ({{count}})",
-    "showEarlier_other": "Afficher les précédentes ({{count}})"
+    "showEarlier_other": "Afficher les précédentes ({{count}})",
+    "errorStillRecording": "Cette réunion est encore en cours d’enregistrement — le résumé sera créé à l’arrêt."
   }
 }

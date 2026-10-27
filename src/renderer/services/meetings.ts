@@ -18,6 +18,9 @@ export async function summarizeMeeting(meetingId: string): Promise<Meeting | nul
     window.tapwisper.meetings.segments(meetingId)
   ])
   if (!meeting) return null
+  // Never summarize a meeting that is still being recorded (it would mark
+  // it 'processing' mid-recording); stop() summarizes once it has ended
+  if (meeting.status === 'recording') throw new Error('meeting-recording')
   const previousStatus = meeting.status
   await window.tapwisper.meetings.update(meetingId, { status: 'processing' })
   try {
@@ -35,8 +38,7 @@ export async function summarizeMeeting(meetingId: string): Promise<Meeting | nul
     })
   } catch (err) {
     await window.tapwisper.meetings.update(meetingId, {
-      status:
-        previousStatus === 'recording' || previousStatus === 'processing' ? 'done' : previousStatus
+      status: previousStatus === 'processing' ? 'done' : previousStatus
     })
     throw err
   }

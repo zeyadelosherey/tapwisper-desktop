@@ -941,6 +941,7 @@
     "errorStart": "Impossibile avviare la registrazione. Riprova.",
     "showEarlier_one": "Mostra 1 intervento precedente",
     "showEarlier_many": "Mostra precedenti ({{count}})",
-    "showEarlier_other": "Mostra precedenti ({{count}})"
+    "showEarlier_other": "Mostra precedenti ({{count}})",
+    "errorStillRecording": "Questa riunione è ancora in registrazione: il riepilogo viene creato quando la interrompi."
   }
 }

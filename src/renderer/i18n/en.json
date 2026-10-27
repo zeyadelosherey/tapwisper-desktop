@@ -929,6 +929,7 @@
     "errorTranscription": "Part of the audio couldn’t be transcribed. Recording continues.",
     "errorStart": "Couldn’t start recording. Try again.",
     "showEarlier_one": "Show 1 earlier turn",
-    "showEarlier_other": "Show earlier ({{count}})"
+    "showEarlier_other": "Show earlier ({{count}})",
+    "errorStillRecording": "This meeting is still being recorded — the summary is made when you stop."
   }
 }

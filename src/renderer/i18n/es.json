@@ -941,6 +941,7 @@
     "errorStart": "No se pudo iniciar la grabación. Inténtalo de nuevo.",
     "showEarlier_one": "Mostrar 1 intervención anterior",
     "showEarlier_many": "Mostrar anteriores ({{count}})",
-    "showEarlier_other": "Mostrar anteriores ({{count}})"
+    "showEarlier_other": "Mostrar anteriores ({{count}})",
+    "errorStillRecording": "Esta reunión aún se está grabando: el resumen se crea cuando la detengas."
   }
 }

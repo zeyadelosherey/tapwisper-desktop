@@ -68,6 +68,12 @@ export function meetingAIErrorMessage(t: TFunction, err: unknown): string {
   if (message === 'empty-meeting') {
     return t('notepad.errorEmpty', 'Nothing was said yet, so there is nothing to work with.')
   }
+  if (message === 'meeting-recording') {
+    return t(
+      'notepad.errorStillRecording',
+      'This meeting is still being recorded — the summary is made when you stop.'
+    )
+  }
   if (/api key/i.test(message)) {
     return t(
       'notepad.errorNoKey',

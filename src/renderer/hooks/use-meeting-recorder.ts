@@ -150,7 +150,9 @@ export function useMeetingRecorder(): MeetingRecorder {
       .setState({
         meetingId: next === 'idle' ? null : (meetingRef.current?.id ?? null),
         status: next,
-        appName: appNameRef.current
+        appName: appNameRef.current,
+        elapsedMs: clockRef.current.accumulated,
+        runningSince: next === 'recording' ? clockRef.current.runningSince || Date.now() : null
       })
       .catch(() => {})
   }, [])

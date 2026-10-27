@@ -43,9 +43,19 @@ export interface MeetingState {
   status: RecorderStatus
   /** Meeting app, when known */
   appName: string | null
+  /** Recorded time (pauses excluded) at the moment of this report, ms */
+  elapsedMs: number
+  /** Epoch ms when the current running span began; null while paused/idle */
+  runningSince: number | null
 }
 
-let state: MeetingState = { meetingId: null, status: 'idle', appName: null }
+let state: MeetingState = {
+  meetingId: null,
+  status: 'idle',
+  appName: null,
+  elapsedMs: 0,
+  runningSince: null
+}
 let windowManagerRef: WindowManager | null = null
 let onStateChange: ((state: MeetingState) => void) | null = null
 
@@ -191,7 +201,9 @@ export function registerNotetaker(
     setState({
       meetingId: next.meetingId ?? null,
       status: next.status ?? 'idle',
-      appName: next.appName ?? null
+      appName: next.appName ?? null,
+      elapsedMs: next.elapsedMs ?? 0,
+      runningSince: next.runningSince ?? null
     })
   })
   ipcMain.handle('meetings:get-state', () => state)
@@ -204,6 +216,9 @@ export function registerNotetaker(
     openNotepad(meetingId)
   )
   ipcMain.handle('meetings:hide-notepad', () => windowManager.hideNotepad())
+  // The notepad page loads lazily, so a request sent on its first show can
+  // arrive before it listens; it collects the latest one on mount instead
+  ipcMain.handle('meetings:take-notepad-request', () => windowManager.takeNotepadRequest())
   ipcMain.handle('meetings:system-audio-support', () => systemAudioSupport())
   ipcMain.handle('meetings:apply-detection-setting', () => applyMeetingDetectionSetting())
 

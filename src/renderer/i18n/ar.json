@@ -977,6 +977,7 @@
     "showEarlier_two": "عرض مداخلتين سابقتين",
     "showEarlier_few": "عرض الأقدم ({{count}})",
     "showEarlier_many": "عرض الأقدم ({{count}})",
-    "showEarlier_other": "عرض الأقدم ({{count}})"
+    "showEarlier_other": "عرض الأقدم ({{count}})",
+    "errorStillRecording": "لا يزال هذا الاجتماع قيد التسجيل — سيُنشأ الملخص عند الإيقاف."
   }
 }

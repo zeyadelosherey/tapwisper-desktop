@@ -129,7 +129,7 @@ export function Notepad(): JSX.Element {
 
   // Requests from the main process (tray, detection, main window)
   useEffect(() => {
-    const offRequest = window.tapwisper.on('notepad:request', (payload: unknown) => {
+    const handle = (payload: unknown): void => {
       if (!isRequest(payload)) return
       const current = recorderRef.current
       if (payload.start) {
@@ -138,7 +138,17 @@ export function Notepad(): JSX.Element {
         setViewId(payload.meetingId)
         setTab('summary')
       }
+    }
+    const offRequest = window.tapwisper.on('notepad:request', (payload: unknown) => {
+      // Clear the queued copy so it isn't handled twice
+      void window.tapwisper.meetings.takeNotepadRequest().catch(() => null)
+      handle(payload)
     })
+    // A request sent before this page finished loading is waiting in main
+    void window.tapwisper.meetings
+      .takeNotepadRequest()
+      .then(handle)
+      .catch(() => {})
     const offStop = window.tapwisper.on('notepad:stop', () => {
       if (recorderRef.current.status !== 'idle') void stop()
     })

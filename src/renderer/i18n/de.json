@@ -929,6 +929,7 @@
     "errorTranscription": "Ein Teil des Audios konnte nicht transkribiert werden. Die Aufnahme läuft weiter.",
     "errorStart": "Aufnahme konnte nicht gestartet werden. Versuch es noch einmal.",
     "showEarlier_one": "1 früheren Beitrag zeigen",
-    "showEarlier_other": "Frühere zeigen ({{count}})"
+    "showEarlier_other": "Frühere zeigen ({{count}})",
+    "errorStillRecording": "Dieses Meeting wird noch aufgezeichnet – die Zusammenfassung entsteht, wenn du stoppst."
   }
 }

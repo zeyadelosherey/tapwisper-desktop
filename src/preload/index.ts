@@ -29,7 +29,10 @@ export interface ActivityRecordDTO {
 }
 
 export type ActivityRecordUpdate = Partial<
-  Pick<ActivityRecordDTO, 'transcription' | 'rawTranscription' | 'wordCount' | 'language' | 'llmResult'>
+  Pick<
+    ActivityRecordDTO,
+    'transcription' | 'rawTranscription' | 'wordCount' | 'language' | 'llmResult'
+  >
 >
 
 export interface ActiveAppInfo {
@@ -74,7 +77,14 @@ export interface MeetingSegmentDTO {
 export type MeetingUpdateDTO = Partial<
   Pick<
     MeetingDTO,
-    'title' | 'endedAt' | 'durationSeconds' | 'status' | 'appName' | 'notes' | 'summary' | 'speakerNames'
+    | 'title'
+    | 'endedAt'
+    | 'durationSeconds'
+    | 'status'
+    | 'appName'
+    | 'notes'
+    | 'summary'
+    | 'speakerNames'
   >
 >
 
@@ -82,6 +92,10 @@ export interface MeetingRecorderState {
   meetingId: string | null
   status: 'idle' | 'recording' | 'paused'
   appName: string | null
+  /** Recorded time (pauses excluded) at the moment of this report, ms */
+  elapsedMs: number
+  /** Epoch ms when the current running span began; null while paused/idle */
+  runningSince: number | null
 }
 
 export interface ActivityQueryParams {
@@ -144,7 +158,8 @@ const api = {
     collapse: () => ipcRenderer.invoke('recording-pill:collapse'),
     expandFull: () => ipcRenderer.invoke('recording-pill:expand-full'),
     collapseToResults: () => ipcRenderer.invoke('recording-pill:collapse-to-results'),
-    setClickable: (clickable: boolean) => ipcRenderer.invoke('recording-pill:set-clickable', clickable)
+    setClickable: (clickable: boolean) =>
+      ipcRenderer.invoke('recording-pill:set-clickable', clickable)
   },
 
   // ── Recording Control ────────────────────────────────────────────
@@ -229,7 +244,8 @@ const api = {
       getStats: (startDate: number, endDate: number) =>
         ipcRenderer.invoke('db:activity:get-stats', startDate, endDate)
     },
-    cleanupOldRecords: (keepCount?: number) => ipcRenderer.invoke('db:cleanup-old-records', keepCount),
+    cleanupOldRecords: (keepCount?: number) =>
+      ipcRenderer.invoke('db:cleanup-old-records', keepCount),
     exportJSON: () => ipcRenderer.invoke('db:export-json'),
     importJSON: (data: unknown) => ipcRenderer.invoke('db:import-json', data)
   },
@@ -251,8 +267,11 @@ const api = {
 
   // ── Notetaker (meeting notes) ───────────────────────────────────
   meetings: {
-    create: (meeting: { id: string; startedAt: number; appName?: string | null }): Promise<MeetingDTO> =>
-      ipcRenderer.invoke('meetings:create', meeting),
+    create: (meeting: {
+      id: string
+      startedAt: number
+      appName?: string | null
+    }): Promise<MeetingDTO> => ipcRenderer.invoke('meetings:create', meeting),
     get: (id: string): Promise<MeetingDTO | null> => ipcRenderer.invoke('meetings:get', id),
     /** Newest first; search covers title, notes, summary and transcript */
     list: (query?: {
@@ -290,6 +309,12 @@ const api = {
     openNotepad: (meetingId?: string): Promise<void> =>
       ipcRenderer.invoke('meetings:open-notepad', meetingId),
     hideNotepad: (): Promise<void> => ipcRenderer.invoke('meetings:hide-notepad'),
+    /** Latest uncollected `notepad:request` (the notepad calls this on mount) */
+    takeNotepadRequest: (): Promise<{
+      meetingId?: string
+      start?: boolean
+      appName?: string
+    } | null> => ipcRenderer.invoke('meetings:take-notepad-request'),
     /** reason: 'macos-too-old' | 'permission-needed' | 'linux-use-monitor' */
     systemAudioSupport: (): Promise<{ supported: boolean; reason?: string }> =>
       ipcRenderer.invoke('meetings:system-audio-support'),
@@ -320,11 +345,11 @@ const api = {
       ipcRenderer.invoke('trigger:keyboard', params),
     appleShortcut: (params: { shortcutName: string; speechInput?: string }) =>
       ipcRenderer.invoke('trigger:apple-shortcut', params),
-    window: (params: { action: string }) =>
-      ipcRenderer.invoke('trigger:window', params),
+    window: (params: { action: string }) => ipcRenderer.invoke('trigger:window', params),
     launchApp: (params: { appPath: string; appName: string }) =>
       ipcRenderer.invoke('trigger:launch-app', params),
-    listApps: () => ipcRenderer.invoke('trigger:list-apps') as Promise<{ name: string; path: string }[]>,
+    listApps: () =>
+      ipcRenderer.invoke('trigger:list-apps') as Promise<{ name: string; path: string }[]>,
     listShortcuts: () => ipcRenderer.invoke('trigger:list-shortcuts') as Promise<string[]>
   },
 
