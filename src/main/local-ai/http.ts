@@ -59,9 +59,13 @@ export function transcriptionForm(
   return form
 }
 
-/** Timeout for transcribing `seconds` of audio: CPU decoding can take a few times real time */
+/** How long transcribing `seconds` of audio may take: CPU decoding can take a few times real time */
+export function transcriptionMs(seconds: number, minimumMs: number): number {
+  return Math.max(minimumMs, seconds * 3000)
+}
+
 export function transcriptionTimeout(seconds: number, minimumMs: number): AbortSignal {
-  return AbortSignal.timeout(Math.max(minimumMs, seconds * 3000))
+  return AbortSignal.timeout(transcriptionMs(seconds, minimumMs))
 }
 
 /** Requested answer length, capped so prompt + answer fit an 8K context */

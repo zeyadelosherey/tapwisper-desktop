@@ -9,13 +9,15 @@ import { rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
 import { LocalAiError } from './errors'
-import { transcriptionTimeout } from './http'
+import { transcriptionMs } from './http'
 import { SerialQueue } from './serial-queue'
+import { loadTimeoutMs } from './sidecar'
 import type { TranscribeInput } from '../../shared/local-ai/types'
 
 export interface ParakeetOptions {
   binary: string
   modelFile: string
+  modelBytes: number
   useGpu: boolean
   threads: number
 }
@@ -48,8 +50,10 @@ async function transcribeOnce(o: ParakeetOptions, input: TranscribeInput): Promi
         {
           cwd: path.dirname(o.binary),
           windowsHide: true,
-          // Model load plus CPU decoding of long clips
-          signal: transcriptionTimeout(input.seconds, 60_000),
+          // Each run loads the model (slow the first time, from disk), then decodes
+          signal: AbortSignal.timeout(
+            loadTimeoutMs(o.modelBytes) + transcriptionMs(input.seconds, 60_000)
+          ),
           maxBuffer: 16 * 1024 * 1024
         },
         (err, stdout, stderr) => {
