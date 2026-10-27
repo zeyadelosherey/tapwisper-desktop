@@ -52,3 +52,4 @@ latest*.yml
 .cache/
 .temp/
 tmp/
+.claude/worktrees/
