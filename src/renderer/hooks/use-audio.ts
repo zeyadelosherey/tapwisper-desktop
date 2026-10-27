@@ -9,8 +9,25 @@ const MIC_CONSTRAINTS: MediaStreamConstraints = {
     sampleRate: 16000,
     channelCount: 1,
     echoCancellation: true,
-    noiseSuppression: true
+    noiseSuppression: true,
+    autoGainControl: true
   }
+}
+
+// Voice activity detection. RMS of the raw waveform (−1..1). With noise
+// suppression on, room noise sits well below 0.005 while normal speech is 0.03+.
+const VOICE_RMS_THRESHOLD = 0.012
+// Release the mic this long after the last recording (unless keepMicWarm is on).
+// Short enough that the OS mic indicator / Bluetooth call-mode don't linger,
+// long enough that back-to-back dictations still start instantly.
+const MIC_IDLE_RELEASE_MS = 60_000
+
+export interface RecordingStats {
+  durationMs: number
+  /** Total time the input level was above the speech threshold */
+  voicedMs: number
+  /** False if no level samples were taken (e.g. rendering throttled) — don't trust voicedMs */
+  analyzed: boolean
 }
 
 export interface AudioRecorderState {
@@ -26,6 +43,8 @@ export interface UseAudioReturn {
   stopRecording: () => Promise<Blob | null>
   cancelRecording: () => void
   getWaveformData: () => number[]
+  /** Stats of the most recently stopped recording (for silence / accidental-tap filtering) */
+  getLastRecordingStats: () => RecordingStats
 }
 
 export function useAudio(): UseAudioReturn {
@@ -51,12 +70,41 @@ export function useAudio(): UseAudioReturn {
   const isRecordingRef = useRef<boolean>(false)
   const lastIpcSendTimeRef = useRef<number>(0)
 
+  // Voice activity tracking for the current recording
+  const timeDomainRef = useRef<Float32Array<ArrayBuffer> | null>(null)
+  const recordStartRef = useRef<number>(0)
+  const voicedMsRef = useRef<number>(0)
+  const lastFrameTimeRef = useRef<number>(0)
+  const framesAnalyzedRef = useRef<number>(0)
+  const lastStatsRef = useRef<RecordingStats>({ durationMs: 0, voicedMs: 0, analyzed: false })
+
+  // In-flight start, so a stop/cancel that arrives during mic spin-up waits for it
+  const startPromiseRef = useRef<Promise<void> | null>(null)
+  const cancelledDuringStartRef = useRef<boolean>(false)
+  const idleReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Waveform analysis loop — uses ref to avoid stale closure
   const updateWaveform = useCallback(() => {
     if (!analyserRef.current) return
 
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
     analyserRef.current.getByteFrequencyData(dataArray)
+
+    // ── Voice activity: accumulate time spent above the speech threshold ──
+    if (!timeDomainRef.current || timeDomainRef.current.length !== analyserRef.current.fftSize) {
+      timeDomainRef.current = new Float32Array(analyserRef.current.fftSize)
+    }
+    const td = timeDomainRef.current
+    analyserRef.current.getFloatTimeDomainData(td)
+    let sumSquares = 0
+    for (let k = 0; k < td.length; k++) sumSquares += td[k] * td[k]
+    const rms = Math.sqrt(sumSquares / td.length)
+    const frameNow = performance.now()
+    // Cap per-frame credit so a throttled frame can't count as a long voiced span
+    const frameMs = Math.min(100, frameNow - (lastFrameTimeRef.current || frameNow))
+    lastFrameTimeRef.current = frameNow
+    framesAnalyzedRef.current++
+    if (rms >= VOICE_RMS_THRESHOLD) voicedMsRef.current += frameMs
 
     // Focus on the speech-relevant frequency range (roughly bins 2–60 out of 128)
     // This makes the bars much more responsive to actual voice
@@ -145,7 +193,35 @@ export function useAudio(): UseAudioReturn {
     }
   }, [])
 
-  const startRecording = useCallback(async (): Promise<void> => {
+  const releaseMic = useCallback((): void => {
+    if (idleReleaseTimerRef.current) {
+      clearTimeout(idleReleaseTimerRef.current)
+      idleReleaseTimerRef.current = null
+    }
+    if (isRecordingRef.current || startPromiseRef.current) return
+    if (warmStreamRef.current) {
+      warmStreamRef.current.getTracks().forEach((track) => track.stop())
+      warmStreamRef.current = null
+    }
+  }, [])
+
+  /** After a recording, keep the mic warm briefly (or forever if the user opted in). */
+  const scheduleMicRelease = useCallback((): void => {
+    if (idleReleaseTimerRef.current) clearTimeout(idleReleaseTimerRef.current)
+    idleReleaseTimerRef.current = null
+    Promise.resolve(window.tapwisper.store.get('keepMicWarm'))
+      .catch(() => false)
+      .then((keepWarm) => {
+        if (keepWarm) return
+        idleReleaseTimerRef.current = setTimeout(releaseMic, MIC_IDLE_RELEASE_MS)
+      })
+  }, [releaseMic])
+
+  const doStartRecording = useCallback(async (): Promise<void> => {
+    if (idleReleaseTimerRef.current) {
+      clearTimeout(idleReleaseTimerRef.current)
+      idleReleaseTimerRef.current = null
+    }
     try {
       // Reuse the warm stream — this is near-instant when the stream is already live
       const stream = await ensureWarmStream()
@@ -180,6 +256,11 @@ export function useAudio(): UseAudioReturn {
       mediaRecorder.start(100) // Collect data every 100ms
       mediaRecorderRef.current = mediaRecorder
 
+      recordStartRef.current = Date.now()
+      voicedMsRef.current = 0
+      lastFrameTimeRef.current = 0
+      framesAnalyzedRef.current = 0
+
       // Start duration timer
       const startTime = Date.now()
       timerRef.current = setInterval(() => {
@@ -195,41 +276,91 @@ export function useAudio(): UseAudioReturn {
       // Start waveform updates
       animFrameRef.current = requestAnimationFrame(updateWaveform)
     } catch (error) {
-      console.error('Failed to start recording:', error)
-      throw new Error('Microphone access denied. Please allow microphone access.')
+      const name = error instanceof DOMException ? error.name : ''
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        throw new Error('Microphone access denied. Please allow microphone access.')
+      }
+      if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        throw new Error('No microphone found. Please connect a microphone.')
+      }
+      if (name === 'NotReadableError') {
+        throw new Error('The microphone is in use by another application.')
+      }
+      throw new Error(error instanceof Error ? error.message : 'Failed to start recording')
     }
   }, [updateWaveform, ensureWarmStream])
 
-  // Warm up the mic on mount so the first recording is instant
+  const startRecording = useCallback(async (): Promise<void> => {
+    cancelledDuringStartRef.current = false
+    const promise = doStartRecording()
+    startPromiseRef.current = promise
+    try {
+      await promise
+    } finally {
+      if (startPromiseRef.current === promise) startPromiseRef.current = null
+    }
+    if (cancelledDuringStartRef.current) {
+      cancelledDuringStartRef.current = false
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+      }
+      cleanupRecording()
+    }
+  }, [doStartRecording])
+
+  // Only pre-open the mic on mount when the user explicitly opted into it —
+  // a permanently open mic keeps the OS mic indicator lit and forces Bluetooth
+  // headsets into low-quality call mode, which also hurts recognition.
   useEffect(() => {
-    ensureWarmStream().catch(() => {
-      // Mic permission will be requested when recording starts
-    })
+    Promise.resolve(window.tapwisper.store.get('keepMicWarm'))
+      .then((keepWarm) => {
+        if (keepWarm) return ensureWarmStream()
+        return undefined
+      })
+      .catch(() => {
+        // Mic permission will be requested when recording starts
+      })
   }, [ensureWarmStream])
 
   const stopRecording = useCallback(async (): Promise<Blob | null> => {
+    // A quick push-to-talk can release before the mic finished starting
+    if (startPromiseRef.current) {
+      await startPromiseRef.current.catch(() => {})
+    }
     return new Promise((resolve) => {
       if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
         resolve(null)
         return
       }
 
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+      lastStatsRef.current = {
+        durationMs: Date.now() - recordStartRef.current,
+        voicedMs: voicedMsRef.current,
+        analyzed: framesAnalyzedRef.current > 0
+      }
+
+      const recorder = mediaRecorderRef.current
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
         cleanupRecording()
+        scheduleMicRelease()
         resolve(blob)
       }
 
-      mediaRecorderRef.current.stop()
+      recorder.stop()
     })
-  }, [])
+  }, [scheduleMicRelease])
 
   const cancelRecording = useCallback(() => {
+    if (startPromiseRef.current) {
+      cancelledDuringStartRef.current = true
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
     }
     cleanupRecording()
-  }, [])
+    scheduleMicRelease()
+  }, [scheduleMicRelease])
 
   /**
    * Clean up recording-specific resources but keep the warm mic stream alive
@@ -260,10 +391,13 @@ export function useAudio(): UseAudioReturn {
     return waveformDataRef.current
   }, [])
 
+  const getLastRecordingStats = useCallback((): RecordingStats => lastStatsRef.current, [])
+
   // Full cleanup on unmount — stop the warm stream too
   useEffect(() => {
     return () => {
       cleanupRecording()
+      if (idleReleaseTimerRef.current) clearTimeout(idleReleaseTimerRef.current)
       if (warmStreamRef.current) {
         warmStreamRef.current.getTracks().forEach((track) => track.stop())
         warmStreamRef.current = null
@@ -276,6 +410,7 @@ export function useAudio(): UseAudioReturn {
     startRecording,
     stopRecording,
     cancelRecording,
-    getWaveformData
+    getWaveformData,
+    getLastRecordingStats
   }
 }

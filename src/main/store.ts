@@ -42,13 +42,20 @@ export interface AppConfig {
 
   // Actions configuration
   actions: ActionCategory[]
-  lastUsedAction: string | null
 
   // App settings
+  /** UI language (i18n). Not used for speech recognition — see speechLanguage. */
   language: string
   theme: 'system' | 'dark' | 'light'
   autoLaunch: boolean
-  showRecordingPill: boolean
+
+  // Speech recognition
+  /** ISO-639-1 code of the language the user speaks, or 'auto' to let the model detect it */
+  speechLanguage: string
+  /** Names, jargon and spellings to bias transcription toward (free text) */
+  speechVocabulary: string
+  /** Keep the microphone open between recordings for instant start (mic indicator stays on) */
+  keepMicWarm: boolean
 
   // Shortcut customization
   shortcuts: {
@@ -111,7 +118,7 @@ const defaultConfig: AppConfig = {
   voiceModels: {
     whisper: 'openai/whisper-large-v3',
     'openai-whisper': 'whisper-1',
-    soniox: 'soniox-stt-async-v3'
+    soniox: 'stt-async-v4'
   },
 
   actions: [
@@ -194,22 +201,19 @@ const defaultConfig: AppConfig = {
     }
   ],
 
-  lastUsedAction: null,
-
   language: 'en',
   theme: 'system',
   autoLaunch: false,
-  showRecordingPill: true,
+
+  speechLanguage: 'auto',
+  speechVocabulary: '',
+  keepMicWarm: false,
 
   shortcuts: {
     record: 'Option+Space'
   },
 
-  snippets: [
-    { id: '1', trigger: '/addr', expansion: '123 Main Street, City, State 12345' },
-    { id: '2', trigger: '/sig', expansion: 'Best regards,\nJohn Doe\nSenior Developer' },
-    { id: '3', trigger: '/email', expansion: 'john.doe@company.com' }
-  ],
+  snippets: [],
 
   triggers: [],
 

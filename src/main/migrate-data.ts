@@ -78,12 +78,25 @@ function migrateActivityRecords(): void {
 }
 
 /**
+ * Older builds stored a display id ("soniox-stt-async-v3") instead of a real
+ * Soniox model id — replace it so the API accepts it and Settings highlights it.
+ */
+function migrateSonioxModel(): void {
+  const store = getStore()
+  const voiceModels = store.get('voiceModels')
+  if (voiceModels && !voiceModels.soniox?.startsWith('stt-')) {
+    store.set('voiceModels', { ...voiceModels, soniox: 'stt-async-v4' })
+  }
+}
+
+/**
  * Run all migrations
  */
 export function runMigrations(): void {
   try {
     migrateStats()
     migrateActivityRecords()
+    migrateSonioxModel()
   } catch {
     // Migration failure is non-fatal — app continues with empty database
   }

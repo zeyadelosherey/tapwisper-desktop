@@ -63,14 +63,57 @@ export async function processText(request: AIRequest): Promise<AIResponse> {
   }
 }
 
+/** Per-request transcription hints passed to every voice provider */
+export interface TranscriptionOptions {
+  /** ISO-639-1 code; undefined lets the model auto-detect the spoken language */
+  language?: string
+  /** Vocabulary / context that biases recognition toward the user's terms */
+  prompt?: string
+}
+
+/** Whisper only reads the last ~224 tokens of the prompt — keep it bounded */
+const MAX_PROMPT_CHARS = 600
+
+function buildVocabularyPrompt(vocabulary: unknown, triggers: unknown): string | undefined {
+  const terms: string[] = []
+  if (typeof vocabulary === 'string') {
+    terms.push(
+      ...vocabulary
+        .split(/[\n,]+/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+    )
+  }
+  // Trigger phrases are exactly the words that must be recognised reliably
+  if (Array.isArray(triggers)) {
+    for (const t of triggers as Array<{ enabled?: boolean; triggerPhrase?: string }>) {
+      if (t.enabled && t.triggerPhrase?.trim()) terms.push(t.triggerPhrase.trim())
+    }
+  }
+  const unique = [...new Set(terms)]
+  if (unique.length === 0) return undefined
+  return unique.join(', ').slice(0, MAX_PROMPT_CHARS)
+}
+
 /**
- * Route transcription to the configured voice provider
+ * Route transcription to the configured voice provider.
+ *
+ * The spoken language comes from the `speechLanguage` setting (default 'auto'),
+ * NOT the UI language — forcing the UI language made Whisper mistranscribe or
+ * translate anyone who speaks a different language than their interface.
  */
 export async function transcribeAudio(
   audioBlob: Blob,
-  language?: string
+  languageOverride?: string
 ): Promise<TranscriptionResponse> {
-  const config = await window.tapwisper.store.getAll() as any
+  const config = (await window.tapwisper.store.getAll()) as Record<string, unknown> & {
+    voiceProvider?: VoiceProvider
+    apiKeys?: Record<string, string>
+    voiceModels?: Partial<Record<VoiceProvider, string>>
+    speechLanguage?: string
+    speechVocabulary?: string
+    triggers?: unknown
+  }
   const provider: VoiceProvider = config.voiceProvider || 'whisper'
 
   const voiceApiKeyMap: Record<VoiceProvider, string> = {
@@ -85,13 +128,19 @@ export async function transcribeAudio(
     throw new Error(`No API key configured for ${provider}. Please add your API key in Settings > AI Provider.`)
   }
 
+  const speechLanguage = languageOverride || config.speechLanguage || 'auto'
+  const options: TranscriptionOptions = {
+    language: speechLanguage === 'auto' ? undefined : speechLanguage,
+    prompt: buildVocabularyPrompt(config.speechVocabulary, config.triggers)
+  }
+
   switch (provider) {
     case 'whisper':
-      return transcribeWithWhisper(audioBlob, apiKey, language, voiceModel)
+      return transcribeWithWhisper(audioBlob, apiKey, options, voiceModel)
     case 'openai-whisper':
-      return transcribeWithOpenAIWhisper(audioBlob, apiKey, language, voiceModel)
+      return transcribeWithOpenAIWhisper(audioBlob, apiKey, options, voiceModel)
     case 'soniox':
-      return transcribeWithSoniox(audioBlob, apiKey, language)
+      return transcribeWithSoniox(audioBlob, apiKey, options, voiceModel)
     default:
       throw new Error(`Unknown voice provider: ${provider}`)
   }

@@ -11,6 +11,68 @@ import { executeTrigger } from '../services/trigger-executor'
 
 type PanelState = 'idle' | 'recording' | 'transcribing'
 
+/** Recordings shorter than this are accidental taps — discard without calling the API */
+const MIN_RECORDING_MS = 300
+/** Less voiced audio than this means nothing was said */
+const MIN_VOICED_MS = 150
+
+/**
+ * Phrases Whisper is known to invent from silence or noise (it was trained on
+ * subtitled video). Only dropped when the recording had very little speech.
+ */
+const HALLUCINATIONS = new Set([
+  'thank you',
+  'thank you very much',
+  'thanks for watching',
+  'thank you for watching',
+  'thanks for watching and see you next time',
+  'please subscribe',
+  'subscribe to my channel',
+  'bye',
+  'you',
+  'so',
+  'okay',
+  'the end',
+  'subtitles by the amaraorg community',
+  'شكرا',
+  'شكرا لكم',
+  'شكرا للمشاهدة',
+  'اشتركوا في القناة',
+  'untertitel im auftrag des zdf',
+  'sous-titres réalisés par la communauté damaraorg'
+])
+
+function isLikelyHallucination(text: string, voicedMs: number): boolean {
+  if (voicedMs > 1200) return false
+  const normalized = text
+    .toLowerCase()
+    .replace(/[.,!?;:'"()…\-–—]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return HALLUCINATIONS.has(normalized)
+}
+
+/** Show a short error in the recording pill (auto-dismisses) */
+function showPillError(message: string): void {
+  window.tapwisper.recordingPill.show()
+  window.tapwisper.window.send('recordingPill', 'recording:error', message)
+}
+
+function friendlyError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  if (/No API key/i.test(raw)) return raw
+  if (/\b401\b|\b403\b|invalid.*key|unauthori[sz]ed/i.test(raw)) {
+    return 'Your voice provider rejected the API key. Check it in Settings > AI Provider.'
+  }
+  if (/\b429\b|rate limit|quota/i.test(raw)) {
+    return 'Voice provider rate limit or quota reached. Try again in a moment.'
+  }
+  if (/Failed to fetch|NetworkError|network/i.test(raw)) {
+    return 'Network error — check your internet connection.'
+  }
+  return raw.length > 160 ? `${raw.slice(0, 157)}...` : raw
+}
+
 /** Track whether the panel is visible so we can replay the entrance animation */
 let showCounter = 0
 
@@ -25,6 +87,7 @@ export function PinnedPanel(): JSX.Element {
     startRecording,
     stopRecording,
     cancelRecording,
+    getLastRecordingStats,
     state: audioState
   } = useAudio()
 
@@ -38,23 +101,38 @@ export function PinnedPanel(): JSX.Element {
     try {
       setState('transcribing')
       const blob = await stopRecording()
-      if (!blob) {
+      const stats = getLastRecordingStats()
+      const hideAll = (): void => {
         setState('idle')
         window.tapwisper.recordingPill.hide()
         window.tapwisper.window.hide('pinnedPanel')
+      }
+      if (!blob || blob.size === 0 || stats.durationMs < MIN_RECORDING_MS) {
+        hideAll()
+        return
+      }
+      // Nothing was said: don't send silence to the API (Whisper invents text from it)
+      if (stats.analyzed && stats.voicedMs < MIN_VOICED_MS) {
+        window.tapwisper.window.hide('pinnedPanel')
+        setState('idle')
+        if (stats.durationMs > 1000) {
+          showPillError('No speech detected. Check that the right microphone is selected.')
+        } else {
+          window.tapwisper.recordingPill.hide()
+        }
         return
       }
 
       // Fire all async work in parallel: transcription, text grab, config reads.
       // Previously these were sequential, adding 100-300ms of avoidable latency.
       const grabPromise = window.tapwisper.clipboard.grabSelectedText().catch(() => '')
-      const langPromise = window.tapwisper.store.get('language') as Promise<string | undefined>
       const snippetsPromise = window.tapwisper.store.get('snippets') as Promise<Snippet[] | undefined>
 
-      const [lang, storedSnippets] = await Promise.all([langPromise, snippetsPromise])
-
-      const result = await transcribeAudio(blob, lang || 'en')
-      const rawTranscription = result.text?.trim() || ''
+      const [result, storedSnippets] = await Promise.all([transcribeAudio(blob), snippetsPromise])
+      let rawTranscription = result.text?.trim() || ''
+      if (rawTranscription && isLikelyHallucination(rawTranscription, stats.voicedMs)) {
+        rawTranscription = ''
+      }
 
       // Wait for grab to complete (it ran in parallel with transcription)
       let selectedText = ''
@@ -110,9 +188,14 @@ export function PinnedPanel(): JSX.Element {
               }
 
               try {
-                await executeTrigger(triggerMatch)
+                const execResult = await executeTrigger(triggerMatch)
+                if (!execResult.success) {
+                  showPillError(
+                    `"${triggerMatch.trigger.name}" failed: ${execResult.error || 'unknown error'}`
+                  )
+                }
               } catch (execErr) {
-                console.error('[PinnedPanel] Trigger execution failed:', execErr)
+                showPillError(`"${triggerMatch.trigger.name}" failed: ${friendlyError(execErr)}`)
               }
               return
             }
@@ -178,13 +261,19 @@ export function PinnedPanel(): JSX.Element {
         window.tapwisper.window.hide('pinnedPanel')
         setState('idle')
       }
-    } catch (err: any) {
-      console.error('Transcription failed:', err)
-      window.tapwisper.recordingPill.hide()
+    } catch (err: unknown) {
       window.tapwisper.window.hide('pinnedPanel')
       setState('idle')
+      showPillError(friendlyError(err))
     }
-  }, [stopRecording, addVoiceRecording, addAIAction, addTranscription, addTranscriptionWithLLM])
+  }, [
+    stopRecording,
+    getLastRecordingStats,
+    addVoiceRecording,
+    addAIAction,
+    addTranscription,
+    addTranscriptionWithLLM
+  ])
 
   // Start recording helper
   const doStartRecording = useCallback(async () => {
@@ -197,10 +286,13 @@ export function PinnedPanel(): JSX.Element {
     // Start actual recording (should be instant if permission already granted)
     try {
       await startRecording()
-    } catch (err: any) {
-      console.error('Failed to start recording:', err)
+    } catch (err: unknown) {
       isRecordingRef.current = false
       setState('idle')
+      window.tapwisper.window.hide('pinnedPanel')
+      // Tell main the recording is over so the next shortcut press starts fresh
+      void window.tapwisper.recording.cancel()
+      showPillError(err instanceof Error ? err.message : 'Failed to start recording')
     }
   }, [startRecording])
 

@@ -14,6 +14,32 @@ import sonioxLogo from '../assets/soniox.png'
 
 // ── Constants ────────────────────────────────────────────────────
 
+/** Languages offered for speech recognition (ISO-639-1). 'auto' lets the model detect. */
+const SPEECH_LANGUAGES: { code: string; label: string }[] = [
+  { code: 'auto', label: 'Auto-detect' },
+  { code: 'en', label: 'English' },
+  { code: 'ar', label: 'العربية (Arabic)' },
+  { code: 'de', label: 'Deutsch (German)' },
+  { code: 'es', label: 'Español (Spanish)' },
+  { code: 'fr', label: 'Français (French)' },
+  { code: 'it', label: 'Italiano (Italian)' },
+  { code: 'pt', label: 'Português (Portuguese)' },
+  { code: 'nl', label: 'Nederlands (Dutch)' },
+  { code: 'tr', label: 'Türkçe (Turkish)' },
+  { code: 'ru', label: 'Русский (Russian)' },
+  { code: 'uk', label: 'Українська (Ukrainian)' },
+  { code: 'pl', label: 'Polski (Polish)' },
+  { code: 'sv', label: 'Svenska (Swedish)' },
+  { code: 'fa', label: 'فارسی (Persian)' },
+  { code: 'ur', label: 'اردو (Urdu)' },
+  { code: 'hi', label: 'हिन्दी (Hindi)' },
+  { code: 'zh', label: '中文 (Chinese)' },
+  { code: 'ja', label: '日本語 (Japanese)' },
+  { code: 'ko', label: '한국어 (Korean)' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'vi', label: 'Tiếng Việt (Vietnamese)' }
+]
+
 const LANGUAGES = [
   { code: 'en', label: 'English', nativeLabel: 'English' },
   { code: 'ar', label: 'Arabic', nativeLabel: 'العربية' },
@@ -123,7 +149,7 @@ const LLM_PROVIDERS: { id: LLMProvider; label: string; shortLabel: string; color
 const VOICE_PROVIDERS: { id: VoiceProvider; label: string; shortLabel: string; description: string; color: string }[] = [
   { id: 'whisper', label: 'Together Whisper', shortLabel: 'Whisper', description: 'Whisper Large v3 via Together AI', color: '#10A37F' },
   { id: 'openai-whisper', label: 'OpenAI Whisper', shortLabel: 'OpenAI', description: 'Whisper & GPT-4o Transcribe via OpenAI', color: '#412991' },
-  { id: 'soniox', label: 'Soniox', shortLabel: 'Soniox', description: 'Soniox STT Async v3', color: '#7EB6E0' }
+  { id: 'soniox', label: 'Soniox', shortLabel: 'Soniox', description: 'Soniox async speech-to-text', color: '#7EB6E0' }
 ]
 
 const PROVIDER_MODELS: Record<LLMProvider, { id: string; label: string; description: string }[]> = {
@@ -188,7 +214,7 @@ const VOICE_PROVIDER_MODELS: Record<VoiceProvider, { id: string; label: string; 
     { id: 'gpt-4o-mini-transcribe', label: 'GPT-4o Mini Transcribe', description: 'Fast & affordable' }
   ],
   soniox: [
-    { id: 'soniox-stt-async-v3', label: 'Soniox STT Async v3', description: 'Real-time streaming' }
+    { id: 'stt-async-v4', label: 'Soniox STT Async v4', description: 'Multilingual, high accuracy' }
   ]
 }
 
@@ -202,7 +228,7 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
 const DEFAULT_VOICE_MODELS: Record<VoiceProvider, string> = {
   whisper: 'openai/whisper-large-v3',
   'openai-whisper': 'whisper-1',
-  soniox: 'soniox-stt-async-v3'
+  soniox: 'stt-async-v4'
 }
 
 const LLM_API_KEY_LABELS: Record<LLMProvider, string> = {
@@ -452,6 +478,9 @@ export function Settings(): JSX.Element {
   const [language, setLanguage] = useState('en')
   const [theme, setTheme] = useState<Theme>('system')
   const [autoLaunch, setAutoLaunch] = useState(false)
+  const [speechLanguage, setSpeechLanguage] = useState('auto')
+  const [speechVocabulary, setSpeechVocabulary] = useState('')
+  const [keepMicWarm, setKeepMicWarm] = useState(false)
 
   // AI Provider tab state
   const [providerSubTab, setProviderSubTab] = useState<ProviderSubTab>('ai')
@@ -510,8 +539,14 @@ export function Settings(): JSX.Element {
       window.tapwisper.store.get('voiceProvider'),
       window.tapwisper.store.get('apiKeys'),
       window.tapwisper.store.get('models'),
-      window.tapwisper.store.get('voiceModels')
-    ]).then(([lang, th, auto, platform, sc, llm, voice, keys, mdls, vMdls]) => {
+      window.tapwisper.store.get('voiceModels'),
+      window.tapwisper.store.get('speechLanguage'),
+      window.tapwisper.store.get('speechVocabulary'),
+      window.tapwisper.store.get('keepMicWarm')
+    ]).then(([lang, th, auto, platform, sc, llm, voice, keys, mdls, vMdls, sLang, vocab, warm]) => {
+      if (typeof sLang === 'string') setSpeechLanguage(sLang)
+      if (typeof vocab === 'string') setSpeechVocabulary(vocab)
+      if (typeof warm === 'boolean') setKeepMicWarm(warm)
       if (lang) {
         setLanguage(lang as string)
         i18n.changeLanguage(lang as string)
@@ -568,6 +603,16 @@ export function Settings(): JSX.Element {
     setAutoLaunch(value)
     window.tapwisper.store.set('autoLaunch', value)
     window.tapwisper.app.setAutoLaunch(value)
+  }, [])
+
+  const handleSpeechLanguageChange = useCallback((code: string) => {
+    setSpeechLanguage(code)
+    window.tapwisper.store.set('speechLanguage', code)
+  }, [])
+
+  const handleKeepMicWarmChange = useCallback((value: boolean) => {
+    setKeepMicWarm(value)
+    window.tapwisper.store.set('keepMicWarm', value)
   }, [])
 
   // ── AI Provider tab handlers ───────────────────────────────
@@ -659,6 +704,92 @@ export function Settings(): JSX.Element {
         </div>
       </section>
 
+      {/* Speech recognition */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <Mic className="w-4 h-4 text-theme-text-secondary" />
+          <h2 className="text-sm font-semibold text-theme-text-secondary uppercase tracking-wider">
+            {t('settings.speechRecognition', 'Speech recognition')}
+          </h2>
+        </div>
+        <div className="bg-theme-card rounded-xl border border-theme-border/50 divide-y divide-theme-border/50">
+          <div className="p-4">
+            <label htmlFor="speech-language" className="text-sm text-theme-text">
+              {t('settings.speechLanguage', 'Spoken language')}
+            </label>
+            <p className="text-xs text-theme-text-tertiary mt-0.5 mb-2">
+              {t(
+                'settings.speechLanguageHint',
+                'Set this to the language you dictate in. Auto-detect works for most people and for switching languages; pick one if short phrases come out in the wrong language.'
+              )}
+            </p>
+            <select
+              id="speech-language"
+              value={speechLanguage}
+              onChange={(e) => handleSpeechLanguageChange(e.target.value)}
+              className="w-full bg-theme-surface text-theme-text text-sm rounded-lg px-3 py-2 border border-theme-border/50 focus:outline-none focus:border-sky-accent/50"
+            >
+              {SPEECH_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.code === 'auto' ? t('settings.speechAutoDetect', 'Auto-detect') : l.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="p-4">
+            <label htmlFor="speech-vocabulary" className="text-sm text-theme-text">
+              {t('settings.speechVocabulary', 'Custom vocabulary')}
+            </label>
+            <p className="text-xs text-theme-text-tertiary mt-0.5 mb-2">
+              {t(
+                'settings.speechVocabularyHint',
+                'Names, products and jargon you use, separated by commas. Your voice trigger phrases are included automatically.'
+              )}
+            </p>
+            <textarea
+              id="speech-vocabulary"
+              value={speechVocabulary}
+              onChange={(e) => setSpeechVocabulary(e.target.value)}
+              onBlur={() => window.tapwisper.store.set('speechVocabulary', speechVocabulary)}
+              rows={2}
+              maxLength={600}
+              placeholder="TapWisper, Kubernetes, Zeyad"
+              className="w-full bg-theme-surface text-theme-text text-sm rounded-lg px-3 py-2 border border-theme-border/50 focus:outline-none focus:border-sky-accent/50 resize-none placeholder:text-theme-text-tertiary"
+            />
+          </div>
+          <div className="p-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-theme-text">
+                {t('settings.keepMicWarm', 'Keep microphone ready')}
+              </p>
+              <p className="text-xs text-theme-text-tertiary mt-0.5">
+                {t(
+                  'settings.keepMicWarmHint',
+                  'Starts recording instantly, but keeps the microphone open (mic indicator stays on; Bluetooth headsets switch to call quality).'
+                )}
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={keepMicWarm}
+              aria-label={t('settings.keepMicWarm', 'Keep microphone ready')}
+              onClick={() => handleKeepMicWarmChange(!keepMicWarm)}
+              className={`
+                w-11 h-6 rounded-full transition-all relative shrink-0
+                ${keepMicWarm ? 'bg-sky-accent' : 'bg-theme-surface'}
+              `}
+            >
+              <div
+                className={`
+                  w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all
+                  ${keepMicWarm ? 'ltr:left-[22px] rtl:right-[22px]' : 'ltr:left-0.5 rtl:right-0.5'}
+                `}
+              />
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* Theme */}
       <section className="mb-8">
         <div className="flex items-center gap-2 mb-3">
@@ -704,6 +835,9 @@ export function Settings(): JSX.Element {
             <p className="text-xs text-theme-text-tertiary mt-0.5">{t('settings.launchHint')}</p>
           </div>
           <button
+            role="switch"
+            aria-checked={autoLaunch}
+            aria-label={t('settings.launchAtStartup')}
             onClick={() => handleAutoLaunchChange(!autoLaunch)}
             className={`
               w-11 h-6 rounded-full transition-all relative
@@ -1127,20 +1261,7 @@ export function Settings(): JSX.Element {
     )
   }
 
-  const FN_COMBO_KEYS = [
-    { key: 'Space', label: 'Space' },
-    { key: 'S', label: 'S' },
-    { key: 'R', label: 'R' },
-    { key: 'D', label: 'D' },
-    { key: 'F', label: 'F' },
-    { key: 'J', label: 'J' },
-    { key: 'K', label: 'K' }
-  ]
-
   const renderShortcutsTab = (): JSX.Element => {
-    const isFnBased = shortcuts.record.toUpperCase().startsWith('FN+')
-    const fnSecondKey = isFnBased ? shortcuts.record.split('+').slice(1).join('+') : ''
-
     return (
       <>
         <section>
@@ -1167,51 +1288,9 @@ export function Settings(): JSX.Element {
               value={shortcuts.record}
               onChange={(v) => handleShortcutChange('record', v)}
               pressKeysText={t('settings.pressKeys')}
-              disabled={isFnBased}
             />
           </div>
 
-          {/* Fn (Globe) key combos — macOS only */}
-          {isMac && (
-            <div className="mt-5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-base">🌐</span>
-                <p className="text-xs font-semibold text-theme-text-tertiary uppercase tracking-wider">
-                  {t('settings.fnKey', 'Fn (Globe) Key')}
-                </p>
-              </div>
-              <p className="text-xs text-theme-text-tertiary mb-3">
-                {t('settings.fnKeyDesc', 'Use the Globe/Fn key combined with another key to start and stop recording')}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {FN_COMBO_KEYS.map((combo) => {
-                  const comboValue = `Fn+${combo.key}`
-                  const isActive = shortcuts.record.toUpperCase() === comboValue.toUpperCase()
-                  return (
-                    <button
-                      key={combo.key}
-                      onClick={() => {
-                        if (isActive) {
-                          handleShortcutChange('record', DEFAULT_SHORTCUTS.record)
-                        } else {
-                          handleShortcutChange('record', comboValue)
-                        }
-                      }}
-                      className={`
-                        px-3 py-2 rounded-lg text-sm font-mono transition-all border
-                        ${isActive
-                          ? 'bg-sky-accent/15 border-sky-accent/50 text-sky-accent'
-                          : 'bg-theme-card border-theme-border/50 text-theme-text-secondary hover:border-theme-border hover:text-theme-text'
-                        }
-                      `}
-                    >
-                      🌐 + {combo.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </section>
       </>
     )
