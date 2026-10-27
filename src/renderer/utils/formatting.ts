@@ -105,3 +105,13 @@ export function formatCompactNumber(value: number): string {
     return new Intl.NumberFormat(undefined, options).format(value)
   }
 }
+
+/** File size in the current UI language, e.g. 142 MB / 1.6 GB */
+export function formatBytes(bytes: number): string {
+  const gb = bytes / 1024 ** 3
+  const [value, unit] = gb >= 1 ? [gb, 'GB'] : [bytes / 1024 ** 2, 'MB']
+  const formatted = new Intl.NumberFormat(currentLocale(), {
+    maximumFractionDigits: value < 10 ? 1 : 0
+  }).format(value)
+  return `${formatted} ${unit}`
+}

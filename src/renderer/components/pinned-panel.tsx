@@ -73,7 +73,7 @@ function friendlyError(err: unknown): string {
   if (/\b401\b|\b403\b|invalid.*key|unauthori[sz]ed/i.test(raw)) {
     return i18n.t(
       'errors.voiceKeyRejected',
-      'Your voice provider rejected the API key. Check it in Settings > AI Provider.'
+      'Your voice provider rejected the API key. Check it in Settings > Speech-to-Text.'
     )
   }
   if (/\b429\b|rate limit|quota/i.test(raw)) {

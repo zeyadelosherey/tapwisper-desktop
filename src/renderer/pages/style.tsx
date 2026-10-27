@@ -125,7 +125,7 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
-                    onClick={() => onNavigate('settings', 'ai-provider')}
+                    onClick={() => onNavigate('settings', 'language-models')}
                   >
                     {t('style.addKey', 'Add API key')}
                   </button>

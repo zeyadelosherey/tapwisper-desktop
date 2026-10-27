@@ -80,7 +80,7 @@ export function meetingAIErrorMessage(t: TFunction, err: unknown): string {
   if (/api key/i.test(message)) {
     return t(
       'notepad.errorNoKey',
-      'Add an API key for your AI provider in Settings → AI Provider first.'
+      'Add an API key for your AI provider in Settings → Language Models first.'
     )
   }
   return message || t('common.unknownError', 'Unknown error')
@@ -100,7 +100,7 @@ export function recorderErrorMessage(t: TFunction, error: RecorderError): string
     case 'no-api-key':
       return t(
         'notepad.errorNoVoiceKey',
-        'Add an API key for your voice provider in Settings → AI Provider to transcribe meetings.'
+        'Add an API key for your voice provider in Settings → Speech-to-Text to transcribe meetings.'
       )
     case 'engine-not-ready':
       return t(

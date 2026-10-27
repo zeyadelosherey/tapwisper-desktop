@@ -67,7 +67,7 @@ export async function processText(request: AIRequest): Promise<AIResponse> {
     throw new Error(
       i18n.t(
         'errors.noApiKey',
-        'No API key configured for {{provider}}. Please add your API key in Settings > AI Provider.',
+        'No API key configured for {{provider}}. Add one in Settings, or choose a local or self-hosted engine there.',
         { provider }
       )
     )
@@ -232,7 +232,7 @@ async function transcribeWithCloud(
     throw new Error(
       i18n.t(
         'errors.noApiKey',
-        'No API key configured for {{provider}}. Please add your API key in Settings > AI Provider.',
+        'No API key configured for {{provider}}. Add one in Settings, or choose a local or self-hosted engine there.',
         { provider }
       )
     )
