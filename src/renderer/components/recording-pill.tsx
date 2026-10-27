@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { WaveformBars } from './waveform-bars'
+import { useOverlayHitRegion } from '../hooks/use-overlay-hit-region'
 import { processText } from '../services/ai-router'
 import {
   BUILT_IN_CATEGORIES,
@@ -8,7 +9,19 @@ import {
 import { useStatsStore } from '../store/stats'
 import { useActivityStore } from '../store/activity'
 
-type PillState = 'hidden' | 'recording' | 'transcribing' | 'loading-ai' | 'result' | 'error' | 'post-recording' | 'done'
+type PillState =
+  | 'hidden'
+  | 'recording'
+  | 'transcribing'
+  | 'loading-ai'
+  | 'result'
+  | 'error'
+  | 'transient-error'
+  | 'post-recording'
+  | 'done'
+
+// How long a transcription/trigger error notice stays on screen
+const TRANSIENT_ERROR_MS = 5000
 
 interface ResultEntry {
   id: string
@@ -35,6 +48,13 @@ export function RecordingPill(): JSX.Element {
   const [isFullExpanded, setIsFullExpanded] = useState(false)
   const [postRecordingText, setPostRecordingText] = useState('')
   const postRecordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Inline error for a failed follow-up action (the result stays visible)
+  const [actionError, setActionError] = useState('')
+  const transientErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Visible elements — used to keep the rest of the overlay click-through
+  const pillBarRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   const addAIAction = useStatsStore((s) => s.addAIAction)
   const addLLMAction = useActivityStore((s) => s.addLLMAction)
@@ -61,10 +81,19 @@ export function RecordingPill(): JSX.Element {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [loadCategories])
 
+  const clearTransientErrorTimer = useCallback(() => {
+    if (transientErrorTimerRef.current) {
+      clearTimeout(transientErrorTimerRef.current)
+      transientErrorTimerRef.current = null
+    }
+  }, [])
+
   const resetAll = useCallback(() => {
     setResultText('')
     setActionLabel('')
     setErrorText('')
+    setActionError('')
+    clearTransientErrorTimer()
     setCopied(false)
     setShowActions(false)
     setResultHistory([])
@@ -74,7 +103,14 @@ export function RecordingPill(): JSX.Element {
       clearTimeout(postRecordingTimerRef.current)
       postRecordingTimerRef.current = null
     }
-  }, [])
+  }, [clearTransientErrorTimer])
+
+  // Hide the transient error notice. The main process collapses the window
+  // and sends recording-pill:hide, which resets the state.
+  const dismissTransientError = useCallback(() => {
+    clearTransientErrorTimer()
+    window.tapwisper.recordingPill.hide()
+  }, [clearTransientErrorTimer])
 
   const dismiss = useCallback(() => {
     setState('done')
@@ -107,14 +143,17 @@ export function RecordingPill(): JSX.Element {
   const handleRunAction = useCallback(async (actionId: string, prompt: string, label: string) => {
     if (state === 'loading-ai' || !resultText) return
 
+    const previousLabel = actionLabel
+
     // Save current result to history
     setResultHistory((prev) => [{
       id: `${Date.now()}`,
-      actionName: actionLabel || 'Voice Command',
+      actionName: previousLabel || 'Voice Command',
       text: resultText
     }, ...prev])
 
     setActionLabel(label)
+    setActionError('')
     setState('loading-ai')
     setShowActions(false)
 
@@ -130,8 +169,13 @@ export function RecordingPill(): JSX.Element {
         llmInput: resultText,
         llmResult: newText
       })
-    } catch (err: any) {
-      console.error('Follow-up action failed:', err)
+    } catch (err) {
+      // Revert to the previous result: text was never replaced, so restore
+      // the label and drop the history entry pushed above.
+      setActionLabel(previousLabel)
+      setResultHistory((prev) => prev.slice(1))
+      const message = err instanceof Error && err.message ? err.message : 'Unknown error'
+      setActionError(`${label} failed: ${message}`)
       setState('result')
     }
   }, [state, resultText, actionLabel, addAIAction, addLLMAction])
@@ -184,6 +228,7 @@ export function RecordingPill(): JSX.Element {
     })
 
     const unsubStart = window.tapwisper.on('recording:start', () => {
+      clearTransientErrorTimer()
       if (postRecordingTimerRef.current) {
         clearTimeout(postRecordingTimerRef.current)
         postRecordingTimerRef.current = null
@@ -237,6 +282,20 @@ export function RecordingPill(): JSX.Element {
       }
     })
 
+    // Transcription / trigger failure reported by the pinned panel. Can
+    // arrive at any time (no prior result-panel:loading). Shows a compact
+    // notice that auto-dismisses.
+    const unsubRecordingError = window.tapwisper.on('recording:error', (msg: unknown) => {
+      resetAll()
+      setErrorText(typeof msg === 'string' && msg.trim() ? msg : 'Something went wrong')
+      setState('transient-error')
+      window.tapwisper.recordingPill.expand()
+      transientErrorTimerRef.current = setTimeout(() => {
+        transientErrorTimerRef.current = null
+        window.tapwisper.recordingPill.hide()
+      }, TRANSIENT_ERROR_MS)
+    })
+
     const dismissPostRecording = (): void => {
       setState('done')
       setPostRecordingText('')
@@ -273,13 +332,15 @@ export function RecordingPill(): JSX.Element {
       unsubLoading()
       unsubResult()
       unsubError()
+      unsubRecordingError()
       unsubPostRecording()
       unsubPostRecordingOpened()
       if (postRecordingTimerRef.current) clearTimeout(postRecordingTimerRef.current)
       if (animationRef.current) cancelAnimationFrame(animationRef.current)
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      clearTransientErrorTimer()
     }
-  }, [resetAll])
+  }, [resetAll, clearTransientErrorTimer])
 
   useEffect(() => {
     if (state === 'transcribing' || state === 'loading-ai') {
@@ -289,10 +350,17 @@ export function RecordingPill(): JSX.Element {
     }
   }, [state])
 
-  if (state === 'hidden') return <></>
-
   const isExiting = state === 'done'
   const showResultPanel = state === 'loading-ai' || state === 'result' || state === 'error'
+  const isTransientError = state === 'transient-error'
+
+  useOverlayHitRegion(
+    [pillBarRef, panelRef],
+    showResultPanel || isTransientError,
+    `${state}-${isFullExpanded}-${showActions}`
+  )
+
+  if (state === 'hidden') return <></>
 
   // Flatten all actions from all visible categories into a single list
   const flatActions = categories
@@ -311,12 +379,20 @@ export function RecordingPill(): JSX.Element {
     <div className="w-full flex flex-col items-center no-select overflow-hidden" style={{ height: '100vh' }}>
       {/* ── Top pill bar ── */}
       <div
-        onClick={state === 'post-recording' ? handleOpenActions : undefined}
+        ref={pillBarRef}
+        onClick={
+          state === 'post-recording'
+            ? handleOpenActions
+            : isTransientError
+              ? dismissTransientError
+              : undefined
+        }
         className={`
           shrink-0 flex items-center justify-center gap-3 px-4 py-1.5
           bg-[#0A0A0A]/95 rounded-full pill-shadow
           transition-all duration-300 ease-out
-          ${state === 'post-recording' ? 'cursor-pointer hover:bg-[#1A1A1A]/95' : ''}
+          ${state === 'post-recording' || isTransientError ? 'cursor-pointer hover:bg-[#1A1A1A]/95' : ''}
+          ${isTransientError ? 'border border-red-500/40' : ''}
           ${isExiting ? 'opacity-0 scale-75' : 'opacity-100 scale-100 animate-scale-up'}
         `}
         style={{ height: 44 }}
@@ -333,7 +409,7 @@ export function RecordingPill(): JSX.Element {
             <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
             <span className="text-[11px] text-white/60 font-medium">Processing...</span>
           </div>
-        ) : (state === 'result' || state === 'error') ? (
+        ) : (state === 'result' || state === 'error' || isTransientError) ? (
           <div className="flex items-center gap-2 px-1">
             {state === 'result' ? (
               <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -361,9 +437,28 @@ export function RecordingPill(): JSX.Element {
         )}
       </div>
 
+      {/* ── Transient error notice (transcription / trigger failure) ── */}
+      {isTransientError && (
+        <div
+          ref={panelRef}
+          role="alert"
+          onClick={dismissTransientError}
+          className="mt-2 w-[340px] max-w-[calc(100%-16px)] flex items-start gap-2.5 px-4 py-3 bg-[#0A0A0A]/95 rounded-2xl pill-shadow border border-red-500/30 cursor-pointer animate-slide-down"
+        >
+          <svg className="w-4 h-4 mt-0.5 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-red-300 leading-relaxed line-clamp-4 break-words">{errorText}</p>
+            <p className="mt-1 text-[10px] text-white/30">Click to dismiss</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Result Panel (slides in below pill) ── */}
       {showResultPanel && (
         <div
+          ref={panelRef}
           className={`
             mt-2 bg-[#0A0A0A]/95 rounded-2xl pill-shadow
             transition-all duration-300 ease-out
@@ -455,7 +550,7 @@ export function RecordingPill(): JSX.Element {
                           <span className="text-[10px] text-white/30">{entry.actionName}</span>
                           <button
                             onClick={() => handleRevert(idx)}
-                            className="opacity-0 group-hover:opacity-100 text-[10px] text-sky-400 hover:text-sky-300 transition-all"
+                            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[10px] text-sky-400 hover:text-sky-300 transition-all"
                           >
                             Revert
                           </button>
@@ -469,8 +564,26 @@ export function RecordingPill(): JSX.Element {
             )}
 
             {state === 'error' && (
-              <div className="py-2">
+              <div className="py-2" role="alert">
                 <p className="text-xs text-red-400/90 leading-relaxed">{errorText}</p>
+              </div>
+            )}
+
+            {state === 'result' && actionError && (
+              <div
+                role="alert"
+                className="mt-2.5 flex items-start gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/25"
+              >
+                <p className="flex-1 text-[11px] text-red-300 leading-relaxed break-words">{actionError}</p>
+                <button
+                  onClick={() => setActionError('')}
+                  aria-label="Dismiss error"
+                  className="shrink-0 text-red-300/60 hover:text-red-300 transition-colors cursor-pointer"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             )}
           </div>
@@ -497,6 +610,7 @@ export function RecordingPill(): JSX.Element {
                         <span className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Actions</span>
                         <button
                           onClick={() => setShowActions(false)}
+                          aria-label="Close actions"
                           className="text-white/30 hover:text-white/60 transition-all cursor-pointer"
                         >
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -561,6 +675,8 @@ export function RecordingPill(): JSX.Element {
 
                 <button
                   onClick={dismiss}
+                  aria-label="Close"
+                  title="Close"
                   className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/50 hover:text-white/80 transition-all cursor-pointer"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   Clock, Mic, Zap, Type, TrendingUp, ArrowUpRight,
   Activity, Sparkles, Timer, LayoutDashboard, History,
@@ -7,7 +8,12 @@ import {
   Search, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useStatsStore, type ActivityEntry } from '../store/stats'
-import { useActivityStore, type TranscriptionRecord } from '../store/activity'
+import {
+  useActivityStore,
+  type ActivityPage,
+  type ActivityQuery,
+  type TranscriptionRecord
+} from '../store/activity'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -16,6 +22,53 @@ import { formatDuration, formatTimeAgo, formatDate, formatTime } from '../utils/
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 type HomeTab = 'dashboard' | 'activity'
+
+const IS_MAC = window.tapwisper.platform.os === 'darwin'
+const DEFAULT_RECORD_SHORTCUT = 'Option+Space'
+const RECORDS_PER_PAGE = 25
+
+/** Format a stored accelerator (e.g. "Option+Space") for the current platform. */
+function formatShortcutKey(part: string): string {
+  const upper = part.toUpperCase()
+  switch (upper) {
+    case 'COMMANDORCONTROL':
+    case 'CMDORCTRL':
+      return IS_MAC ? '⌘' : 'Ctrl'
+    case 'CMD':
+    case 'COMMAND':
+    case 'META':
+    case 'SUPER':
+      return IS_MAC ? '⌘' : 'Win'
+    case 'CTRL':
+    case 'CONTROL':
+      return IS_MAC ? '⌃' : 'Ctrl'
+    case 'ALT':
+    case 'OPTION':
+      return IS_MAC ? '⌥' : 'Alt'
+    case 'SHIFT':
+      return IS_MAC ? '⇧' : 'Shift'
+    case 'FN':
+      return IS_MAC ? '🌐' : 'Fn'
+    case 'SPACE':
+      return 'Space'
+    case 'ESCAPE':
+      return 'Esc'
+    default:
+      return part.length === 1 ? upper : part
+  }
+}
+
+function formatShortcutParts(accelerator: string): string[] {
+  return accelerator
+    .split('+')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(formatShortcutKey)
+}
+
+function joinShortcutParts(parts: string[]): string {
+  return parts.join(IS_MAC ? ' ' : '+')
+}
 
 // ── Component ────────────────────────────────────────────────────
 
@@ -39,16 +92,33 @@ export function Home(): JSX.Element {
 
   const {
     records: activityRecords,
+    totalCount: activityTotal,
     isLoaded: activityLoaded,
     loadRecords,
+    queryRecords,
     deleteRecord
   } = useActivityStore()
+
+  const [recordShortcut, setRecordShortcut] = useState(DEFAULT_RECORD_SHORTCUT)
 
   // Refresh stats and activity on mount and when switching between Dashboard/Activity tabs
   useEffect(() => {
     loadStats()
     loadRecords()
   }, [activeTab, loadStats, loadRecords])
+
+  // The record shortcut is configurable in Settings
+  useEffect(() => {
+    window.tapwisper.store
+      .get('shortcuts')
+      .then((shortcuts) => {
+        const record = (shortcuts as { record?: unknown } | undefined)?.record
+        if (typeof record === 'string' && record.trim()) setRecordShortcut(record)
+      })
+      .catch(() => {
+        // Keep the default
+      })
+  }, [])
 
   const timeSavedMinutes = useMemo(
     () => Math.round((voiceTimeSavedSeconds + aiTimeSavedSeconds) / 60),
@@ -170,9 +240,12 @@ export function Home(): JSX.Element {
         >
           <History className="w-4 h-4" />
           {t('home.activityTab', 'Activity')}
-          {activityRecords.length > 0 && (
-            <span className="ml-1 w-5 h-5 flex items-center justify-center text-[10px] font-semibold bg-sky-accent/15 text-sky-accent rounded-full">
-              {activityRecords.length}
+          {activityTotal > 0 && (
+            <span
+              className="ms-1 min-w-5 h-5 px-1 flex items-center justify-center text-[10px] font-semibold bg-sky-accent/15 text-sky-accent rounded-full"
+              aria-label={`${activityTotal}`}
+            >
+              {activityTotal > 99 ? '99+' : activityTotal}
             </span>
           )}
         </button>
@@ -180,7 +253,9 @@ export function Home(): JSX.Element {
 
       {activeTab === 'activity' ? (
         <ActivityTab
-          records={activityRecords}
+          totalCount={activityTotal}
+          refreshToken={`${activityTotal}-${activityRecords[0]?.id ?? ''}`}
+          queryRecords={queryRecords}
           onDelete={deleteRecord}
           t={t}
         />
@@ -192,6 +267,7 @@ export function Home(): JSX.Element {
           chartMax={chartMax}
           todayIdx={todayIdx}
           recentActivity={recentActivity}
+          recordShortcut={recordShortcut}
           t={t}
         />
       )}
@@ -202,9 +278,13 @@ export function Home(): JSX.Element {
 // ── Activity Tab Component ────────────────────────────────────────
 
 interface ActivityTabProps {
-  records: TranscriptionRecord[]
+  /** Total records in the database (unfiltered) */
+  totalCount: number
+  /** Changes whenever records are added/removed so the page is re-queried */
+  refreshToken: string
+  queryRecords: (query: ActivityQuery) => Promise<ActivityPage>
   onDelete: (id: string) => void
-  t: (key: string, fallback?: string) => string
+  t: TFunction
 }
 
 // Helper to render text with code blocks
@@ -264,14 +344,69 @@ function renderTextWithCodeBlocks(text: string): JSX.Element {
   return <>{parts}</>
 }
 
-function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
+function ActivityTab({
+  totalCount,
+  refreshToken,
+  queryRecords,
+  onDelete,
+  t
+}: ActivityTabProps): JSX.Element {
   const [selectedRecord, setSelectedRecord] = useState<TranscriptionRecord | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showOriginalInput, setShowOriginalInput] = useState(true)
   const [showLLMResult, setShowLLMResult] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const recordsPerPage = 25
+  // Current page from the database; null until the first query resolves
+  const [page, setPage] = useState<ActivityPage | null>(null)
+  const recordsPerPage = RECORDS_PER_PAGE
+
+  // Debounce search so we don't query the database on every keystroke
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 200)
+    return () => clearTimeout(timeout)
+  }, [searchQuery])
+
+  // Reset to page 1 when the search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch])
+
+  // Query the current page (database-side paging + search)
+  useEffect(() => {
+    let cancelled = false
+    queryRecords({
+      offset: (currentPage - 1) * recordsPerPage,
+      limit: recordsPerPage,
+      search: debouncedSearch || undefined
+    })
+      .then((result) => {
+        if (cancelled) return
+        // Deleting the last record on a page: step back a page
+        if (result.records.length === 0 && result.total > 0 && currentPage > 1) {
+          setCurrentPage(Math.max(1, Math.ceil(result.total / recordsPerPage)))
+          return
+        }
+        setPage(result)
+      })
+      .catch(() => {
+        if (!cancelled) setPage({ records: [], total: 0 })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [queryRecords, currentPage, debouncedSearch, recordsPerPage, refreshToken])
+
+  // Escape closes the detail dialog
+  useEffect(() => {
+    if (!selectedRecord) return
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setSelectedRecord(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [selectedRecord])
 
   // Reset collapse states when opening a new record
   const handleSelectRecord = (record: TranscriptionRecord) => {
@@ -290,36 +425,12 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
     }
   }
 
-  // Filter records based on search query
-  const filteredRecords = useMemo(() => {
-    if (!searchQuery.trim()) return records
-
-    const query = searchQuery.toLowerCase()
-    return records.filter((record) => {
-      const searchableText = [
-        record.transcription,
-        record.llmInput,
-        record.llmResult,
-        record.llmAction
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-      return searchableText.includes(query)
-    })
-  }, [records, searchQuery])
-
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredRecords.length / recordsPerPage)
+  // Calculate pagination (filtered total comes from the database)
+  const paginatedRecords = useMemo(() => page?.records ?? [], [page])
+  const filteredTotal = page?.total ?? 0
+  const totalPages = Math.ceil(filteredTotal / recordsPerPage)
   const startIndex = (currentPage - 1) * recordsPerPage
   const endIndex = startIndex + recordsPerPage
-  const paginatedRecords = filteredRecords.slice(startIndex, endIndex)
-
-  // Reset to page 1 when search changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery])
 
   // Group records by date
   const groupedRecords = useMemo(() => {
@@ -344,32 +455,38 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
       {/* Search Bar */}
       <div className="mb-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-text-muted" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-text-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('home.searchActivity', 'Search activity...')}
-            className="w-full pl-10 pr-4 py-2.5 bg-theme-card rounded-xl border border-theme-border/30 text-sm text-theme-text placeholder-theme-text-muted outline-none focus:ring-2 focus:ring-sky-accent/30 transition-all"
+            aria-label={t('home.searchActivity', 'Search activity...')}
+            className="w-full ps-10 pe-10 py-2.5 bg-theme-card rounded-xl border border-theme-border/30 text-sm text-theme-text placeholder-theme-text-muted outline-none focus:ring-2 focus:ring-sky-accent/30 transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text transition-colors"
+              aria-label={t('home.clearSearch', 'Clear search')}
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-theme-text-muted hover:text-theme-text transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
-        {searchQuery && (
-          <p className="text-xs text-theme-text-muted mt-2">
-            {filteredRecords.length} {filteredRecords.length === 1 ? t('home.result', 'result') : t('home.results', 'results')}
+        {debouncedSearch && page && (
+          <p className="text-xs text-theme-text-muted mt-2" aria-live="polite">
+            {filteredTotal} {filteredTotal === 1 ? t('home.result', 'result') : t('home.results', 'results')}
           </p>
         )}
       </div>
 
-      {/* Empty State */}
-      {records.length === 0 ? (
+      {/* Loading / Empty State */}
+      {!page ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-6 h-6 border-2 border-theme-border border-t-sky-accent rounded-full animate-spin" />
+        </div>
+      ) : totalCount === 0 && !debouncedSearch ? (
         <div
           className="bg-theme-card rounded-3xl p-8 border border-theme-border/20 text-center"
           style={{ animation: 'slide-up 0.4s ease-out backwards' }}
@@ -384,7 +501,7 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
             {t('home.noActivityDesc', 'Your transcriptions and AI actions will appear here')}
           </p>
         </div>
-      ) : filteredRecords.length === 0 ? (
+      ) : paginatedRecords.length === 0 ? (
         <div className="bg-theme-card rounded-3xl p-8 border border-theme-border/20 text-center">
           <div className="w-12 h-12 rounded-xl bg-theme-surface/50 flex items-center justify-center mx-auto mb-4">
             <Search className="w-6 h-6 text-theme-text-muted" />
@@ -420,8 +537,16 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
                 return (
                   <div
                     key={record.id}
+                    role="button"
+                    tabIndex={0}
                     className="bg-theme-card rounded-2xl border border-theme-border/20 transition-all hover:border-theme-border/40 cursor-pointer"
                     onClick={() => handleSelectRecord(record)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleSelectRecord(record)
+                      }
+                    }}
                   >
                     {/* Main Row */}
                     <div className="flex items-start gap-3 p-3">
@@ -490,40 +615,42 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-theme-border/20">
           <p className="text-xs text-theme-text-muted">
-            {t('home.showing', 'Showing')} {startIndex + 1}-{Math.min(endIndex, filteredRecords.length)} {t('home.of', 'of')} {filteredRecords.length}
+            {t('home.showing', 'Showing')} {startIndex + 1}-{Math.min(endIndex, filteredTotal)} {t('home.of', 'of')} {filteredTotal}
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
+              aria-label={t('home.previousPage', 'Previous page')}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4 rtl-flip" />
             </button>
             <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
                 // Show first page, last page, current page, and pages around current
                 if (
-                  page === 1 ||
-                  page === totalPages ||
-                  (page >= currentPage - 1 && page <= currentPage + 1)
+                  pageNum === 1 ||
+                  pageNum === totalPages ||
+                  (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
                 ) {
                   return (
                     <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      aria-current={currentPage === pageNum ? 'page' : undefined}
                       className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-medium transition-all ${
-                        currentPage === page
+                        currentPage === pageNum
                           ? 'bg-sky-accent text-white'
                           : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/50'
                       }`}
                     >
-                      {page}
+                      {pageNum}
                     </button>
                   )
-                } else if (page === currentPage - 2 || page === currentPage + 2) {
+                } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
                   return (
-                    <span key={page} className="text-theme-text-muted px-1">
+                    <span key={pageNum} className="text-theme-text-muted px-1">
                       ...
                     </span>
                   )
@@ -534,9 +661,10 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
+              aria-label={t('home.nextPage', 'Next page')}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface/50 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 rtl-flip" />
             </button>
           </div>
         </div>
@@ -551,6 +679,9 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
           onClick={() => setSelectedRecord(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="activity-detail-title"
             className="bg-theme-card rounded-3xl border border-theme-border/30 max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
@@ -571,7 +702,7 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
                   )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-theme-text">
+                  <h3 id="activity-detail-title" className="text-sm font-semibold text-theme-text">
                     {selectedRecord.llmAction || t('home.voiceNote', 'Voice Note')}
                   </h3>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -588,6 +719,9 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
               </div>
               <button
                 onClick={() => setSelectedRecord(null)}
+                aria-label={t('home.close', 'Close')}
+                title={t('home.close', 'Close')}
+                autoFocus
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-theme-text-muted hover:text-theme-text hover:bg-theme-surface transition-all"
               >
                 <X className="w-4.5 h-4.5" />
@@ -618,6 +752,7 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
                 <div className="border border-sky-accent/20 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setShowOriginalInput(!showOriginalInput)}
+                    aria-expanded={showOriginalInput}
                     className="w-full flex items-center justify-between p-3 bg-sky-accent/8 hover:bg-sky-accent/12 transition-colors"
                   >
                     <div className="flex items-center gap-2">
@@ -647,6 +782,7 @@ function ActivityTab({ records, onDelete, t }: ActivityTabProps): JSX.Element {
                 <div className="border border-purple-500/20 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setShowLLMResult(!showLLMResult)}
+                    aria-expanded={showLLMResult}
                     className="w-full flex items-center justify-between p-3 bg-purple-500/8 hover:bg-purple-500/12 transition-colors"
                   >
                     <div className="flex items-center gap-2">
@@ -720,7 +856,9 @@ interface DashboardTabProps {
   chartMax: number
   todayIdx: number
   recentActivity: ActivityEntry[] | undefined
-  t: (key: string, fallback?: string) => string
+  /** Configured record shortcut accelerator, e.g. "Option+Space" */
+  recordShortcut: string
+  t: TFunction
 }
 
 function DashboardTab({
@@ -730,8 +868,15 @@ function DashboardTab({
   chartMax,
   todayIdx,
   recentActivity,
+  recordShortcut,
   t
 }: DashboardTabProps): JSX.Element {
+  const shortcutParts = formatShortcutParts(recordShortcut)
+  const recordKeys = joinShortcutParts(shortcutParts)
+  // Hold the shortcut and tap its main key again to open the pinned panel
+  const mainKey = shortcutParts[shortcutParts.length - 1] ?? ''
+  const pinnedKeys = IS_MAC ? `${recordKeys} ${mainKey}` : `${recordKeys}+${mainKey}`
+
   return (
     <>
 
@@ -748,8 +893,8 @@ function DashboardTab({
               group
             `}
             style={{
-              animationDelay: `${i * 60}ms`,
-              animation: 'slide-up 0.4s ease-out backwards'
+              // Single shorthand — a later `animation` would reset animationDelay
+              animation: `slide-up 0.4s ease-out ${i * 60}ms backwards`
             }}
           >
             {/* Icon badge */}
@@ -948,11 +1093,11 @@ function DashboardTab({
         <div className="space-y-0.5">
           {[
             {
-              keys: navigator.platform.includes('Mac') ? '⌥ Space' : 'Alt+Space',
+              keys: recordKeys,
               label: t('shortcuts.holdToRecord')
             },
             {
-              keys: navigator.platform.includes('Mac') ? '⌥ Space Space' : 'Alt+Space+Space',
+              keys: pinnedKeys,
               label: t('shortcuts.openPinnedPanel')
             },
             {

@@ -18,7 +18,13 @@ import type {
   BrowserChoice,
   WindowAction
 } from '../models/trigger'
-import { ACTION_TYPE_META, getDefaultActionConfig } from '../models/trigger'
+import {
+  ACTION_TYPE_META,
+  getAvailableActionTypes,
+  getDefaultActionConfig
+} from '../models/trigger'
+
+const IS_MAC = window.tapwisper.platform.os === 'darwin'
 
 // ── Props ───────────────────────────────────────────────────────
 
@@ -65,12 +71,17 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
   const [triggerType, setTriggerType] = useState<'exact' | 'prefix'>(trigger?.triggerType || 'prefix')
   const [name, setName] = useState(trigger?.name || '')
 
-  // Auto-set name from trigger phrase if not manually set
+  // Escape closes the dialog
   useEffect(() => {
-    if (!isEditing && triggerPhrase && !name) {
-      // Will be set on save
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
     }
-  }, [triggerPhrase, name, isEditing])
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   const handleActionTypeSelect = useCallback((type: TriggerActionType) => {
     setActionType(type)
@@ -114,14 +125,19 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#0D0D0D] border border-white/[0.06] rounded-2xl shadow-2xl w-[580px] max-h-[85vh] flex flex-col overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="trigger-modal-title"
+        className="bg-theme-card border border-theme-border/60 rounded-2xl shadow-2xl w-[580px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col overflow-hidden"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-theme-border/40">
           <div>
-            <h2 className="text-lg font-semibold text-white">
+            <h2 id="trigger-modal-title" className="text-lg font-semibold text-theme-text">
               {isEditing ? 'Edit Trigger' : 'New Trigger'}
             </h2>
-            <p className="text-xs text-white/30 mt-0.5">
+            <p className="text-xs text-theme-text-muted mt-0.5">
               {step === 'action-type' && 'Choose what action this trigger performs'}
               {step === 'configure' && 'Configure the action and set your trigger phrase'}
               {step === 'trigger-phrase' && 'Set the phrase that activates this trigger'}
@@ -129,9 +145,11 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center"
+            aria-label="Close"
+            title="Close"
+            className="w-8 h-8 rounded-lg hover:bg-theme-surface flex items-center justify-center"
           >
-            <X className="w-4 h-4 text-white/40" />
+            <X className="w-4 h-4 text-theme-text-tertiary" />
           </button>
         </div>
 
@@ -164,21 +182,21 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-theme-border/40">
           <div>
             {(step === 'configure' || step === 'trigger-phrase') && (
               <button
                 onClick={handleBack}
-                className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-4 h-4 rtl-flip" />
                 Back
               </button>
             )}
             {step === 'action-type' && (
               <button
                 onClick={onClose}
-                className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 text-sm text-theme-text-secondary hover:text-theme-text transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
                 Cancel
@@ -189,10 +207,10 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
           {step === 'configure' && (
             <button
               onClick={handleNext}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-[#0D0D0D] text-sm font-semibold hover:bg-white/90 transition-all"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-theme-text text-theme-bg text-sm font-semibold hover:bg-theme-text/90 transition-all"
             >
               Continue
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 rtl-flip" />
             </button>
           )}
 
@@ -202,8 +220,8 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
               disabled={!isValid}
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 isValid
-                  ? 'bg-white text-[#0D0D0D] hover:bg-white/90'
-                  : 'bg-white/10 text-white/30 cursor-not-allowed'
+                  ? 'bg-theme-text text-theme-bg hover:bg-theme-text/90'
+                  : 'bg-theme-surface text-theme-text-muted cursor-not-allowed'
               }`}
             >
               <Check className="w-4 h-4" />
@@ -228,7 +246,7 @@ function ActionTypeStep({
   return (
     <div>
       <div className="grid grid-cols-3 gap-2.5">
-        {ACTION_TYPE_META.map((meta) => {
+        {getAvailableActionTypes(window.tapwisper.platform.os).map((meta) => {
           const isActive = selected === meta.id
           const color = ACTION_COLORS[meta.id]
           return (
@@ -238,13 +256,13 @@ function ActionTypeStep({
               className={`
                 relative flex flex-col items-center text-center p-4 rounded-xl border transition-all
                 ${isActive
-                  ? 'border-sky-accent/50 bg-[#111111]'
-                  : 'border-white/[0.04] bg-[#080808] hover:border-white/[0.08] hover:bg-[#0F0F0F]'
+                  ? 'border-sky-accent/50 bg-theme-surface/60'
+                  : 'border-theme-border/30 bg-theme-bg hover:border-theme-border/60 hover:bg-theme-surface/40'
                 }
               `}
             >
               {isActive && (
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-2 end-2">
                   <Check className="w-3.5 h-3.5 text-sky-accent" />
                 </div>
               )}
@@ -254,8 +272,8 @@ function ActionTypeStep({
               >
                 <span style={{ color }}>{ACTION_ICONS[meta.id]}</span>
               </div>
-              <p className="text-[13px] font-semibold text-white">{meta.label}</p>
-              <p className="text-[11px] text-white/40 mt-1 leading-tight line-clamp-2">{meta.description}</p>
+              <p className="text-[13px] font-semibold text-theme-text">{meta.label}</p>
+              <p className="text-[11px] text-theme-text-tertiary mt-1 leading-tight line-clamp-2">{meta.description}</p>
               <p className="text-[10px] mt-2 font-mono leading-tight" style={{ color: `${color}99` }}>
                 {meta.example}
               </p>
@@ -580,16 +598,18 @@ function WebSearchConfigForm({
         </div>
       </div>
 
-      {/* Browser */}
-      <div>
-        <SectionLabel>Browser</SectionLabel>
-        <OptionGroup<BrowserChoice>
-          options={['default', 'safari', 'chrome', 'firefox']}
-          value={config.browser}
-          onChange={(v) => update({ browser: v })}
-          labels={{ default: 'Default Browser', safari: 'Safari', chrome: 'Chrome', firefox: 'Firefox' }}
-        />
-      </div>
+      {/* Browser — choosing a specific browser is only supported on macOS */}
+      {IS_MAC && (
+        <div>
+          <SectionLabel>Browser</SectionLabel>
+          <OptionGroup<BrowserChoice>
+            options={['default', 'safari', 'chrome', 'firefox']}
+            value={config.browser}
+            onChange={(v) => update({ browser: v })}
+            labels={{ default: 'Default Browser', safari: 'Safari', chrome: 'Chrome', firefox: 'Firefox' }}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -634,7 +654,7 @@ function AIChatConfigForm({
             <button
               key={opt.id}
               onClick={() => update({ responseHandling: opt.id })}
-              className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+              className={`w-full text-start px-4 py-3 rounded-xl border transition-all ${
                 config.responseHandling === opt.id
                   ? 'border-sky-accent/50 bg-sky-accent/8'
                   : 'border-theme-border/30 hover:border-theme-border/50'
@@ -705,7 +725,7 @@ function TerminalConfigForm({
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => update({ executionMode: 'background' })}
-            className={`px-4 py-3 rounded-xl border text-left transition-all ${
+            className={`px-4 py-3 rounded-xl border text-start transition-all ${
               config.executionMode === 'background'
                 ? 'border-sky-accent/50 bg-sky-accent/8'
                 : 'border-theme-border/30 hover:border-theme-border/50'
@@ -716,7 +736,7 @@ function TerminalConfigForm({
           </button>
           <button
             onClick={() => update({ executionMode: 'visual' })}
-            className={`px-4 py-3 rounded-xl border text-left transition-all ${
+            className={`px-4 py-3 rounded-xl border text-start transition-all ${
               config.executionMode === 'visual'
                 ? 'border-sky-accent/50 bg-sky-accent/8'
                 : 'border-theme-border/30 hover:border-theme-border/50'
@@ -736,12 +756,15 @@ function TerminalConfigForm({
         </div>
         <button
           onClick={() => update({ showOutput: !config.showOutput })}
+          role="switch"
+          aria-checked={config.showOutput}
+          aria-label="Show output in panel"
           className={`relative w-10 h-6 rounded-full transition-colors shrink-0 ${
             config.showOutput ? 'bg-sky-accent' : 'bg-theme-surface/60'
           }`}
         >
           <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-            config.showOutput ? 'translate-x-5' : 'translate-x-1'
+            config.showOutput ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
           }`} />
         </button>
       </div>
@@ -762,6 +785,8 @@ function TerminalConfigForm({
               {config.commands.length > 1 && (
                 <button
                   onClick={() => removeCommand(idx)}
+                  aria-label="Remove command"
+                  title="Remove command"
                   className="w-9 h-9 rounded-lg hover:bg-red-500/10 flex items-center justify-center shrink-0 self-center"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-red-400" />
@@ -879,7 +904,7 @@ function AppleShortcutConfigForm({
                 <button
                   key={s}
                   onClick={() => update({ shortcutName: s })}
-                  className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  className={`w-full text-start px-3 py-1.5 rounded-md text-sm transition-colors ${
                     config.shortcutName === s
                       ? 'bg-sky-accent/10 text-sky-accent'
                       : 'text-theme-text-secondary hover:bg-theme-surface/40'
@@ -1039,7 +1064,7 @@ function WindowConfigForm({
               <button
                 key={a.id}
                 onClick={() => update({ action: a.id })}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl border text-start transition-all ${
                   isActive
                     ? 'border-sky-accent/50 bg-sky-accent/8'
                     : 'border-theme-border/30 hover:border-theme-border/50'
@@ -1116,7 +1141,7 @@ function LaunchAppConfigForm({
                   update({ appName: app.name, appPath: app.path })
                   setFilter(app.name)
                 }}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                className={`w-full text-start px-3 py-2 rounded-md text-sm transition-colors ${
                   config.appName === app.name
                     ? 'bg-sky-accent/10 text-sky-accent'
                     : 'text-theme-text-secondary hover:bg-theme-surface/40'

@@ -28,11 +28,29 @@ const CONFIG_NAV: { id: Page; labelKey: string; icon: React.ReactNode }[] = [
   { id: 'snippets', labelKey: 'nav.snippets', icon: <Code2 className="w-5 h-5" /> }
 ]
 
+// Window chrome differs per platform (see src/main/windows.ts):
+// - macOS: hidden inset title bar — traffic lights float over the sidebar
+// - Windows: hidden title bar + native controls overlay (40px) at the top end
+// - Linux: native window frame, nothing to make room for
+const OS = window.tapwisper.platform.os
+const IS_MAC = OS === 'darwin'
+const HAS_CONTROLS_OVERLAY = OS === 'win32'
+
 export function MainWindow(): JSX.Element {
   const { t } = useTranslation()
   const [activePage, setActivePage] = useState<Page>('home')
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
+  const [appVersion, setAppVersion] = useState('')
   const loadStats = useStatsStore((s) => s.loadStats)
+
+  useEffect(() => {
+    window.tapwisper.app
+      .getVersion()
+      .then(setAppVersion)
+      .catch(() => {
+        // Version is informational only
+      })
+  }, [])
 
   // Check if onboarding has been completed
   useEffect(() => {
@@ -111,13 +129,23 @@ export function MainWindow(): JSX.Element {
 
   // Show onboarding if not yet completed
   if (showOnboarding) {
-    return <Onboarding onComplete={handleOnboardingComplete} />
+    return (
+      <>
+        {/* Frameless title bar (macOS/Windows): keep the window draggable */}
+        {OS !== 'linux' && <div className="drag-region fixed top-0 inset-x-0 h-10 z-10" />}
+        <Onboarding onComplete={handleOnboardingComplete} />
+      </>
+    )
   }
 
   return (
     <div className="flex h-screen bg-theme-bg">
       {/* Sidebar */}
-      <div className="w-56 bg-theme-card ltr:border-r rtl:border-l border-theme-border/30 flex flex-col pt-12">
+      <div
+        className={`w-56 bg-theme-card border-e border-theme-border/30 flex flex-col ${
+          IS_MAC ? 'pt-12' : ''
+        }`}
+      >
         {/* Drag region / title bar area */}
         <div className="drag-region h-12 flex items-center px-4 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 no-drag min-w-0 flex-1">
@@ -139,6 +167,7 @@ export function MainWindow(): JSX.Element {
               <button
                 key={item.id}
                 onClick={() => setActivePage(item.id)}
+                aria-current={activePage === item.id ? 'page' : undefined}
                 className={`
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
                   ${activePage === item.id
@@ -163,6 +192,7 @@ export function MainWindow(): JSX.Element {
               <button
                 key={item.id}
                 onClick={() => setActivePage(item.id)}
+                aria-current={activePage === item.id ? 'page' : undefined}
                 className={`
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
                   ${activePage === item.id
@@ -180,6 +210,7 @@ export function MainWindow(): JSX.Element {
           <div className="mt-auto pt-2 border-t border-theme-border/30 space-y-1">
             <button
               onClick={() => setActivePage('settings')}
+              aria-current={activePage === 'settings' ? 'page' : undefined}
               className={`
                 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
                 ${activePage === 'settings'
@@ -198,14 +229,16 @@ export function MainWindow(): JSX.Element {
         <div className="px-3 pb-3">
           <div className="rounded-xl bg-theme-bg p-3 space-y-2">
             <p className="text-xs font-medium text-theme-text">{t('app.name')} Desktop</p>
-            <p className="text-xs text-theme-text-muted">v1.0.0</p>
+            {appVersion && <p className="text-xs text-theme-text-muted">v{appVersion}</p>}
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto">
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Windows: room for (and drag area beside) the native window controls */}
+        {HAS_CONTROLS_OVERLAY && <div className="drag-region h-10 shrink-0" />}
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {renderPage()}
         </div>
       </div>

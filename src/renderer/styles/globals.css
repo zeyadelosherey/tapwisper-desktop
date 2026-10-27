@@ -94,6 +94,19 @@
   html.transparent body {
     background: transparent !important;
   }
+
+  /* Visible keyboard focus ring for every interactive element. Mouse clicks
+     don't trigger :focus-visible, so this only shows for keyboard users. */
+  :focus-visible {
+    outline: 2px solid rgb(126 182 224 / 0.9);
+    outline-offset: 2px;
+  }
+
+  /* Text inputs already show their own focus styling */
+  input:focus-visible,
+  textarea:focus-visible {
+    outline-offset: 0;
+  }
 }
 
 @layer components {
@@ -149,9 +162,10 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
-  /* Lighter shadow for floating popups over page content */
+  /* Lighter shadow for floating popups. Kept within 32px of the card so it
+     fits inside the command popup window's transparent padding. */
   .popup-shadow {
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
   }
 
   /* Green accent for accepted changes */

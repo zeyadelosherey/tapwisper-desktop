@@ -2,6 +2,55 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 
 export type IpcCallback = (...args: unknown[]) => void
 
+/** A rectangle in window (CSS pixel) coordinates. */
+export interface OverlayRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface ActivityRecordDTO {
+  id: string
+  timestamp: number
+  type: 'voice' | 'voice-with-llm'
+  transcription: string
+  durationSeconds: number
+  wordCount: number
+  llmAction?: string
+  llmInput?: string
+  llmResult?: string
+}
+
+export interface ActivityQueryParams {
+  offset?: number
+  limit?: number
+  search?: string
+}
+
+export interface ActivityQueryResult {
+  records: ActivityRecordDTO[]
+  total: number
+}
+
+// ── Initial theme ────────────────────────────────────────────────
+// The main process passes the resolved theme as a command-line switch so the
+// `dark` class is on <html> before the first paint (no flash of the wrong
+// theme). App.tsx takes over once React mounts.
+const themeSwitch = process.argv.find((arg) => arg.startsWith('--tapwisper-theme='))
+if (themeSwitch) {
+  const isDark = themeSwitch.endsWith('=dark')
+  const applyInitialTheme = (): boolean => {
+    const root = document.documentElement
+    if (!root) return false
+    root.classList.toggle('dark', isDark)
+    return true
+  }
+  if (!applyInitialTheme()) {
+    document.addEventListener('readystatechange', applyInitialTheme, { once: true })
+  }
+}
+
 // Exposed API to renderer processes
 const api = {
   // ── Window Management ──────────────────────────────────────────
@@ -12,6 +61,17 @@ const api = {
       ipcRenderer.invoke('window:send', type, channel, ...args),
     setAIPanelExpanded: (expanded: boolean) =>
       ipcRenderer.invoke('window:ai-panel:set-expanded', expanded)
+  },
+
+  // ── Overlay click-through ──────────────────────────────────────
+  // Transparent overlays ignore the mouse except over their visible card.
+  overlay: {
+    /** macOS/Windows: report that the cursor entered (true) / left (false) the card. */
+    setInteractive: (interactive: boolean): Promise<void> =>
+      ipcRenderer.invoke('overlay:set-interactive', interactive),
+    /** Linux: report the visible rectangles; everything else is click-through. */
+    setHitRegion: (rects: OverlayRect[]): Promise<void> =>
+      ipcRenderer.invoke('overlay:set-hit-region', rects)
   },
 
   // ── Recording Pill ─────────────────────────────────────────────
@@ -64,7 +124,9 @@ const api = {
 
   // ── App ────────────────────────────────────────────────────────
   app: {
-    setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke('app:set-auto-launch', enabled)
+    setAutoLaunch: (enabled: boolean): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('app:set-auto-launch', enabled),
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version')
   },
 
   // ── Permissions ──────────────────────────────────────────────────
@@ -76,7 +138,9 @@ const api = {
 
   // ── Platform Info ──────────────────────────────────────────────
   platform: {
-    info: () => ipcRenderer.invoke('platform:info')
+    info: () => ipcRenderer.invoke('platform:info'),
+    /** Synchronous OS identifier: 'darwin' | 'win32' | 'linux' | ... */
+    os: process.platform as string
   },
 
   // ── Database (Stats & Activity) ────────────────────────────────
@@ -84,12 +148,15 @@ const api = {
     stats: {
       get: () => ipcRenderer.invoke('db:stats:get'),
       getFromActivity: () => ipcRenderer.invoke('db:stats:get-from-activity'),
-      update: (data: any) => ipcRenderer.invoke('db:stats:update', data),
+      update: (data: Record<string, unknown>) => ipcRenderer.invoke('db:stats:update', data),
       resetWeekly: () => ipcRenderer.invoke('db:stats:reset-weekly')
     },
     activity: {
       getAll: (limit?: number) => ipcRenderer.invoke('db:activity:get-all', limit),
-      add: (record: any) => ipcRenderer.invoke('db:activity:add', record),
+      /** Paged + searchable query, newest first; `total` counts all matches. */
+      query: (params: ActivityQueryParams): Promise<ActivityQueryResult> =>
+        ipcRenderer.invoke('db:activity:query', params),
+      add: (record: ActivityRecordDTO) => ipcRenderer.invoke('db:activity:add', record),
       delete: (id: string) => ipcRenderer.invoke('db:activity:delete', id),
       clearAll: () => ipcRenderer.invoke('db:activity:clear-all'),
       getByDateRange: (startDate: number, endDate: number) =>
@@ -99,7 +166,7 @@ const api = {
     },
     cleanupOldRecords: (keepCount?: number) => ipcRenderer.invoke('db:cleanup-old-records', keepCount),
     exportJSON: () => ipcRenderer.invoke('db:export-json'),
-    importJSON: (data: any) => ipcRenderer.invoke('db:import-json', data)
+    importJSON: (data: unknown) => ipcRenderer.invoke('db:import-json', data)
   },
 
   // ── Trigger Actions ──────────────────────────────────────────────

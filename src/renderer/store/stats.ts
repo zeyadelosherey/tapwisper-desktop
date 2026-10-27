@@ -157,8 +157,8 @@ export const useStatsStore = create<StatsState>((set, get) => ({
           set({ isLoaded: true })
         }
       }
-    } catch (err) {
-      console.error('[StatsStore] Failed to load stats:', err)
+    } catch {
+      // Database unavailable — show empty stats rather than spinning forever
       set({ isLoaded: true })
     }
   },

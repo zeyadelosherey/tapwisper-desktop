@@ -1,13 +1,19 @@
 import { shell } from 'electron'
-import { exec, execFile } from 'child_process'
+import { exec, execFile, spawn } from 'child_process'
 import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 const execFileAsync = promisify(execFile)
 
+const isMac = process.platform === 'darwin'
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 // ── Web Search ──────────────────────────────────────────────────
 
-interface WebSearchParams {
+export interface WebSearchParams {
   url: string
   browser: 'default' | 'safari' | 'chrome' | 'firefox'
 }
@@ -16,16 +22,16 @@ export async function executeWebSearch(params: WebSearchParams): Promise<{ succe
   try {
     const { url, browser } = params
 
-    if (browser === 'default' || process.platform !== 'darwin') {
+    if (browser === 'default' || !isMac) {
       await shell.openExternal(url)
     } else {
       const browserApp = getBrowserAppName(browser)
-      await execAsync(`open -a "${browserApp}" "${url}"`)
+      await execFileAsync('open', ['-a', browserApp, url])
     }
 
     return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
@@ -40,7 +46,7 @@ function getBrowserAppName(browser: string): string {
 
 // ── Terminal Command ────────────────────────────────────────────
 
-interface TerminalParams {
+export interface TerminalParams {
   commands: string[]
   executionMode: 'background' | 'visual'
   speechInput?: string
@@ -76,14 +82,14 @@ export async function executeTerminal(params: TerminalParams): Promise<{ success
     }
 
     return { success: true, output: results.join('\n') }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
 // ── Keyboard Shortcut ───────────────────────────────────────────
 
-interface KeyboardParams {
+export interface KeyboardParams {
   shortcut: string
   delay?: number
 }
@@ -113,8 +119,8 @@ export async function executeKeyboard(params: KeyboardParams): Promise<{ success
     }
 
     return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
@@ -156,7 +162,7 @@ function convertToPowerShellKey(shortcut: string): string {
 
 // ── Apple Shortcut ──────────────────────────────────────────────
 
-interface AppleShortcutParams {
+export interface AppleShortcutParams {
   shortcutName: string
   speechInput?: string
 }
@@ -174,14 +180,14 @@ export async function executeAppleShortcut(params: AppleShortcutParams): Promise
 
     const { stdout } = await execFileAsync('shortcuts', args, { timeout: 30000 })
     return { success: true, output: stdout?.trim() || '' }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
 // ── Window Management ───────────────────────────────────────────
 
-interface WindowParams {
+export interface WindowParams {
   action:
     | 'left-half' | 'right-half' | 'top-half' | 'bottom-half'
     | 'top-left-quarter' | 'top-right-quarter'
@@ -191,15 +197,16 @@ interface WindowParams {
 
 export async function executeWindow(params: WindowParams): Promise<{ success: boolean; error?: string }> {
   try {
-    if (process.platform === 'darwin') {
-      const lines = getWindowAppleScriptLines(params.action)
-      if (!lines || lines.length === 0) return { success: false, error: `Unknown window action: ${params.action}` }
-      const args = lines.flatMap((line) => ['-e', line])
-      await execFileAsync('osascript', args)
+    if (!isMac) {
+      return { success: false, error: 'Window management actions are only supported on macOS' }
     }
+    const lines = getWindowAppleScriptLines(params.action)
+    if (!lines || lines.length === 0) return { success: false, error: `Unknown window action: ${params.action}` }
+    const args = lines.flatMap((line) => ['-e', line])
+    await execFileAsync('osascript', args)
     return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
 }
 
@@ -275,24 +282,75 @@ function getWindowAppleScriptLines(action: string): string[] {
 
 // ── Launch App ──────────────────────────────────────────────────
 
-interface LaunchAppParams {
+export interface LaunchAppParams {
   appPath: string
   appName: string
 }
 
 export async function executeLaunchApp(params: LaunchAppParams): Promise<{ success: boolean; error?: string }> {
   try {
+    const appName = params.appName?.trim()
+
     if (params.appPath) {
-      await shell.openPath(params.appPath)
-    } else if (params.appName && process.platform === 'darwin') {
-      await execAsync(`open -a "${params.appName}"`)
-    } else {
+      // openPath resolves with an error string instead of throwing
+      const error = await shell.openPath(params.appPath)
+      if (error) return { success: false, error }
+    } else if (!appName) {
       return { success: false, error: 'No app path or name provided' }
+    } else if (isMac) {
+      await execFileAsync('open', ['-a', appName])
+    } else if (process.platform === 'win32') {
+      await launchWindowsAppByName(appName)
+    } else if (process.platform === 'linux') {
+      await launchLinuxAppByName(appName)
+    } else {
+      return { success: false, error: 'Launching apps by name is not supported on this platform' }
     }
     return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message }
+  } catch (err) {
+    return { success: false, error: errorMessage(err) }
   }
+}
+
+/**
+ * Windows: `start "" "<name>"` resolves App Paths registrations (e.g.
+ * "chrome", "winword") and anything on PATH, like the Run dialog does.
+ */
+async function launchWindowsAppByName(appName: string): Promise<void> {
+  // Strip characters that are special to cmd.exe so the name can't break
+  // out of its quotes.
+  const safeName = appName.replace(/["^&|<>%!]/g, '')
+  if (!safeName) throw new Error(`Invalid application name: ${appName}`)
+  await execAsync(`start "" "${safeName}"`, { windowsHide: true })
+}
+
+/**
+ * Linux: try the desktop entry via gtk-launch (e.g. "firefox",
+ * "org.gnome.Nautilus"), then fall back to running a command of that name.
+ */
+async function launchLinuxAppByName(appName: string): Promise<void> {
+  const candidates = Array.from(new Set([appName, appName.toLowerCase()]))
+  for (const id of candidates) {
+    try {
+      await execFileAsync('gtk-launch', [id], { timeout: 10000 })
+      return
+    } catch {
+      // Not a desktop entry id (or gtk-launch missing) — try the next option
+    }
+  }
+
+  const command = appName.toLowerCase()
+  if (!/^[\w.+-]+$/.test(command)) {
+    throw new Error(`Could not find an application named "${appName}"`)
+  }
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, [], { detached: true, stdio: 'ignore' })
+    child.once('error', () => reject(new Error(`Could not find an application named "${appName}"`)))
+    child.once('spawn', () => {
+      child.unref()
+      resolve()
+    })
+  })
 }
 
 // ── List Installed Apps (macOS) ─────────────────────────────────

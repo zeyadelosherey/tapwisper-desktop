@@ -1,5 +1,8 @@
-import { ipcMain, IpcMainInvokeEvent, app } from 'electron'
-import { WindowManager } from './windows'
+import { ipcMain, IpcMainInvokeEvent, app, BrowserWindow, type Rectangle } from 'electron'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import { WindowManager, applyNativeTheme, type WindowType } from './windows'
 import { ClipboardManager } from './clipboard'
 import { getStore } from './store'
 import { encodeWav, saveTempAudio, cleanupAudioFile } from './audio'
@@ -15,8 +18,103 @@ import {
   executeWindow,
   executeLaunchApp,
   listInstalledApps,
-  listAppleShortcuts
+  listAppleShortcuts,
+  type WebSearchParams,
+  type TerminalParams,
+  type WindowParams
 } from './trigger-actions'
+
+const WINDOW_TYPES: readonly WindowType[] = [
+  'main',
+  'recordingPill',
+  'pinnedPanel',
+  'commandPopup',
+  'aiPanel'
+]
+
+function isWindowType(value: unknown): value is WindowType {
+  return typeof value === 'string' && (WINDOW_TYPES as readonly string[]).includes(value)
+}
+
+// Settings that every window (including pre-warmed overlays) must react to
+const BROADCAST_SETTINGS = ['theme', 'language'] as const
+
+// ── Auto Launch ──────────────────────────────────────────────────
+
+interface AutoLaunchResult {
+  success: boolean
+  error?: string
+}
+
+function getLinuxAutostartFile(): string {
+  const configHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config')
+  return path.join(configHome, 'autostart', 'tapwisper.desktop')
+}
+
+/** Quote an argument for the Exec key of a .desktop file (Desktop Entry spec). */
+function quoteDesktopExecArg(arg: string): string {
+  const safe = arg.replace(/%/g, '%%')
+  if (!/[\s"'`$\\<>~|&;*?#()]/.test(arg)) return safe
+  // Quote, escape the quoting-rule characters, then apply the key-file
+  // string escape (backslashes doubled) which is decoded first.
+  const quoted = `"${safe.replace(/(["`$\\])/g, '\\$1')}"`
+  return quoted.replace(/\\/g, '\\\\')
+}
+
+/**
+ * Electron's setLoginItemSettings only works on macOS and Windows. On Linux,
+ * follow the XDG autostart spec by writing ~/.config/autostart/tapwisper.desktop.
+ */
+function setLinuxAutoLaunch(enabled: boolean): void {
+  const file = getLinuxAutostartFile()
+  if (!enabled) {
+    fs.rmSync(file, { force: true })
+    return
+  }
+
+  // AppImage builds run from a temporary mount; APPIMAGE is the real file.
+  // In development the Electron binary needs the app path as an argument.
+  let args: string[]
+  if (process.env.APPIMAGE) {
+    args = [process.env.APPIMAGE]
+  } else if (app.isPackaged) {
+    args = [process.execPath]
+  } else {
+    args = [process.execPath, app.getAppPath()]
+  }
+
+  const content = [
+    '[Desktop Entry]',
+    'Type=Application',
+    'Version=1.0',
+    'Name=TapWisper',
+    'Comment=Voice dictation with AI',
+    `Exec=${args.map(quoteDesktopExecArg).join(' ')}`,
+    'Terminal=false',
+    'X-GNOME-Autostart-enabled=true',
+    ''
+  ].join('\n')
+
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, content, 'utf8')
+}
+
+function setAutoLaunch(enabled: boolean): AutoLaunchResult {
+  try {
+    if (process.platform === 'linux') {
+      setLinuxAutoLaunch(enabled)
+    } else {
+      app.setLoginItemSettings({
+        openAtLogin: enabled,
+        openAsHidden: true
+      })
+    }
+    return { success: true }
+  } catch (err) {
+    // e.g. "Operation not permitted" in dev mode or when the app isn't signed
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
 
 export function registerIpcHandlers(
   windowManager: WindowManager,
@@ -65,7 +163,22 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle('window:send', (_e: IpcMainInvokeEvent, type: string, channel: string, ...args: unknown[]) => {
-    windowManager.sendToWindow(type as any, channel, ...args)
+    if (!isWindowType(type)) return
+    windowManager.sendToWindow(type, channel, ...args)
+  })
+
+  // ── Overlay click-through ──────────────────────────────────────
+  // Overlay renderers report when the cursor is over their visible card
+  // (macOS/Windows) or which rectangles are visible (Linux) so transparent
+  // regions don't swallow clicks meant for the apps underneath.
+  ipcMain.handle('overlay:set-interactive', (e: IpcMainInvokeEvent, interactive: boolean) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (win) windowManager.setOverlayInteractive(win, interactive === true)
+  })
+
+  ipcMain.handle('overlay:set-hit-region', (e: IpcMainInvokeEvent, rects: Rectangle[]) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (win) windowManager.setOverlayHitRegion(win, Array.isArray(rects) ? rects : [])
   })
 
   // ── Recording Pill ─────────────────────────────────────────────
@@ -137,12 +250,20 @@ export function registerIpcHandlers(
   // ── Store (Config) ─────────────────────────────────────────────
   ipcMain.handle('store:get', (_e: IpcMainInvokeEvent, key: string) => {
     const store = getStore()
-    return store.get(key as any)
+    return store.get(key)
   })
 
   ipcMain.handle('store:set', (_e: IpcMainInvokeEvent, key: string, value: unknown) => {
     const store = getStore()
-    store.set(key as any, value as any)
+    store.set(key, value)
+
+    if (key === 'theme') {
+      applyNativeTheme()
+      windowManager.applyThemeToMainWindow()
+    }
+    if ((BROADCAST_SETTINGS as readonly string[]).includes(key)) {
+      windowManager.broadcast('settings:changed', key, value)
+    }
   })
 
   ipcMain.handle('store:getAll', () => {
@@ -153,34 +274,27 @@ export function registerIpcHandlers(
   ipcMain.handle('store:reset', () => {
     const store = getStore()
     store.clear()
+
+    // Defaults may differ from what overlays currently show
+    applyNativeTheme()
+    windowManager.applyThemeToMainWindow()
+    for (const key of BROADCAST_SETTINGS) {
+      windowManager.broadcast('settings:changed', key, store.get(key))
+    }
   })
+
+  // ── App ────────────────────────────────────────────────────────
+  ipcMain.handle('app:get-version', () => app.getVersion())
 
   // ── Auto Launch ────────────────────────────────────────────────
   ipcMain.handle('app:set-auto-launch', (_e: IpcMainInvokeEvent, enabled: boolean) => {
-    try {
-      app.setLoginItemSettings({
-        openAtLogin: enabled,
-        openAsHidden: true
-      })
-    } catch {
-      // "Operation not permitted" in dev mode or when app isn't properly signed
-    }
+    return setAutoLaunch(enabled === true)
   })
 
-  // Apply stored auto-launch setting on startup
-  {
-    const currentStore = getStore()
-    const savedAutoLaunch = currentStore.get('autoLaunch')
-    if (savedAutoLaunch) {
-      try {
-        app.setLoginItemSettings({
-          openAtLogin: true,
-          openAsHidden: true
-        })
-      } catch {
-        // Ignore in dev mode — login items require a packaged/signed app
-      }
-    }
+  // Apply stored auto-launch setting on startup (also refreshes the Linux
+  // autostart entry in case the executable moved, e.g. after an update)
+  if (getStore().get('autoLaunch')) {
+    setAutoLaunch(true)
   }
 
   // ── Shortcuts ────────────────────────────────────────────────────
@@ -255,7 +369,11 @@ export function registerIpcHandlers(
     return db.getActivityRecords(limit || 100)
   })
 
-  ipcMain.handle('db:activity:add', (_e: IpcMainInvokeEvent, record: db.ActivityRecord) => {
+  ipcMain.handle('db:activity:query', (_e: IpcMainInvokeEvent, params?: db.ActivityQuery) => {
+    return db.queryActivityRecords(params ?? {})
+  })
+
+  ipcMain.handle('db:activity:add',(_e: IpcMainInvokeEvent, record: db.ActivityRecord) => {
     db.addActivityRecord(record)
   })
 
@@ -284,17 +402,17 @@ export function registerIpcHandlers(
     return db.exportToJSON()
   })
 
-  ipcMain.handle('db:import-json', (_e: IpcMainInvokeEvent, data: any) => {
+  ipcMain.handle('db:import-json', (_e: IpcMainInvokeEvent, data: Parameters<typeof db.importFromJSON>[0]) => {
     db.importFromJSON(data)
   })
 
   // ── Trigger Actions ─────────────────────────────────────────────
-  ipcMain.handle('trigger:web-search', async (_e: IpcMainInvokeEvent, params: { url: string; browser: string }) => {
-    return await executeWebSearch(params as any)
+  ipcMain.handle('trigger:web-search', async (_e: IpcMainInvokeEvent, params: WebSearchParams) => {
+    return await executeWebSearch(params)
   })
 
-  ipcMain.handle('trigger:terminal', async (_e: IpcMainInvokeEvent, params: { commands: string[]; executionMode: string; speechInput?: string }) => {
-    return await executeTerminal(params as any)
+  ipcMain.handle('trigger:terminal', async (_e: IpcMainInvokeEvent, params: TerminalParams) => {
+    return await executeTerminal(params)
   })
 
   ipcMain.handle('trigger:keyboard', async (_e: IpcMainInvokeEvent, params: { shortcut: string; delay?: number }) => {
@@ -305,8 +423,8 @@ export function registerIpcHandlers(
     return await executeAppleShortcut(params)
   })
 
-  ipcMain.handle('trigger:window', async (_e: IpcMainInvokeEvent, params: { action: string }) => {
-    return await executeWindow(params as any)
+  ipcMain.handle('trigger:window', async (_e: IpcMainInvokeEvent, params: WindowParams) => {
+    return await executeWindow(params)
   })
 
   ipcMain.handle('trigger:launch-app', async (_e: IpcMainInvokeEvent, params: { appPath: string; appName: string }) => {
