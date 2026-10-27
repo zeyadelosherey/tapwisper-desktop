@@ -93,7 +93,6 @@
     "searchActions": "Cerca azioni...",
     "addCustom": "Aggiungi categoria",
     "toolbarPreview": "Anteprima barra",
-    "manageCategories": "Gestisci le categorie di azioni AI e la barra degli strumenti",
     "categories": "Categorie",
     "newCategory": "Nuova categoria",
     "emoji": "Emoji",
@@ -149,7 +148,6 @@
   },
   "notes": {
     "title": "Note",
-    "subtitle": "Le tue note vocali",
     "noNotes": "Nessuna nota",
     "noNotesHint": "Registra una nota vocale per iniziare",
     "today": "Oggi",
@@ -157,7 +155,6 @@
     "recording": "Registrazione...",
     "transcribing": "Trascrizione...",
     "recordNote": "Registra una nota vocale",
-    "recordHint": "Tocca per iniziare a registrare",
     "copyNote": "Copia nota",
     "deleteMessage": "Questa nota verrà eliminata definitivamente.",
     "deleteNote": "Elimina nota",
@@ -176,7 +173,7 @@
   },
   "snippets": {
     "title": "Snippet",
-    "subtitle": "Pronuncia un attivatore mentre detti e TapWisper scrive al suo posto il testo completo: firme, link, indirizzi.",
+    "subtitle": "Di’ un attivatore e TapWisper scrive il testo completo.",
     "noSnippets": "Nessuno snippet",
     "noSnippetsHint": "Crea scorciatoie come /email o «il mio indirizzo».",
     "addSnippet": "Aggiungi snippet",
@@ -191,7 +188,6 @@
     "expansionRequired": "Il testo di espansione è obbligatorio",
     "triggerLabel": "Trigger",
     "triggerRequired": "Il trigger è obbligatorio",
-    "phraseExample": "il mio link del calendario",
     "phraseExplainer": "Oppure usa una frase semplice e pronunciala.",
     "slashExplainer": "I comandi iniziano con una barra. Di’ «slash sig» per inserirlo.",
     "sayHint": "Di’ «slash {{name}}»",
@@ -303,7 +299,6 @@
     "libraryDescription_one": "{{count}} template di prompt incluso in TapWisper. I template aggiunti compaiono nella categoria «Mini App» della pagina Azioni, dove puoi modificarli, riordinarli o rimuoverli.",
     "libraryDescription_many": "{{count}} di template di prompt inclusi in TapWisper. I template aggiunti compaiono nella categoria «Mini App» della pagina Azioni, dove puoi modificarli, riordinarli o rimuoverli.",
     "libraryDescription_other": "{{count}} template di prompt inclusi in TapWisper. I template aggiunti compaiono nella categoria «Mini App» della pagina Azioni, dove puoi modificarli, riordinarli o rimuoverli.",
-    "libraryTitle": "Libreria di template",
     "removeFromActions": "Rimuovi dalle azioni",
     "removeTemplate": "Rimuovi {{name}} dalle azioni",
     "saveFailed": "Impossibile aggiornare le tue azioni. Riprova."
@@ -680,11 +675,11 @@
     "enableAnyway": "Attiva comunque",
     "newTrigger": "Nuovo trigger",
     "noTriggers": "Ancora nessun trigger",
-    "noTriggersHint": "Crea un trigger per eseguire azioni come ricerche web, chat AI, comandi del terminale e altro ancora, semplicemente pronunciando una frase.",
+    "noTriggersHint": "Avvia una ricerca web, una chat IA o un comando dicendo una frase.",
     "plusSpeech": "+ il tuo parlato",
     "saveAnyway": "Salva comunque",
     "say": "Di':",
-    "subtitle": "Crea trigger vocali che eseguono azioni quando pronunci frasi specifiche",
+    "subtitle": "Di’ una frase per eseguire un’azione.",
     "toggleTrigger": "Attiva il trigger {{name}}"
   },
   "shortcut": {
@@ -724,7 +719,7 @@
   },
   "dictionary": {
     "title": "Dizionario",
-    "subtitle": "Nomi, marchi e gergo che TapWisper deve sempre scrivere correttamente. Queste parole vengono privilegiate durante il riconoscimento e tutto ciò che indichi in «Spesso sentito come» viene corretto con la grafia giusta.",
+    "subtitle": "Nomi e parole che TapWisper deve scrivere sempre giusti.",
     "termLabel": "Parola o nome",
     "termPlaceholder": "ad es. TapWisper",
     "aliasesLabel": "Spesso sentito come",
@@ -740,17 +735,13 @@
     "edit": "Modifica {{term}}",
     "delete": "Rimuovi {{term}}",
     "deleteTitle": "Rimuovere dal dizionario?",
-    "deleteMessage": "«{{term}}» e le sue correzioni verranno rimossi.",
-    "countLabel": "{{count}} parole",
-    "countLabel_one": "{{count}} parola",
-    "countLabel_many": "{{count}} parole",
-    "countLabel_other": "{{count}} parole"
+    "deleteMessage": "«{{term}}» e le sue correzioni verranno rimossi."
   },
   "style": {
     "title": "Stile",
-    "subtitle": "Decidi come deve suonare la tua dettatura in ogni tipo di app: curata nelle email, rilassata in chat.",
+    "subtitle": "Come suona la tua dettatura in ogni tipo di app.",
     "smartFormatting": "Formattazione intelligente",
-    "smartFormattingBody": "Usa il tuo provider di IA per rifinire ogni dettato: elimina gli intercalari, applica le tue correzioni («alle quattro, anzi, alle cinque»), trasforma gli elenchi parlati in elenchi e sistema la punteggiatura. Non traduce mai.",
+    "smartFormattingBody": "Toglie gli intercalari, applica le correzioni e sistema la punteggiatura. Non traduce mai.",
     "noKey": "La formattazione intelligente richiede una chiave API di {{provider}}. Nel frattempo, il dettato viene incollato esattamente come trascritto.",
     "addKey": "Aggiungi chiave API",
     "tonesLabel": "Tono per app",

@@ -10,8 +10,7 @@ import {
   Keyboard,
   Smartphone,
   AppWindow,
-  Rocket,
-  AudioLines
+  Rocket
 } from 'lucide-react'
 import { Page, PageHeader, Switch } from '../components/ui/primitives'
 import type { Trigger, TriggerActionType } from '../models/trigger'
@@ -178,10 +177,7 @@ export function Triggers(): JSX.Element {
     <Page>
       <PageHeader
         title={t('nav.triggers', 'Triggers')}
-        description={t(
-          'triggers.subtitle',
-          'Create voice-activated triggers to perform actions when you say specific phrases'
-        )}
+        description={t('triggers.subtitle', 'Say a phrase to run an action.')}
         actions={
           <button onClick={handleNewTrigger} className="btn-primary">
             <Plus className="h-4 w-4" />
@@ -192,53 +188,54 @@ export function Triggers(): JSX.Element {
 
       {/* Triggers List */}
       {triggers.length === 0 ? (
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-hairline-strong px-5 py-7 text-center">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal-tint text-signal">
-            <AudioLines className="h-5 w-5" />
-          </span>
-          <p className="font-display mt-4 text-[16px] text-ink">
+        <div className="grain-hero flex flex-col items-center rounded-2xl px-5 pb-10 pt-12 text-center">
+          <p className="font-display text-[17px] text-ink">
             {t('triggers.noTriggers', 'No triggers yet')}
           </p>
-          <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-ink-muted">
+          <p className="mt-1 max-w-sm text-[13px] leading-snug text-ink-muted">
             {t(
               'triggers.noTriggersHint',
-              'Create a trigger to perform actions like web searches, AI chat, terminal commands, and more — just by speaking a phrase.'
+              'Run a web search, AI chat or command just by saying a phrase.'
             )}
           </p>
-          <button onClick={handleNewTrigger} className="btn-primary mt-5">
+          <button onClick={handleNewTrigger} className="btn-primary mt-4">
             {t('triggers.createFirst', 'Create Your First Trigger')}
           </button>
         </div>
       ) : (
-        <div className="card divide-y divide-hairline overflow-hidden">
+        <div className="divide-y divide-hairline/70 border-t border-hairline/70">
           {triggers.map((trigger) => (
             <div
               key={trigger.id}
-              className={`group flex items-center gap-4 px-3.5 py-2.5 transition-colors duration-200 hover:bg-panel ${
+              className={`group flex items-center gap-3 py-2 ${
                 trigger.enabled ? '' : 'opacity-60'
               }`}
             >
               {/* Action type icon */}
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-hairline bg-panel text-ink-muted">
+              <span
+                className="shrink-0 text-ink-soft"
+                title={getActionLabel(trigger.actionType)}
+                aria-hidden="true"
+              >
                 {ACTION_ICONS[trigger.actionType]}
               </span>
 
               {/* Trigger info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-[14px] font-medium text-ink">{trigger.name}</span>
-                  <span className="chip shrink-0">{getActionLabel(trigger.actionType)}</span>
+                  <span className="truncate text-[13.5px] text-ink">{trigger.name}</span>
+                  <span className="sr-only">{getActionLabel(trigger.actionType)}</span>
                 </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-[12.5px] text-ink-muted">
+                <div className="mt-0.5 flex items-center gap-2">
+                  <span className="text-[12px] text-ink-soft">
                     {t('triggers.say', 'Say:')} &ldquo;
-                    <span className="font-medium text-ink" dir="auto">
+                    <span className="text-ink-muted" dir="auto">
                       {trigger.triggerPhrase}
                     </span>
                     &rdquo;
                   </span>
                   {trigger.triggerType === 'prefix' && (
-                    <span className="text-[12.5px] text-ink-soft">
+                    <span className="text-[12px] text-ink-faint">
                       {t('triggers.plusSpeech', '+ your speech')}
                     </span>
                   )}

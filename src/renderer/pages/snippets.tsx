@@ -1,6 +1,6 @@
 import { useState, useEffect, useId } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trash2, Plus, Pencil, TextQuote, ArrowRight, X } from 'lucide-react'
+import { Trash2, Plus, Pencil, X } from 'lucide-react'
 import { Snippet, findDuplicateTrigger, isValidTrigger } from '../models/snippet'
 import { useConfirmDialog } from '../components/confirm-dialog'
 import { Page, PageHeader } from '../components/ui/primitives'
@@ -132,7 +132,7 @@ export function Snippets(): JSX.Element {
     >
       <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div>
-          <label htmlFor={triggerId} className="mb-1.5 block text-[12.5px] font-medium text-ink">
+          <label htmlFor={triggerId} className="mb-1 block text-[12px] text-ink-soft">
             {t('snippets.triggerLabel', 'Trigger')}
           </label>
           <input
@@ -147,14 +147,14 @@ export function Snippets(): JSX.Element {
             dir="auto"
             className={`field ${duplicate ? '!border-danger' : ''}`}
           />
-          <p className="mt-1.5 text-[12px] text-ink-muted">
+          <p className="mt-1 text-[12px] text-ink-soft">
             {spoken
               ? t('snippets.sayHint', 'Say “slash {{name}}”', { name: spoken })
               : t('snippets.triggerHint', 'Start with / for a command, or use a plain phrase.')}
           </p>
         </div>
         <div>
-          <label htmlFor={expansionId} className="mb-1.5 block text-[12.5px] font-medium text-ink">
+          <label htmlFor={expansionId} className="mb-1 block text-[12px] text-ink-soft">
             {t('snippets.expansionLabel', 'Expansion text')}
           </label>
           <textarea
@@ -195,10 +195,7 @@ export function Snippets(): JSX.Element {
     <Page>
       <PageHeader
         title={t('snippets.title', 'Snippets')}
-        description={t(
-          'snippets.subtitle',
-          'Say a trigger while dictating and TapWisper types the full text in its place — signatures, links, addresses.'
-        )}
+        description={t('snippets.subtitle', 'Say a trigger and TapWisper types the full text.')}
         actions={
           mode === null && snippets.length > 0 ? (
             <button type="button" onClick={openNew} className="btn-primary">
@@ -209,113 +206,89 @@ export function Snippets(): JSX.Element {
         }
       />
 
-      {/* How triggers are spoken */}
-      <div className="mb-5 grid gap-3 md:grid-cols-2">
-        <div className="well flex items-start gap-3 px-3 py-2.5">
-          <span className="chip shrink-0 !bg-signal-tint !text-signal !border-signal/20">/sig</span>
-          <p className="text-[12.5px] leading-relaxed text-ink-muted">
-            {t(
-              'snippets.slashExplainer',
-              'Commands start with a slash. Say “slash sig” to insert it.'
-            )}
-          </p>
-        </div>
-        <div className="well flex items-start gap-3 px-3 py-2.5">
-          <span className="chip shrink-0">{t('snippets.phraseExample', 'my calendar link')}</span>
-          <p className="text-[12.5px] leading-relaxed text-ink-muted">
-            {t('snippets.phraseExplainer', 'Or use a plain phrase and simply say it.')}
-          </p>
-        </div>
-      </div>
-
       {mode?.kind === 'new' && <div className="mb-4">{renderForm()}</div>}
 
       {snippets.length === 0 && mode === null ? (
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-hairline-strong px-5 py-7 text-center">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal-tint text-signal">
-            <TextQuote className="h-5 w-5" />
-          </span>
-          <p className="font-display mt-4 text-[16px] text-ink">
+        <div className="grain-hero flex flex-col items-center rounded-2xl px-5 pb-10 pt-12 text-center">
+          <p className="font-display text-[17px] text-ink">
             {t('snippets.noSnippets', 'No snippets yet')}
           </p>
-          <p className="mt-1.5 max-w-[380px] text-[13px] leading-relaxed text-ink-muted">
+          <p className="mt-1 max-w-[380px] text-[13px] leading-snug text-ink-muted">
             {t('snippets.noSnippetsHint', 'Create shortcuts like /email or “my address”.')}
           </p>
-          <button type="button" onClick={openNew} className="btn-primary mt-5">
+          <button type="button" onClick={openNew} className="btn-primary mt-4">
             <Plus className="h-4 w-4" />
             {t('snippets.addSnippet', 'Add snippet')}
           </button>
         </div>
       ) : (
         snippets.length > 0 && (
-          <ul className="card divide-y divide-hairline overflow-hidden">
-            {snippets.map((snippet) =>
-              editingId === snippet.id ? (
-                <li key={snippet.id} className="bg-panel p-3">
-                  {renderForm()}
-                </li>
-              ) : (
-                <li
-                  key={snippet.id}
-                  className="group flex items-center gap-4 px-3.5 py-2 transition-colors duration-200 hover:bg-panel"
-                >
-                  <div className="w-48 shrink-0">
-                    <span
+          <>
+            <ul className="divide-y divide-hairline/70 border-t border-hairline/70">
+              {snippets.map((snippet) =>
+                editingId === snippet.id ? (
+                  <li key={snippet.id} className="py-3">
+                    {renderForm()}
+                  </li>
+                ) : (
+                  <li key={snippet.id} className="group flex min-h-10 items-start gap-4 py-2">
+                    <p
                       dir="auto"
-                      className={`chip max-w-full truncate !h-7 !text-[12.5px] ${
-                        snippet.trigger.trim().startsWith('/')
-                          ? '!border-signal/20 !bg-signal-tint !text-signal'
-                          : ''
+                      title={
+                        spokenForm(snippet.trigger)
+                          ? t('snippets.sayHint', 'Say “slash {{name}}”', {
+                              name: spokenForm(snippet.trigger)
+                            })
+                          : undefined
+                      }
+                      className={`w-44 shrink-0 truncate pt-px text-[13px] ${
+                        snippet.trigger.trim().startsWith('/') ? 'text-signal' : 'text-ink'
                       }`}
                     >
                       {snippet.trigger}
-                    </span>
-                    {spokenForm(snippet.trigger) && (
-                      <p className="mt-1 truncate text-[11.5px] text-ink-soft">
-                        {t('snippets.sayHint', 'Say “slash {{name}}”', {
-                          name: spokenForm(snippet.trigger)
+                    </p>
+                    <p
+                      dir="auto"
+                      className="min-w-0 flex-1 whitespace-pre-line text-[13px] leading-relaxed text-ink-muted line-clamp-2"
+                    >
+                      {snippet.expansion}
+                    </p>
+                    <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(snippet)}
+                        aria-label={t('snippets.editSnippet', 'Edit snippet {{trigger}}', {
+                          trigger: snippet.trigger
                         })}
-                      </p>
-                    )}
-                  </div>
-                  <ArrowRight
-                    className="h-4 w-4 shrink-0 text-ink-faint rtl-flip"
-                    aria-hidden="true"
-                  />
-                  <p
-                    dir="auto"
-                    className="min-w-0 flex-1 whitespace-pre-line text-[13.5px] leading-relaxed text-ink line-clamp-2"
-                  >
-                    {snippet.expansion}
-                  </p>
-                  <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover:opacity-100">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(snippet)}
-                      aria-label={t('snippets.editSnippet', 'Edit snippet {{trigger}}', {
-                        trigger: snippet.trigger
-                      })}
-                      title={t('common.edit', 'Edit')}
-                      className="icon-btn"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteSnippet(snippet)}
-                      aria-label={t('snippets.deleteSnippet', 'Delete snippet {{trigger}}', {
-                        trigger: snippet.trigger
-                      })}
-                      title={t('common.delete', 'Delete')}
-                      className="icon-btn hover:!text-danger"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </li>
-              )
-            )}
-          </ul>
+                        title={t('common.edit', 'Edit')}
+                        className="icon-btn"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteSnippet(snippet)}
+                        aria-label={t('snippets.deleteSnippet', 'Delete snippet {{trigger}}', {
+                          trigger: snippet.trigger
+                        })}
+                        title={t('common.delete', 'Delete')}
+                        className="icon-btn hover:!text-danger"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </li>
+                )
+              )}
+            </ul>
+            <p className="mt-3 text-[12px] text-ink-soft">
+              {t(
+                'snippets.slashExplainer',
+                'Commands start with a slash. Say “slash sig” to insert it.'
+              )}{' '}
+              {t('snippets.phraseExplainer', 'Or use a plain phrase and simply say it.')}
+            </p>
+          </>
         )
       )}
       {dialog}

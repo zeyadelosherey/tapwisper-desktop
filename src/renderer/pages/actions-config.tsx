@@ -480,15 +480,12 @@ export function ActionsConfig(): JSX.Element {
 
   return (
     <Page>
-      <PageHeader
-        title={t('nav.actions')}
-        description={t('actions.manageCategories', 'Manage your AI action categories and toolbar')}
-      />
+      <PageHeader title={t('nav.actions')} />
 
       {/* Toolbar Preview */}
       <section className="mb-5">
-        <h2 className="section-label mb-3">{t('actions.toolbarPreview')}</h2>
-        <div className="flex gap-2 p-4 bg-theme-card rounded-xl border border-theme-border/50 overflow-x-auto">
+        <h2 className="section-label mb-2">{t('actions.toolbarPreview')}</h2>
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {sortedCategories
             .filter((c) => c.isVisible)
             .map((category) => (
@@ -509,7 +506,7 @@ export function ActionsConfig(): JSX.Element {
 
       {/* Categories List */}
       <section className="mb-4">
-        <h2 className="section-label mb-3">{t('actions.categories', 'Categories')}</h2>
+        <h2 className="section-label mb-1">{t('actions.categories', 'Categories')}</h2>
         <ul>
           {sortedCategories.map((category, index) => {
             if (editor === category.id && !category.isBuiltIn) {

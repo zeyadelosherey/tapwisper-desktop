@@ -1,15 +1,6 @@
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  AlertTriangle,
-  Briefcase,
-  Check,
-  Mail,
-  MessageCircle,
-  Shapes,
-  WandSparkles,
-  type LucideProps
-} from 'lucide-react'
+import { AlertTriangle, Check } from 'lucide-react'
 import {
   DEFAULT_WRITING_STYLES,
   type StyleCategory,
@@ -17,14 +8,14 @@ import {
   type WritingStyles
 } from '../models/style'
 import type { LLMProvider } from '../constants/providers'
-import { Callout, Page, PageHeader, Switch } from '../components/ui/primitives'
+import { Callout, Page, PageHeader, Row, Switch } from '../components/ui/primitives'
 import type { Navigate } from './main-window'
 
-const CATEGORIES: { id: StyleCategory; icon: ComponentType<LucideProps> }[] = [
-  { id: 'messages', icon: MessageCircle },
-  { id: 'work', icon: Briefcase },
-  { id: 'email', icon: Mail },
-  { id: 'other', icon: Shapes }
+const CATEGORIES: { id: StyleCategory }[] = [
+  { id: 'messages' },
+  { id: 'work' },
+  { id: 'email' },
+  { id: 'other' }
 ]
 
 const TONES: StyleTone[] = ['formal', 'casual', 'very-casual']
@@ -97,37 +88,27 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
     <Page>
       <PageHeader
         title={t('style.title', 'Style')}
-        description={t(
-          'style.subtitle',
-          'Decide how your dictation should read in each kind of app — buttoned-up for email, relaxed for chats.'
-        )}
+        description={t('style.subtitle', 'How your dictation reads in each kind of app.')}
       />
 
       {/* Smart Formatting */}
-      <div className="card overflow-hidden">
-        <div className="flex items-start gap-4 px-4 py-3">
-          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-signal-tint text-signal">
-            <WandSparkles className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-[16px] leading-tight text-ink">
-              {t('style.smartFormatting', 'Smart Formatting')}
-            </p>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted text-pretty">
-              {t(
-                'style.smartFormattingBody',
-                'Uses your AI provider to tidy every dictation: removes filler words, applies your corrections (“at four — no, five”), turns spoken lists into lists and fixes punctuation. It never translates.'
-              )}
-            </p>
-          </div>
-          <Switch
-            checked={enabled}
-            onChange={toggle}
-            label={t('style.smartFormatting', 'Smart Formatting')}
-          />
-        </div>
+      <div>
+        <Row
+          title={t('style.smartFormatting', 'Smart Formatting')}
+          description={t(
+            'style.smartFormattingBody',
+            'Removes filler words, applies corrections and fixes punctuation. Never translates.'
+          )}
+          control={
+            <Switch
+              checked={enabled}
+              onChange={toggle}
+              label={t('style.smartFormatting', 'Smart Formatting')}
+            />
+          }
+        />
         {!hasKey && (
-          <div className="border-t border-hairline bg-panel px-4 py-2.5">
+          <div className="mt-1">
             <Callout tone="warning" icon={<AlertTriangle />}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span>
@@ -153,12 +134,12 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
       </div>
 
       {/* Per-category tone */}
-      <section className="mt-6" aria-disabled={!enabled}>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+      <section className="mt-7" aria-disabled={!enabled}>
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h2 className="section-label">{t('style.tonesLabel', 'Tone by app')}</h2>
             {!enabled && (
-              <p className="mt-1.5 text-[12.5px] text-ink-muted">
+              <p className="mt-0.5 text-[12px] text-ink-soft">
                 {t('style.disabledHint', 'Turn on Smart Formatting to apply these styles.')}
               </p>
             )}
@@ -169,7 +150,6 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
             className="inline-flex rounded-[11px] border border-hairline bg-sunken p-0.5"
           >
             {CATEGORIES.map((c) => {
-              const Icon = c.icon
               const active = c.id === category
               return (
                 <button
@@ -180,13 +160,12 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
                   aria-selected={active}
                   aria-controls="style-tones"
                   onClick={() => setCategory(c.id)}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] px-3 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-out ${
+                  className={`inline-flex h-7 items-center rounded-[8px] px-2.5 text-[12.5px] transition-[background-color,color,box-shadow] duration-200 ease-out ${
                     active
                       ? 'bg-raised text-ink shadow-[0_1px_2px_rgb(27_26_23/0.12)]'
                       : 'text-ink-muted hover:text-ink'
                   }`}
                 >
-                  <Icon className={`h-3.5 w-3.5 ${active ? 'text-signal' : ''}`} />
                   {t(`style.categories.${c.id}`)}
                 </button>
               )
@@ -194,7 +173,7 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
           </div>
         </div>
 
-        <p className="mb-4 text-[13px] text-ink-muted">
+        <p className="mb-3 text-[12px] text-ink-soft">
           {t(`style.categoryApps.${activeCategory.id}`)}
         </p>
 
@@ -216,32 +195,26 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
                 aria-checked={selected}
                 disabled={!enabled}
                 onClick={() => chooseTone(tone)}
-                className={`relative flex flex-col rounded-xl border p-4 text-start transition-[border-color,box-shadow,background-color] duration-200 ease-out disabled:cursor-not-allowed ${
+                title={t(`style.toneHints.${TONE_KEY[tone]}`)}
+                className={`relative flex flex-col rounded-xl border px-3.5 py-3 text-start transition-[border-color,background-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 disabled:cursor-not-allowed ${
                   selected
-                    ? 'border-signal bg-signal-tint/30 ring-4 ring-signal/10'
+                    ? 'border-signal/70 bg-signal-tint/25'
                     : 'border-hairline bg-raised enabled:hover:border-hairline-strong'
                 }`}
               >
-                <span className="flex items-start justify-between gap-2">
-                  <span>
-                    <span className="font-display block text-[15px] leading-tight text-ink">
-                      {t(`style.tones.${TONE_KEY[tone]}`)}
-                    </span>
-                    <span className="mt-1 block text-[12px] text-ink-muted">
-                      {t(`style.toneHints.${TONE_KEY[tone]}`)}
-                    </span>
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border ${
-                      selected ? 'border-signal bg-signal text-on-signal' : 'border-hairline-strong'
-                    }`}
-                  >
-                    {selected && <Check className="h-3 w-3" strokeWidth={3} />}
-                  </span>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[13px] text-ink">{t(`style.tones.${TONE_KEY[tone]}`)}</span>
+                  {selected && (
+                    <Check
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 text-signal"
+                      strokeWidth={2.5}
+                    />
+                  )}
                 </span>
+                <span className="sr-only">{t(`style.toneHints.${TONE_KEY[tone]}`)}</span>
                 <span
-                  className="mt-4 block min-h-[96px] whitespace-pre-line rounded-xl rounded-ss-sm border border-hairline bg-panel px-3.5 py-3 text-[13px] leading-relaxed text-ink"
+                  className="mt-2 block min-h-[64px] whitespace-pre-line text-[12.5px] leading-relaxed text-ink-muted"
                   dir="auto"
                 >
                   {t(`style.samples.${category}.${TONE_KEY[tone]}`)}

@@ -93,7 +93,6 @@
     "searchActions": "Rechercher des actions...",
     "addCustom": "Ajouter une catégorie",
     "toolbarPreview": "Aperçu",
-    "manageCategories": "Gérer vos catégories d'actions IA et la barre d'outils",
     "categories": "Catégories",
     "newCategory": "Nouvelle catégorie",
     "emoji": "Emoji",
@@ -149,7 +148,6 @@
   },
   "notes": {
     "title": "Notes",
-    "subtitle": "Vos notes vocales",
     "noNotes": "Aucune note",
     "noNotesHint": "Enregistrez une note vocale pour commencer",
     "today": "Aujourd'hui",
@@ -157,7 +155,6 @@
     "recording": "Enregistrement...",
     "transcribing": "Transcription...",
     "recordNote": "Enregistrer une note vocale",
-    "recordHint": "Appuyez pour commencer l'enregistrement",
     "copyNote": "Copier la note",
     "deleteMessage": "Cette note sera définitivement supprimée.",
     "deleteNote": "Supprimer la note",
@@ -176,7 +173,7 @@
   },
   "snippets": {
     "title": "Extraits",
-    "subtitle": "Prononcez un déclencheur pendant la dictée et TapWisper tape le texte complet à sa place — signatures, liens, adresses.",
+    "subtitle": "Dites un déclencheur et TapWisper tape le texte complet.",
     "noSnippets": "Aucun extrait",
     "noSnippetsHint": "Créez des raccourcis comme /email ou « mon adresse ».",
     "addSnippet": "Ajouter un extrait",
@@ -191,7 +188,6 @@
     "expansionRequired": "Le texte d'expansion est obligatoire",
     "triggerLabel": "Déclencheur",
     "triggerRequired": "Le déclencheur est obligatoire",
-    "phraseExample": "mon lien d’agenda",
     "phraseExplainer": "Ou utilisez une simple expression et dites-la.",
     "slashExplainer": "Les commandes commencent par une barre oblique. Dites « slash sig » pour l’insérer.",
     "sayHint": "Dites « slash {{name}} »",
@@ -303,7 +299,6 @@
     "libraryDescription_one": "{{count}} modèle de prompt fourni avec TapWisper. Les modèles ajoutés apparaissent dans la catégorie « Mini Apps » de la page Actions, où vous pouvez les modifier, les réorganiser ou les retirer.",
     "libraryDescription_many": "{{count}} de modèles de prompts fournis avec TapWisper. Les modèles ajoutés apparaissent dans la catégorie « Mini Apps » de la page Actions, où vous pouvez les modifier, les réorganiser ou les retirer.",
     "libraryDescription_other": "{{count}} modèles de prompts fournis avec TapWisper. Les modèles ajoutés apparaissent dans la catégorie « Mini Apps » de la page Actions, où vous pouvez les modifier, les réorganiser ou les retirer.",
-    "libraryTitle": "Bibliothèque de modèles",
     "removeFromActions": "Retirer des actions",
     "removeTemplate": "Retirer {{name}} des actions",
     "saveFailed": "Impossible de mettre à jour vos actions. Veuillez réessayer."
@@ -680,11 +675,11 @@
     "enableAnyway": "Activer quand même",
     "newTrigger": "Nouveau déclencheur",
     "noTriggers": "Aucun déclencheur pour le moment",
-    "noTriggersHint": "Créez un déclencheur pour lancer des actions comme des recherches web, le chat IA, des commandes de terminal et plus encore, simplement en prononçant une phrase.",
+    "noTriggersHint": "Lancez une recherche web, un chat IA ou une commande en disant une phrase.",
     "plusSpeech": "+ votre parole",
     "saveAnyway": "Enregistrer quand même",
     "say": "Dites :",
-    "subtitle": "Créez des déclencheurs vocaux qui lancent des actions lorsque vous prononcez certaines phrases",
+    "subtitle": "Dites une phrase pour lancer une action.",
     "toggleTrigger": "Activer le déclencheur {{name}}"
   },
   "shortcut": {
@@ -724,7 +719,7 @@
   },
   "dictionary": {
     "title": "Dictionnaire",
-    "subtitle": "Noms, marques et jargon que TapWisper doit toujours écrire correctement. Ces mots sont favorisés lors de la reconnaissance, et tout ce qui figure sous « Souvent mal compris comme » est corrigé vers la bonne orthographe.",
+    "subtitle": "Noms et mots que TapWisper doit toujours bien écrire.",
     "termLabel": "Mot ou nom",
     "termPlaceholder": "p. ex. TapWisper",
     "aliasesLabel": "Souvent mal compris comme",
@@ -740,17 +735,13 @@
     "edit": "Modifier {{term}}",
     "delete": "Retirer {{term}}",
     "deleteTitle": "Retirer du dictionnaire ?",
-    "deleteMessage": "« {{term}} » et ses corrections seront supprimés.",
-    "countLabel": "{{count}} mots",
-    "countLabel_one": "{{count}} mot",
-    "countLabel_many": "{{count}} mots",
-    "countLabel_other": "{{count}} mots"
+    "deleteMessage": "« {{term}} » et ses corrections seront supprimés."
   },
   "style": {
     "title": "Style",
-    "subtitle": "Choisissez le ton de vos dictées selon l’app — soigné pour les e-mails, détendu pour les discussions.",
+    "subtitle": "Le ton de votre dictée dans chaque type d’app.",
     "smartFormatting": "Mise en forme intelligente",
-    "smartFormattingBody": "Utilise votre fournisseur d’IA pour peaufiner chaque dictée : supprime les mots de remplissage, applique vos corrections (« à quatre heures — non, cinq »), transforme les énumérations en listes et corrige la ponctuation. Elle ne traduit jamais.",
+    "smartFormattingBody": "Supprime les mots parasites, applique les corrections et la ponctuation. Ne traduit jamais.",
     "noKey": "La mise en forme intelligente nécessite une clé API {{provider}}. En attendant, la dictée est collée telle qu’elle a été transcrite.",
     "addKey": "Ajouter une clé API",
     "tonesLabel": "Ton selon l’app",

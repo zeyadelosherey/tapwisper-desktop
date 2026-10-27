@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Plus, Check, Trash2, Library } from 'lucide-react'
+import { Search, Plus, Check, Trash2 } from 'lucide-react'
 import { CategoryIcon } from '../components/icon-map'
 import type { ActionCategory, ActionItem } from '../models/actions-config'
 import { BUILT_IN_CATEGORIES } from '../models/actions-config'
@@ -341,21 +341,13 @@ export function MiniAppStore(): JSX.Element {
       <PageHeader title={t('miniApps.title')} description={t('miniApps.subtitle')} />
 
       {/* Honest description of where these templates come from */}
-      <div className="flex items-start gap-3 p-3 mb-4 rounded-xl bg-theme-surface/30 border border-theme-border/30">
-        <Library className="w-4 h-4 text-theme-text-secondary shrink-0 mt-0.5" aria-hidden="true" />
-        <div>
-          <h2 className="text-sm font-medium text-theme-text">
-            {t('miniApps.libraryTitle', 'Template library')}
-          </h2>
-          <p className="text-xs text-theme-text-muted mt-0.5">
-            {t(
-              'miniApps.libraryDescription',
-              '{{count}} prompt templates bundled with TapWisper. Added templates appear in the "Mini Apps" category on the Actions page, where you can edit, reorder or remove them.',
-              { count: SAMPLE_PROMPTS.length }
-            )}
-          </p>
-        </div>
-      </div>
+      <p className="-mt-3 mb-4 max-w-[600px] text-[12px] leading-snug text-ink-soft">
+        {t(
+          'miniApps.libraryDescription',
+          '{{count}} prompt templates bundled with TapWisper. Added templates appear in the "Mini Apps" category on the Actions page, where you can edit, reorder or remove them.',
+          { count: SAMPLE_PROMPTS.length }
+        )}
+      </p>
 
       {saveError && (
         <p role="alert" className="text-xs text-recording-red mb-4">

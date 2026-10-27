@@ -93,7 +93,6 @@
     "searchActions": "Buscar acciones...",
     "addCustom": "Añadir categoría",
     "toolbarPreview": "Vista previa",
-    "manageCategories": "Gestiona tus categorías de acciones IA y la barra de herramientas",
     "categories": "Categorías",
     "newCategory": "Nueva categoría",
     "emoji": "Emoji",
@@ -149,7 +148,6 @@
   },
   "notes": {
     "title": "Notas",
-    "subtitle": "Tus notas de voz",
     "noNotes": "Sin notas aún",
     "noNotesHint": "Graba una nota de voz para empezar",
     "today": "Hoy",
@@ -157,7 +155,6 @@
     "recording": "Grabando...",
     "transcribing": "Transcribiendo...",
     "recordNote": "Grabar una nota de voz",
-    "recordHint": "Toca para empezar a grabar",
     "copyNote": "Copiar nota",
     "deleteMessage": "Esta nota se eliminará de forma permanente.",
     "deleteNote": "Eliminar nota",
@@ -176,7 +173,7 @@
   },
   "snippets": {
     "title": "Fragmentos",
-    "subtitle": "Di un activador mientras dictas y TapWisper escribe el texto completo en su lugar: firmas, enlaces, direcciones.",
+    "subtitle": "Di un disparador y TapWisper escribe el texto completo.",
     "noSnippets": "Sin fragmentos aún",
     "noSnippetsHint": "Crea atajos como /email o «mi dirección».",
     "addSnippet": "Añadir fragmento",
@@ -191,7 +188,6 @@
     "expansionRequired": "El texto de expansión es obligatorio",
     "triggerLabel": "Disparador",
     "triggerRequired": "El disparador es obligatorio",
-    "phraseExample": "mi enlace de calendario",
     "phraseExplainer": "O usa una frase normal y simplemente dila.",
     "slashExplainer": "Los comandos empiezan con una barra. Di «slash sig» para insertarlo.",
     "sayHint": "Di «slash {{name}}»",
@@ -303,7 +299,6 @@
     "libraryDescription_one": "{{count}} plantilla de prompt incluida con TapWisper. Las plantillas que añadas aparecen en la categoría «Mini Apps» de la página Acciones, donde puedes editarlas, reordenarlas o quitarlas.",
     "libraryDescription_many": "{{count}} plantillas de prompts incluidas con TapWisper. Las plantillas que añadas aparecen en la categoría «Mini Apps» de la página Acciones, donde puedes editarlas, reordenarlas o quitarlas.",
     "libraryDescription_other": "{{count}} plantillas de prompts incluidas con TapWisper. Las plantillas que añadas aparecen en la categoría «Mini Apps» de la página Acciones, donde puedes editarlas, reordenarlas o quitarlas.",
-    "libraryTitle": "Biblioteca de plantillas",
     "removeFromActions": "Quitar de las acciones",
     "removeTemplate": "Quitar {{name}} de las acciones",
     "saveFailed": "No se pudieron actualizar tus acciones. Inténtalo de nuevo."
@@ -680,11 +675,11 @@
     "enableAnyway": "Activar de todos modos",
     "newTrigger": "Nuevo disparador",
     "noTriggers": "Aún no hay disparadores",
-    "noTriggersHint": "Crea un disparador para realizar acciones como búsquedas web, chat con IA, comandos de terminal y más, con solo decir una frase.",
+    "noTriggersHint": "Lanza una búsqueda web, un chat de IA o un comando solo con decir una frase.",
     "plusSpeech": "+ lo que digas",
     "saveAnyway": "Guardar de todos modos",
     "say": "Di:",
-    "subtitle": "Crea disparadores por voz que realizan acciones cuando dices frases concretas",
+    "subtitle": "Di una frase para ejecutar una acción.",
     "toggleTrigger": "Activar el disparador {{name}}"
   },
   "shortcut": {
@@ -724,7 +719,7 @@
   },
   "dictionary": {
     "title": "Diccionario",
-    "subtitle": "Nombres, marcas y jerga que TapWisper siempre debe escribir bien. Estas palabras se priorizan al reconocer la voz, y todo lo que añadas en «A menudo se oye como» se corrige a la grafía correcta.",
+    "subtitle": "Nombres y palabras que TapWisper siempre debe acertar.",
     "termLabel": "Palabra o nombre",
     "termPlaceholder": "p. ej., TapWisper",
     "aliasesLabel": "A menudo se oye como",
@@ -740,17 +735,13 @@
     "edit": "Editar {{term}}",
     "delete": "Quitar {{term}}",
     "deleteTitle": "¿Quitar del diccionario?",
-    "deleteMessage": "Se quitarán «{{term}}» y sus correcciones.",
-    "countLabel": "{{count}} palabras",
-    "countLabel_one": "{{count}} palabra",
-    "countLabel_many": "{{count}} palabras",
-    "countLabel_other": "{{count}} palabras"
+    "deleteMessage": "Se quitarán «{{term}}» y sus correcciones."
   },
   "style": {
     "title": "Estilo",
-    "subtitle": "Decide cómo debe sonar tu dictado en cada tipo de app: formal en el correo, relajado en los chats.",
+    "subtitle": "Cómo suena tu dictado en cada tipo de app.",
     "smartFormatting": "Formato inteligente",
-    "smartFormattingBody": "Usa tu proveedor de IA para pulir cada dictado: quita muletillas, aplica tus correcciones («a las cuatro, no, a las cinco»), convierte las enumeraciones en listas y corrige la puntuación. Nunca traduce.",
+    "smartFormattingBody": "Quita muletillas, aplica correcciones y arregla la puntuación. Nunca traduce.",
     "noKey": "El formato inteligente necesita una clave de API de {{provider}}. Mientras tanto, el dictado se pega tal cual se transcribió.",
     "addKey": "Añadir clave de API",
     "tonesLabel": "Tono según la app",

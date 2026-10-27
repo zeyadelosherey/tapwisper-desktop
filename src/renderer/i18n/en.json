@@ -90,7 +90,6 @@
     "searchActions": "Search actions...",
     "addCustom": "Add Custom Category",
     "toolbarPreview": "Toolbar Preview",
-    "manageCategories": "Manage your AI action categories and toolbar",
     "categories": "Categories",
     "newCategory": "New Category",
     "emoji": "Emoji",
@@ -144,7 +143,6 @@
   },
   "notes": {
     "title": "Notes",
-    "subtitle": "Voice notes captured with transcription",
     "noNotes": "No notes yet",
     "noNotesHint": "Record a voice note to get started",
     "today": "Today",
@@ -152,7 +150,6 @@
     "recording": "Recording...",
     "transcribing": "Transcribing...",
     "recordNote": "Record a voice note",
-    "recordHint": "Tap to start recording",
     "copyNote": "Copy note",
     "deleteMessage": "This note will be permanently removed.",
     "deleteNote": "Delete note",
@@ -171,7 +168,7 @@
   },
   "snippets": {
     "title": "Snippets",
-    "subtitle": "Say a trigger while dictating and TapWisper types the full text in its place — signatures, links, addresses.",
+    "subtitle": "Say a trigger and TapWisper types the full text.",
     "noSnippets": "No snippets yet",
     "noSnippetsHint": "Create shortcuts like /email or “my address”.",
     "addSnippet": "Add Snippet",
@@ -186,7 +183,6 @@
     "expansionRequired": "Expansion text is required",
     "triggerLabel": "Trigger",
     "triggerRequired": "Trigger is required",
-    "phraseExample": "my calendar link",
     "phraseExplainer": "Or use a plain phrase and simply say it.",
     "slashExplainer": "Commands start with a slash. Say “slash sig” to insert it.",
     "sayHint": "Say “slash {{name}}”",
@@ -297,7 +293,6 @@
     "libraryDescription": "{{count}} prompt templates bundled with TapWisper. Added templates appear in the \"Mini Apps\" category on the Actions page, where you can edit, reorder or remove them.",
     "libraryDescription_one": "{{count}} prompt template bundled with TapWisper. Added templates appear in the \"Mini Apps\" category on the Actions page, where you can edit, reorder or remove them.",
     "libraryDescription_other": "{{count}} prompt templates bundled with TapWisper. Added templates appear in the \"Mini Apps\" category on the Actions page, where you can edit, reorder or remove them.",
-    "libraryTitle": "Template library",
     "removeFromActions": "Remove from actions",
     "removeTemplate": "Remove {{name}} from actions",
     "saveFailed": "Could not update your actions. Please try again."
@@ -673,11 +668,11 @@
     "enableAnyway": "Enable anyway",
     "newTrigger": "New Trigger",
     "noTriggers": "No triggers yet",
-    "noTriggersHint": "Create a trigger to perform actions like web searches, AI chat, terminal commands, and more — just by speaking a phrase.",
+    "noTriggersHint": "Run a web search, AI chat or command just by saying a phrase.",
     "plusSpeech": "+ your speech",
     "saveAnyway": "Save anyway",
     "say": "Say:",
-    "subtitle": "Create voice-activated triggers to perform actions when you say specific phrases",
+    "subtitle": "Say a phrase to run an action.",
     "toggleTrigger": "Enable trigger {{name}}"
   },
   "shortcut": {
@@ -717,7 +712,7 @@
   },
   "dictionary": {
     "title": "Dictionary",
-    "subtitle": "Names, brands and jargon TapWisper should always get right. Words here are favored during recognition, and anything listed as “often misheard as” is corrected to the right spelling.",
+    "subtitle": "Names and words TapWisper should always get right.",
     "termLabel": "Word or name",
     "termPlaceholder": "e.g. TapWisper",
     "aliasesLabel": "Often misheard as",
@@ -733,16 +728,13 @@
     "edit": "Edit {{term}}",
     "delete": "Remove {{term}}",
     "deleteTitle": "Remove from dictionary?",
-    "deleteMessage": "“{{term}}” and its corrections will be removed.",
-    "countLabel": "{{count}} words",
-    "countLabel_one": "{{count}} word",
-    "countLabel_other": "{{count}} words"
+    "deleteMessage": "“{{term}}” and its corrections will be removed."
   },
   "style": {
     "title": "Style",
-    "subtitle": "Decide how your dictation should read in each kind of app — buttoned-up for email, relaxed for chats.",
+    "subtitle": "How your dictation reads in each kind of app.",
     "smartFormatting": "Smart Formatting",
-    "smartFormattingBody": "Uses your AI provider to tidy every dictation: removes filler words, applies your corrections (“at four — no, five”), turns spoken lists into lists and fixes punctuation. It never translates.",
+    "smartFormattingBody": "Removes filler words, applies corrections and fixes punctuation. Never translates.",
     "noKey": "Smart Formatting needs an API key for {{provider}}. Until then, dictation is pasted exactly as transcribed.",
     "addKey": "Add API key",
     "tonesLabel": "Tone by app",

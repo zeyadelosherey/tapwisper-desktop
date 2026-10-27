@@ -90,7 +90,6 @@
     "searchActions": "Aktionen suchen...",
     "addCustom": "Kategorie hinzufügen",
     "toolbarPreview": "Vorschau",
-    "manageCategories": "KI-Aktionskategorien und Symbolleiste verwalten",
     "categories": "Kategorien",
     "newCategory": "Neue Kategorie",
     "emoji": "Emoji",
@@ -144,7 +143,6 @@
   },
   "notes": {
     "title": "Notizen",
-    "subtitle": "Deine Sprachnotizen",
     "noNotes": "Keine Notizen",
     "noNotesHint": "Nimm eine Sprachnotiz auf",
     "today": "Heute",
@@ -152,7 +150,6 @@
     "recording": "Aufnahme läuft...",
     "transcribing": "Wird transkribiert...",
     "recordNote": "Sprachnotiz aufnehmen",
-    "recordHint": "Tippen, um die Aufnahme zu starten",
     "copyNote": "Notiz kopieren",
     "deleteMessage": "Diese Notiz wird dauerhaft entfernt.",
     "deleteNote": "Notiz löschen",
@@ -171,7 +168,7 @@
   },
   "snippets": {
     "title": "Snippets",
-    "subtitle": "Sag beim Diktieren einen Auslöser, und TapWisper tippt stattdessen den ganzen Text – Signaturen, Links, Adressen.",
+    "subtitle": "Sag einen Auslöser und TapWisper tippt den ganzen Text.",
     "noSnippets": "Keine Snippets",
     "noSnippetsHint": "Erstelle Kürzel wie /email oder „meine Adresse“.",
     "addSnippet": "Snippet hinzufügen",
@@ -186,7 +183,6 @@
     "expansionRequired": "Ein Erweiterungstext ist erforderlich",
     "triggerLabel": "Auslöser",
     "triggerRequired": "Ein Auslöser ist erforderlich",
-    "phraseExample": "mein Kalenderlink",
     "phraseExplainer": "Oder nutze eine normale Wortgruppe und sag sie einfach.",
     "slashExplainer": "Befehle beginnen mit einem Schrägstrich. Sag „slash sig“, um ihn einzufügen.",
     "sayHint": "Sag „slash {{name}}“",
@@ -297,7 +293,6 @@
     "libraryDescription": "{{count}} Prompt-Vorlagen sind in TapWisper enthalten. Hinzugefügte Vorlagen erscheinen auf der Seite „Aktionen“ in der Kategorie „Mini-Apps“, wo du sie bearbeiten, neu anordnen oder entfernen kannst.",
     "libraryDescription_one": "{{count}} Prompt-Vorlage ist in TapWisper enthalten. Hinzugefügte Vorlagen erscheinen auf der Seite „Aktionen“ in der Kategorie „Mini-Apps“, wo du sie bearbeiten, neu anordnen oder entfernen kannst.",
     "libraryDescription_other": "{{count}} Prompt-Vorlagen sind in TapWisper enthalten. Hinzugefügte Vorlagen erscheinen auf der Seite „Aktionen“ in der Kategorie „Mini-Apps“, wo du sie bearbeiten, neu anordnen oder entfernen kannst.",
-    "libraryTitle": "Vorlagenbibliothek",
     "removeFromActions": "Aus Aktionen entfernen",
     "removeTemplate": "{{name}} aus Aktionen entfernen",
     "saveFailed": "Deine Aktionen konnten nicht aktualisiert werden. Bitte versuche es erneut."
@@ -673,11 +668,11 @@
     "enableAnyway": "Trotzdem aktivieren",
     "newTrigger": "Neuer Auslöser",
     "noTriggers": "Noch keine Auslöser",
-    "noTriggersHint": "Erstelle einen Auslöser, um Aktionen wie Websuchen, KI-Chat, Terminal-Befehle und mehr auszuführen – einfach durch das Sprechen einer Phrase.",
+    "noTriggersHint": "Starte eine Websuche, einen KI-Chat oder einen Befehl, indem du einen Satz sagst.",
     "plusSpeech": "+ deine Sprache",
     "saveAnyway": "Trotzdem speichern",
     "say": "Sag:",
-    "subtitle": "Erstelle sprachgesteuerte Auslöser, die Aktionen ausführen, wenn du bestimmte Phrasen sagst",
+    "subtitle": "Sag einen Satz, um eine Aktion auszuführen.",
     "toggleTrigger": "Auslöser {{name}} aktivieren"
   },
   "shortcut": {
@@ -717,7 +712,7 @@
   },
   "dictionary": {
     "title": "Wörterbuch",
-    "subtitle": "Namen, Marken und Fachbegriffe, die TapWisper immer richtig schreiben soll. Diese Wörter werden bei der Erkennung bevorzugt, und alles unter „Oft falsch gehört als“ wird zur richtigen Schreibweise korrigiert.",
+    "subtitle": "Namen und Wörter, die TapWisper immer richtig schreiben soll.",
     "termLabel": "Wort oder Name",
     "termPlaceholder": "z. B. TapWisper",
     "aliasesLabel": "Oft falsch gehört als",
@@ -733,16 +728,13 @@
     "edit": "{{term}} bearbeiten",
     "delete": "{{term}} entfernen",
     "deleteTitle": "Aus dem Wörterbuch entfernen?",
-    "deleteMessage": "„{{term}}“ und seine Korrekturen werden entfernt.",
-    "countLabel": "{{count}} Wörter",
-    "countLabel_one": "{{count}} Wort",
-    "countLabel_other": "{{count}} Wörter"
+    "deleteMessage": "„{{term}}“ und seine Korrekturen werden entfernt."
   },
   "style": {
     "title": "Stil",
-    "subtitle": "Lege fest, wie deine Diktate in jeder Art von App klingen – förmlich in E-Mails, locker im Chat.",
+    "subtitle": "Wie dein Diktat in jeder Art von App klingt.",
     "smartFormatting": "Intelligente Formatierung",
-    "smartFormattingBody": "Nutzt deinen KI-Anbieter, um jedes Diktat zu glätten: entfernt Füllwörter, übernimmt deine Korrekturen („um vier – nein, fünf“), macht aus gesprochenen Aufzählungen Listen und korrigiert die Zeichensetzung. Es wird nie übersetzt.",
+    "smartFormattingBody": "Entfernt Füllwörter, übernimmt Korrekturen und setzt Satzzeichen. Übersetzt nie.",
     "noKey": "Die intelligente Formatierung braucht einen API-Schlüssel für {{provider}}. Bis dahin wird das Diktat genau so eingefügt, wie es transkribiert wurde.",
     "addKey": "API-Schlüssel hinzufügen",
     "tonesLabel": "Ton je nach App",

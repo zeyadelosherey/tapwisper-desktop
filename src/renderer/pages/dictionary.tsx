@@ -1,10 +1,11 @@
 import { useEffect, useId, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookA, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Pencil, Plus, Trash2, X } from 'lucide-react'
 import type { DictionaryEntry } from '../models/dictionary'
 import { useConfirmDialog } from '../components/confirm-dialog'
 import { ChipsInput } from '../components/ui/chips-input'
 import { Page, PageHeader } from '../components/ui/primitives'
+import { ExpandingSearch } from '../components/ui/expanding-search'
 
 interface Draft {
   term: string
@@ -131,10 +132,16 @@ export function Dictionary(): JSX.Element {
     <Page>
       <PageHeader
         title={t('dictionary.title', 'Dictionary')}
-        description={t(
-          'dictionary.subtitle',
-          'Names, brands and jargon TapWisper should always get right. Words here are favored during recognition, and anything listed as “often misheard as” is corrected to the right spelling.'
-        )}
+        description={t('dictionary.subtitle', 'Names and words TapWisper should always get right.')}
+        actions={
+          entries.length > 4 ? (
+            <ExpandingSearch
+              value={search}
+              onChange={setSearch}
+              label={t('dictionary.search', 'Search dictionary')}
+            />
+          ) : undefined
+        }
       />
 
       {/* Add */}
@@ -148,34 +155,12 @@ export function Dictionary(): JSX.Element {
 
       {/* List */}
       <div className="mt-6">
-        <div className="mb-3 flex items-center justify-between gap-4">
-          <h2 className="section-label">
-            {t('dictionary.countLabel', '{{count}} words', { count: entries.length })}
-          </h2>
-          {entries.length > 4 && (
-            <div className="relative w-64">
-              <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t('dictionary.search', 'Search dictionary')}
-                aria-label={t('dictionary.search', 'Search dictionary')}
-                className="field h-9 ps-9"
-              />
-            </div>
-          )}
-        </div>
-
         {!loaded ? null : entries.length === 0 ? (
-          <div className="flex flex-col items-center rounded-xl border border-dashed border-hairline-strong px-5 py-7 text-center">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal-tint text-signal">
-              <BookA className="h-5 w-5" />
-            </span>
-            <p className="font-display mt-4 text-[16px] text-ink">
+          <div className="grain-hero flex flex-col items-center rounded-2xl px-5 pb-10 pt-12 text-center">
+            <p className="font-display text-[17px] text-ink">
               {t('dictionary.emptyTitle', 'Your dictionary is empty')}
             </p>
-            <p className="mt-1.5 max-w-[380px] text-[13px] leading-relaxed text-ink-muted">
+            <p className="mt-1 max-w-[380px] text-[13px] leading-snug text-ink-muted">
               {t(
                 'dictionary.emptyBody',
                 'Add the words that come out wrong — your name, your company, product names, technical terms.'
@@ -187,10 +172,10 @@ export function Dictionary(): JSX.Element {
             {t('home.noResults', 'No results found')}
           </p>
         ) : (
-          <ul className="card divide-y divide-hairline overflow-hidden">
+          <ul className="divide-y divide-hairline/70 border-t border-hairline/70">
             {filtered.map((entry) =>
               editing === entry.id ? (
-                <li key={entry.id} className="bg-panel p-4">
+                <li key={entry.id} className="py-3">
                   <EntryForm
                     draft={editDraft}
                     onChange={setEditDraft}
@@ -206,25 +191,16 @@ export function Dictionary(): JSX.Element {
                   />
                 </li>
               ) : (
-                <li
-                  key={entry.id}
-                  className="group flex items-center gap-4 px-3.5 py-2 transition-colors duration-200 hover:bg-panel"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14.5px] font-medium text-ink" dir="auto">
+                <li key={entry.id} className="group flex min-h-10 items-center gap-4 py-1.5">
+                  <div className="flex min-w-0 flex-1 items-baseline gap-3">
+                    <p className="shrink-0 truncate text-[13.5px] text-ink" dir="auto">
                       {entry.term}
                     </p>
                     {entry.aliases.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        <span className="text-[11.5px] text-ink-soft">
-                          {t('dictionary.correctsLabel', 'Fixes')}
-                        </span>
-                        {entry.aliases.map((alias) => (
-                          <span key={alias} className="chip" dir="auto">
-                            {alias}
-                          </span>
-                        ))}
-                      </div>
+                      <p className="min-w-0 truncate text-[12px] text-ink-soft">
+                        {t('dictionary.correctsLabel', 'Fixes')}{' '}
+                        <bdi>{entry.aliases.join(', ')}</bdi>
+                      </p>
                     )}
                   </div>
                   <div className="flex shrink-0 gap-1 opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover:opacity-100">
@@ -290,11 +266,10 @@ function EntryForm({
           onCancel()
         }
       }}
-      className={compact ? '' : 'card p-3.5'}
     >
       <div className="grid items-end gap-2 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto]">
         <div>
-          <label htmlFor={termId} className="mb-1 block text-[12px] font-medium text-ink">
+          <label htmlFor={termId} className="mb-1 block text-[12px] text-ink-soft">
             {t('dictionary.termLabel', 'Word or name')}
           </label>
           <input
@@ -313,11 +288,9 @@ function EntryForm({
           />
         </div>
         <div>
-          <span className="mb-1 block text-[12px] font-medium text-ink">
+          <span className="mb-1 block text-[12px] text-ink-soft">
             {t('dictionary.aliasesLabel', 'Often misheard as')}
-            <span className="ms-1.5 font-normal text-ink-faint">
-              {t('dictionary.optional', 'optional')}
-            </span>
+            <span className="ms-1.5 text-ink-faint">{t('dictionary.optional', 'optional')}</span>
           </span>
           <ChipsInput
             values={draft.aliases}
