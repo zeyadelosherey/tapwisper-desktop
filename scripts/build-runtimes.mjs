@@ -94,6 +94,41 @@ function platformOptions(name) {
   return [...common, ...dynamicCpu, ...gpu, '-DCMAKE_INSTALL_RPATH=$ORIGIN']
 }
 
+/**
+ * Windows passes command-line arguments, and char* paths given to fopen, in the
+ * legacy ANSI code page, so the runtimes can't open a model under a folder like
+ * C:\Users\محمد\…. This manifest makes UTF-8 their code page (Windows 10 1903+).
+ */
+const UTF8_MANIFEST = join(ROOT, 'scripts', 'windows-utf8.manifest')
+
+/** The Windows SDK's mt.exe, as found by CMake, or the newest one installed */
+function manifestTool(buildDir) {
+  const cache = readFileSync(join(buildDir, 'CMakeCache.txt'), 'utf8')
+  const fromCache = cache.match(/^CMAKE_MT:FILEPATH=(.+)$/m)?.[1]?.trim()
+  if (fromCache && existsSync(fromCache)) return fromCache
+  const kits = 'C:\\Program Files (x86)\\Windows Kits\\10\\bin'
+  const versions = existsSync(kits) ? readdirSync(kits).filter((v) => /^10\./.test(v)) : []
+  const latest = versions
+    .map((v) => join(kits, v, 'x64', 'mt.exe'))
+    .filter(existsSync)
+    .sort()
+    .at(-1)
+  if (!latest) throw new Error('mt.exe not found: install the Windows 10/11 SDK')
+  return latest
+}
+
+/** Merge the UTF-8 manifest into the one the linker embedded */
+function embedUtf8Manifest(mt, exe) {
+  const resource = `${exe};#1`
+  run(mt, [
+    '-nologo',
+    `-inputresource:${resource}`,
+    '-manifest',
+    UTF8_MANIFEST,
+    `-outputresource:${resource}`
+  ])
+}
+
 function run(cmd, cmdArgs, cwd) {
   console.log(`$ ${cmd} ${cmdArgs.join(' ')}`)
   execFileSync(cmd, cmdArgs, { cwd, stdio: 'inherit' })
@@ -127,7 +162,14 @@ function isRuntimeLibrary(path) {
 
 function build(name, spec) {
   const options = [...spec.options, ...platformOptions(name)]
-  const stamp = JSON.stringify({ tag: spec.tag, target, targets: spec.targets, options })
+  const manifest = platform === 'win32' ? readFileSync(UTF8_MANIFEST, 'utf8') : null
+  const stamp = JSON.stringify({
+    tag: spec.tag,
+    target,
+    targets: spec.targets,
+    options,
+    ...(manifest && { manifest })
+  })
   const outDir = join(OUT, name)
   const stampFile = join(outDir, 'build.json')
   if (!force && existsSync(stampFile) && readFileSync(stampFile, 'utf8') === stamp) {
@@ -171,6 +213,10 @@ function build(name, spec) {
   const libraries = findFiles(buildDir, (f) => SHARED_LIB.test(f)).filter(isRuntimeLibrary)
   for (const file of [...binaries, ...libraries]) {
     copyFileSync(file, join(outDir, basename(file)))
+  }
+  if (manifest) {
+    const mt = manifestTool(buildDir)
+    for (const binary of binaries) embedUtf8Manifest(mt, join(outDir, basename(binary)))
   }
   writeFileSync(stampFile, stamp)
   console.log(`${name}: ${spec.tag} → ${outDir}`)
