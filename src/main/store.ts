@@ -72,6 +72,10 @@ export interface AppConfig {
   captureMeetingAudio: boolean
   /** Generate the summary automatically when a meeting ends */
   autoSummarizeMeetings: boolean
+  /** Live-translate meeting transcripts into this language ('' = off) */
+  meetingTranslateTo: string
+  /** Paste dictation translated into this language ('' = off) */
+  dictationTranslateTo: string
 
   // Smart Formatting (LLM clean-up pass after transcription)
   smartFormatting: boolean
@@ -343,6 +347,8 @@ const defaultConfig: AppConfig = {
   recognizeMeetings: true,
   captureMeetingAudio: true,
   autoSummarizeMeetings: true,
+  meetingTranslateTo: '',
+  dictationTranslateTo: '',
 
   smartFormatting: false,
   writingStyles: { messages: 'casual', work: 'casual', email: 'formal', other: 'formal' },

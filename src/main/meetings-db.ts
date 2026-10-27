@@ -38,6 +38,10 @@ export interface MeetingSegment {
   startMs: number
   endMs: number
   text: string
+  /** Live translation of `text`, when enabled */
+  translation?: string | null
+  /** Language code `translation` is in */
+  translatedTo?: string | null
 }
 
 export type MeetingUpdate = Partial<
@@ -85,6 +89,18 @@ export function initMeetingsSchema(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_segments_meeting ON meeting_segments(meetingId, startMs);
   `)
+
+  // Additive columns for databases created before live translation
+  const columns = new Set(
+    (getDatabase().prepare('PRAGMA table_info(meeting_segments)').all() as { name: string }[]).map(
+      (c) => c.name
+    )
+  )
+  for (const column of ['translation', 'translatedTo']) {
+    if (!columns.has(column)) {
+      getDatabase().exec(`ALTER TABLE meeting_segments ADD COLUMN ${column} TEXT`)
+    }
+  }
 }
 
 function fromRow(row: MeetingRow): Meeting {
@@ -197,6 +213,20 @@ export function addSegment(segment: MeetingSegment): void {
       segment.meetingId
     )
   })()
+}
+
+export function setSegmentTranslation(
+  id: string,
+  translation: string,
+  translatedTo: string
+): MeetingSegment | null {
+  const db = getDatabase()
+  db.prepare('UPDATE meeting_segments SET translation = ?, translatedTo = ? WHERE id = ?').run(
+    translation,
+    translatedTo,
+    id
+  )
+  return (db.prepare('SELECT * FROM meeting_segments WHERE id = ?').get(id) as MeetingSegment) ?? null
 }
 
 export function getSegments(meetingId: string): MeetingSegment[] {

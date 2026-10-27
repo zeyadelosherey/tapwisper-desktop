@@ -19,6 +19,7 @@ import {
   type CapturedChunk
 } from './meeting-capture'
 import { containment } from '../utils/text-similarity'
+import { translateText } from '../services/translate'
 
 export type RecorderStatus = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping'
 
@@ -131,6 +132,8 @@ export function useMeetingRecorder(): MeetingRecorder {
   const pendingRef = useRef(0)
   const lastPersistRef = useRef(0)
   const appNameRef = useRef<string | null>(null)
+  // Live translation runs on its own queue so it never delays transcription
+  const translateQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const clock = useCallback((): number => {
     const c = clockRef.current
@@ -150,6 +153,17 @@ export function useMeetingRecorder(): MeetingRecorder {
         appName: appNameRef.current
       })
       .catch(() => {})
+  }, [])
+
+  // Translations saved by anyone (live queue below, or a backlog translation
+  // started from the UI) update the live transcript
+  useEffect(() => {
+    return window.tapwisper.on('meetings:segment-translated', (value: unknown) => {
+      const updated = value as MeetingSegment | null
+      if (!updated || updated.meetingId !== meetingRef.current?.id) return
+      segmentsRef.current = segmentsRef.current.map((s) => (s.id === updated.id ? updated : s))
+      setSegments(segmentsRef.current)
+    })
   }, [])
 
   // Keep the meeting fresh when the UI edits it (title, notes, speakers…)
@@ -215,6 +229,21 @@ export function useMeetingRecorder(): MeetingRecorder {
         segmentsRef.current = insertSorted(segmentsRef.current, segment)
         setSegments(segmentsRef.current)
         setError((e) => (e === 'transcription-failed' ? null : e))
+      }
+
+      // Live translation (setting read per segment so it can be toggled mid-meeting)
+      const target = (await window.tapwisper.store.get('meetingTranslateTo').catch(() => '')) as
+        | string
+        | undefined
+      if (target) {
+        translateQueueRef.current = translateQueueRef.current
+          .then(async () => {
+            const translation = await translateText(segment.text, target)
+            await window.tapwisper.meetings.setSegmentTranslation(segment.id, translation, target)
+          })
+          .catch(() => {
+            // A failed translation leaves the original text; the UI can retry the backlog
+          })
       }
     },
     []

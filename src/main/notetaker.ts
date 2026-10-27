@@ -30,6 +30,7 @@ import {
   deleteMeeting,
   addSegment,
   getSegments,
+  setSegmentTranslation,
   type MeetingSegment,
   type MeetingUpdate
 } from './meetings-db'
@@ -175,6 +176,14 @@ export function registerNotetaker(
   })
   ipcMain.handle('meetings:segments', (_e: IpcMainInvokeEvent, meetingId: string) =>
     getSegments(meetingId)
+  )
+  ipcMain.handle(
+    'meetings:set-segment-translation',
+    (_e: IpcMainInvokeEvent, id: string, translation: string, translatedTo: string) => {
+      const segment = setSegmentTranslation(id, translation, translatedTo)
+      if (segment) windowManager.broadcast('meetings:segment-translated', segment)
+      return segment
+    }
   )
 
   // Recorder state reported by the notepad

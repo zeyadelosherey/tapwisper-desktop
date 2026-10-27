@@ -65,6 +65,10 @@ export interface MeetingSegmentDTO {
   startMs: number
   endMs: number
   text: string
+  /** Live translation of `text`, when enabled */
+  translation?: string | null
+  /** Language code `translation` is in */
+  translatedTo?: string | null
 }
 
 export type MeetingUpdateDTO = Partial<
@@ -267,6 +271,13 @@ const api = {
       ipcRenderer.invoke('meetings:add-segment', segment),
     segments: (meetingId: string): Promise<MeetingSegmentDTO[]> =>
       ipcRenderer.invoke('meetings:segments', meetingId),
+    /** Broadcasts `meetings:segment-translated` (the updated segment) */
+    setSegmentTranslation: (
+      id: string,
+      translation: string,
+      translatedTo: string
+    ): Promise<MeetingSegmentDTO | null> =>
+      ipcRenderer.invoke('meetings:set-segment-translation', id, translation, translatedTo),
     /** Reported by the notepad's recorder; broadcast as `meeting:state` */
     setState: (state: MeetingRecorderState): Promise<void> =>
       ipcRenderer.invoke('meetings:set-state', state),

@@ -92,6 +92,7 @@ interface PipelineConfigWithTriggers {
   snippets?: Snippet[]
   smartFormatting?: boolean
   writingStyles?: Partial<WritingStyles>
+  dictationTranslateTo?: string
   triggers?: Trigger[]
 }
 
@@ -196,7 +197,11 @@ export function PinnedPanel(): JSX.Element {
       let selectedText = ''
       try {
         const grabbedText = await grabPromise
-        if (grabbedText && typeof grabbedText === 'string' && !/^__tapwisper_sentinel_\d+__$/.test(grabbedText)) {
+        if (
+          grabbedText &&
+          typeof grabbedText === 'string' &&
+          !/^__tapwisper_sentinel_\d+__$/.test(grabbedText)
+        ) {
           selectedText = grabbedText.trim()
         }
       } catch {
@@ -286,7 +291,8 @@ export function PinnedPanel(): JSX.Element {
           const aiResult = await processText({
             prompt: transcription,
             text: selectedText,
-            systemInstruction: 'You are a helpful writing assistant. The user has selected some text and given you a voice instruction about what to do with it. Follow their instruction precisely. Keep the language of the selected text unless the instruction asks to translate. Only return the result text, nothing else — no explanations, no quotes, no markdown formatting.'
+            systemInstruction:
+              'You are a helpful writing assistant. The user has selected some text and given you a voice instruction about what to do with it. Follow their instruction precisely. Keep the language of the selected text unless the instruction asks to translate. Only return the result text, nothing else — no explanations, no quotes, no markdown formatting.'
           })
 
           window.tapwisper.window.send('recordingPill', 'result-panel:result', aiResult.result)
@@ -314,14 +320,15 @@ export function PinnedPanel(): JSX.Element {
 
         // Optional Smart Formatting (LLM clean-up in the app's writing style).
         // Never throws — falls back to the corrected transcript.
-        const finalText = config.smartFormatting
-          ? await postProcessTranscript(
-              transcription,
-              { appName: appInfo?.name, windowTitle: appInfo?.title },
-              // Dictionary/snippets were already applied above
-              { ...config, dictionary: [], snippets: [] }
-            )
-          : transcription
+        const finalText =
+          config.smartFormatting || config.dictationTranslateTo
+            ? await postProcessTranscript(
+                transcription,
+                { appName: appInfo?.name, windowTitle: appInfo?.title },
+                // Dictionary/snippets were already applied above
+                { ...config, dictionary: [], snippets: [] }
+              )
+            : transcription
 
         const id = addTranscription({
           transcription: finalText,
@@ -397,9 +404,15 @@ export function PinnedPanel(): JSX.Element {
   const doStartRecordingRef = useRef(doStartRecording)
   const doStopAndTranscribeRef = useRef(doStopAndTranscribe)
   const cancelRecordingRef = useRef(cancelRecording)
-  useEffect(() => { doStartRecordingRef.current = doStartRecording }, [doStartRecording])
-  useEffect(() => { doStopAndTranscribeRef.current = doStopAndTranscribe }, [doStopAndTranscribe])
-  useEffect(() => { cancelRecordingRef.current = cancelRecording }, [cancelRecording])
+  useEffect(() => {
+    doStartRecordingRef.current = doStartRecording
+  }, [doStartRecording])
+  useEffect(() => {
+    doStopAndTranscribeRef.current = doStopAndTranscribe
+  }, [doStopAndTranscribe])
+  useEffect(() => {
+    cancelRecordingRef.current = cancelRecording
+  }, [cancelRecording])
 
   // Subscribe to IPC events once (empty deps). Callbacks accessed via stable refs.
   useEffect(() => {
@@ -498,7 +511,13 @@ export function PinnedPanel(): JSX.Element {
             title={t('pinnedPanel.cancelRecording', 'Cancel recording')}
             className="no-drag w-8 h-8 rounded-full bg-white/[0.08] hover:bg-white/[0.16] flex items-center justify-center transition-all cursor-pointer shrink-0"
           >
-            <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <svg
+              className="w-4 h-4 text-white/80"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

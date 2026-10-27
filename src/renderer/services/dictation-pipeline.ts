@@ -14,6 +14,7 @@ import {
   type WritingStyles
 } from '../models/style'
 import { processText } from './ai-router'
+import { translateText } from './translate'
 
 export interface PipelineContext {
   /** App being dictated into (for the writing style) */
@@ -28,7 +29,12 @@ interface PipelineConfig {
   snippets?: Snippet[]
   smartFormatting?: boolean
   writingStyles?: Partial<WritingStyles>
+  /** Paste the dictation translated into this language ('' = off) */
+  dictationTranslateTo?: string
 }
+
+/** Translation is one LLM round-trip; never make the user wait longer than this */
+const TRANSLATE_TIMEOUT_MS = 8000
 
 /** Formatting must never make dictation feel slow — fall back to raw text after this */
 const FORMAT_TIMEOUT_MS = 4000
@@ -76,10 +82,7 @@ function looksLikeCleanup(input: string, output: string): boolean {
   return output.length <= input.length * 1.6 + 40
 }
 
-export async function smartFormat(
-  text: string,
-  tone: StyleTone
-): Promise<string> {
+export async function smartFormat(text: string, tone: StyleTone): Promise<string> {
   const words = text.split(/\s+/).filter(Boolean).length
   if (words < MIN_WORDS_TO_FORMAT) return text
 
@@ -115,9 +118,29 @@ export async function postProcessTranscript(
   if (!text.trim()) return text
   const config = configOverride ?? (await loadConfig().catch(() => ({}) as PipelineConfig))
   const corrected = applyLocalCorrections(text, config)
-  if (!config.smartFormatting || context.skipFormatting) return corrected
-
   const category = categorizeApp(context.appName, context.windowTitle)
   const tone = { ...DEFAULT_WRITING_STYLES, ...config.writingStyles }[category]
+
+  // Translated dictation: one request that also does the Smart Formatting
+  // clean-up when enabled, instead of two round-trips
+  if (config.dictationTranslateTo && !context.skipFormatting) {
+    const timeout = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), TRANSLATE_TIMEOUT_MS)
+    )
+    try {
+      const translated = await Promise.race([
+        translateText(corrected, config.dictationTranslateTo, {
+          cleanUp: !!config.smartFormatting,
+          tone: config.smartFormatting ? TONE_RULES[tone] : undefined
+        }),
+        timeout
+      ])
+      if (translated?.trim()) return translated.trim()
+    } catch {
+      // Fall through to the untranslated text — never lose the dictation
+    }
+  }
+
+  if (!config.smartFormatting || context.skipFormatting) return corrected
   return smartFormat(corrected, tone)
 }
