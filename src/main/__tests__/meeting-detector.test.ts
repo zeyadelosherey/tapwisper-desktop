@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest'
-import { matchMeeting } from '../meeting-detector'
+import { describe, it, expect, vi } from 'vitest'
+
+// CI installs without Electron's binary, so keep the real package out of the test
+vi.mock('electron', () => ({ powerMonitor: { getSystemIdleTime: () => 0 } }))
+vi.mock('../app-context', () => ({ getActiveApp: async () => null }))
+
+const { matchMeeting } = await import('../meeting-detector')
 
 describe('matchMeeting', () => {
   it('recognises common call apps', () => {
