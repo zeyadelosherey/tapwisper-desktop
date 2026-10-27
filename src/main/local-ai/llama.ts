@@ -1,14 +1,16 @@
 /** llama.cpp's llama-server: launch arguments and the chat request */
-import { readChatReply } from './http'
+import { randomUUID } from 'crypto'
+import { CHAT_TIMEOUT_MS, outputTokens, readChatReply } from './http'
 import { loadTimeoutMs, type RuntimeOptions, type SidecarLaunch } from './sidecar'
 import { LOCAL_LLM_CONTEXT_TOKENS, toChatMessages } from '../../shared/local-ai/catalog'
 import type { ChatInput, LocalModelEntry } from '../../shared/local-ai/types'
 
-/** Output budget reserved inside the context window (see LOCAL_LLM_MAX_INPUT_CHARS) */
-const MAX_OUTPUT_TOKENS = 2048
-
-/** CPU generation of a long answer can take minutes on older machines */
-const CHAT_TIMEOUT_MS = 5 * 60_000
+/**
+ * The server only listens on 127.0.0.1, but web pages in a browser can still
+ * reach localhost; a key known only to this app keeps them out. Stable for the
+ * app's lifetime so it doesn't force a restart.
+ */
+const API_KEY = randomUUID()
 
 export function llamaLaunch(o: RuntimeOptions): SidecarLaunch {
   return {
@@ -33,7 +35,9 @@ export function llamaLaunch(o: RuntimeOptions): SidecarLaunch {
       '-t',
       String(o.threads),
       // Use the model's own chat template, needed for enable_thinking below
-      '--jinja'
+      '--jinja',
+      '--api-key',
+      API_KEY
     ]
   }
 }
@@ -45,11 +49,11 @@ export async function llamaChat(
 ): Promise<string> {
   const res = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
     body: JSON.stringify({
       messages: toChatMessages(input),
       temperature: input.temperature ?? 0.7,
-      max_tokens: Math.min(input.maxTokens ?? MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS),
+      max_tokens: outputTokens(input),
       ...(model.thinking ? { chat_template_kwargs: { enable_thinking: false } } : {})
     }),
     signal: AbortSignal.timeout(CHAT_TIMEOUT_MS)

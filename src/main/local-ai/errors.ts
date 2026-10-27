@@ -10,7 +10,7 @@ export class LocalAiError extends Error {
   }
 }
 
-/** The inference server could not be started (as opposed to a failed request) */
+/** Starting the inference server failed (as opposed to a failed request) */
 export class SidecarStartError extends LocalAiError {}
 
 export function ok<T>(data: T): LocalAiResult<T> {

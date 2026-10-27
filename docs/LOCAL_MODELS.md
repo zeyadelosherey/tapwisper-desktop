@@ -122,7 +122,7 @@ npx vitest run src/main/local-ai/__tests__/runtimes.smoke.test.ts
 | [vLLM](https://docs.vllm.ai) | ✅ | ✅ | `http://localhost:8000` |
 | [LocalAI](https://localai.io) | ✅ | ✅ | `http://localhost:8080` |
 | [speaches](https://github.com/speaches-ai/speaches) | ✅ | | `http://localhost:8000` |
-| whisper.cpp `whisper-server` | ✅ | | start it with `--inference-path /v1/audio/transcriptions` |
+| whisper.cpp `whisper-server` | ✅ | | start it with `-l auto --inference-path /v1/audio/transcriptions` |
 
 How to set one up:
 - **Address.** Enter it with or without `/v1`.

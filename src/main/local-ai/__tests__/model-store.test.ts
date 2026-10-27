@@ -10,6 +10,7 @@ const SHA = createHash('sha256').update(FILE).digest('hex')
 
 let dir: string
 let linkedEtag: string | undefined
+let linkedSize: number
 let requests: Array<Record<string, string>>
 
 // Hugging Face stand-in: honours Range requests and sends the LFS hash on HEAD
@@ -33,7 +34,8 @@ vi.mock('electron', () => ({
         end: () =>
           setTimeout(() =>
             handlers.redirect?.(302, 'HEAD', 'https://cdn', {
-              'x-linked-etag': [`"${linkedEtag}"`]
+              'x-linked-etag': [`"${linkedEtag}"`],
+              'x-linked-size': [String(linkedSize)]
             })
           ),
         abort: () => {}
@@ -48,6 +50,7 @@ const store = await import('../model-store')
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'models-test-'))
   linkedEtag = SHA
+  linkedSize = FILE.length
   requests = []
 })
 
@@ -81,6 +84,15 @@ describe('downloadModel', () => {
     expect(result).toMatchObject({ ok: false, code: 'checksum-mismatch' })
     expect(existsSync(target())).toBe(false)
     expect(existsSync(`${target()}.part`)).toBe(false)
+  })
+
+  it('checks the size when the server gives no hash', async () => {
+    linkedEtag = undefined
+    linkedSize = FILE.length + 1
+    const result = await store.downloadModel('whisper-tiny', () => {})
+    expect(result).toMatchObject({ ok: false, code: 'checksum-mismatch' })
+    linkedSize = FILE.length
+    expect((await store.downloadModel('whisper-tiny', () => {})).ok).toBe(true)
   })
 
   it('deletes installed models', async () => {

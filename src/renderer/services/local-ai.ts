@@ -5,6 +5,7 @@
  */
 import i18n from '../i18n'
 import { toWav16k } from '../utils/audio-convert'
+import { LOCAL_LLM_MAX_INPUT_CHARS } from '../../shared/local-ai/catalog'
 import type {
   AIEngine,
   ChatInput,
@@ -27,6 +28,8 @@ const FALLBACK_MESSAGES: Record<LocalAiErrorCode, string> = {
   'download-failed': 'The download failed. Check your connection and try again.',
   'checksum-mismatch': 'The downloaded file was damaged and has been removed. Try again.',
   'model-in-use': 'This model is busy. Try again in a moment.',
+  'input-too-long':
+    'This text is too long for the model. Select less text, or use a cloud provider for long texts.',
   'not-configured': 'Add your server address and model in Settings › {{page}}.',
   unreachable: "Couldn't reach your server. Check that it's running and the address is right.",
   unauthorized: 'Your server rejected the API key.',
@@ -86,6 +89,9 @@ export async function transcribeOnDevice(
 }
 
 export async function chatOnDevice(engine: DeviceEngine, input: ChatInput): Promise<string> {
+  // Local and self-hosted models have small context windows; failing here beats a garbled answer
+  const length = input.prompt.length + input.text.length + (input.systemInstruction?.length ?? 0)
+  if (length > LOCAL_LLM_MAX_INPUT_CHARS) throw new LocalEngineError('input-too-long', 'llm')
   const api = engine === 'local' ? window.tapwisper.localAi : window.tapwisper.selfHosted
   return unwrap(await api.chat(input), 'llm')
 }

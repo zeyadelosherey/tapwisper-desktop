@@ -91,10 +91,6 @@ interface ActiveDownload {
 
 const downloads = new Map<string, ActiveDownload>()
 
-export function isDownloading(id: string): boolean {
-  return downloads.has(id)
-}
-
 /** Download a catalog model. Calling it again for the same id joins the running download */
 export function downloadModel(
   id: string,
@@ -134,7 +130,8 @@ async function runDownload(
       throw new DownloadError('insufficient-disk')
     }
 
-    const expectedSha = model.sha256 ?? (await huggingFaceSha256(model.url))
+    // A pinned hash wins; otherwise the server's own hash, or at least its size
+    const expected = model.sha256 ? { sha256: model.sha256 } : await huggingFaceFileInfo(model.url)
     for (let attempt = 1; ; attempt++) {
       try {
         await fetchToFile(model.url, part, signal, report)
@@ -147,7 +144,7 @@ async function runDownload(
     }
 
     report.state('verifying')
-    if (expectedSha && (await sha256File(part)) !== expectedSha) {
+    if (!(await matches(part, expected))) {
       await rm(part, { force: true })
       throw new DownloadError('checksum-mismatch')
     }
@@ -244,6 +241,12 @@ async function write(out: WriteStream, chunk: Uint8Array): Promise<void> {
   if (!out.write(chunk)) await once(out, 'drain')
 }
 
+async function matches(file: string, expected: RemoteFileInfo): Promise<boolean> {
+  if (expected.sha256) return (await sha256File(file)) === expected.sha256
+  if (expected.size) return (await fileSize(file)) === expected.size
+  return true
+}
+
 export async function sha256File(file: string): Promise<string> {
   const hash = createHash('sha256')
   for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer)
@@ -256,21 +259,28 @@ export function parseLinkedEtag(value: string | string[] | undefined): string | 
   return raw && /^[a-f0-9]{64}$/i.test(raw) ? raw.toLowerCase() : undefined
 }
 
-/** The expected hash of a Hugging Face file, or undefined when the server doesn't say */
-function huggingFaceSha256(url: string): Promise<string | undefined> {
+interface RemoteFileInfo {
+  sha256?: string
+  size?: number
+}
+
+/** Hash and size Hugging Face publishes for a file (both empty when it doesn't say) */
+function huggingFaceFileInfo(url: string): Promise<RemoteFileInfo> {
   return new Promise((resolve) => {
     const request = net.request({ method: 'HEAD', url, redirect: 'manual' })
-    const timer = setTimeout(() => finish(undefined), 10_000)
-    function finish(sha: string | undefined): void {
+    const timer = setTimeout(() => finish({}), 10_000)
+    function finish(info: RemoteFileInfo): void {
       clearTimeout(timer)
       request.abort()
-      resolve(sha)
+      resolve(info)
     }
-    request.on('redirect', (_status, _method, _url, headers) =>
-      finish(parseLinkedEtag(headers['x-linked-etag']))
-    )
-    request.on('response', (res) => finish(parseLinkedEtag(res.headers['x-linked-etag'])))
-    request.on('error', () => finish(undefined))
+    const read = (headers: Record<string, string | string[]>): RemoteFileInfo => ({
+      sha256: parseLinkedEtag(headers['x-linked-etag']),
+      size: Number([headers['x-linked-size']].flat()[0]) || undefined
+    })
+    request.on('redirect', (_status, _method, _url, headers) => finish(read(headers)))
+    request.on('response', (res) => finish(read(res.headers)))
+    request.on('error', () => finish({}))
     request.end()
   })
 }

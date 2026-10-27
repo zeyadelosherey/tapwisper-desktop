@@ -15,6 +15,7 @@
  * Needs git, CMake ≥ 3.21 and a C++17 compiler (Xcode CLT, MSVC or GCC/Clang).
  */
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
@@ -41,6 +42,7 @@ const force = args.includes('--force')
 
 const { platform, arch } = process
 const target = `${platform}-${arch}`
+// Keep in sync with SUPPORTED_TARGETS in src/main/local-ai/hardware.ts
 const SUPPORTED = ['darwin-arm64', 'darwin-x64', 'win32-x64', 'linux-x64']
 if (!SUPPORTED.includes(target)) {
   console.error(
@@ -141,8 +143,10 @@ function build(name, spec) {
     run('git', ['checkout', '--force', spec.tag], src)
   }
 
-  // Kept between runs: CMake rebuilds only what changed
-  const buildDir = join(CACHE, `${name}-build-${target}`)
+  // Kept between runs so CMake rebuilds only what changed; one directory per set of
+  // options, so dropping e.g. --vulkan can't leave a stale backend library behind
+  const optionsHash = createHash('sha1').update(stamp).digest('hex').slice(0, 8)
+  const buildDir = join(CACHE, `${name}-build-${target}-${optionsHash}`)
   run('cmake', ['-S', src, '-B', buildDir, ...options])
   run('cmake', [
     '--build',

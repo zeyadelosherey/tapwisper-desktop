@@ -336,7 +336,7 @@
     },
     "selfHosted": {
       "server": "Server",
-      "sttHint": "Any server with an OpenAI-compatible /v1/audio/transcriptions endpoint. For whisper.cpp, start whisper-server with --inference-path /v1/audio/transcriptions.",
+      "sttHint": "Any server with an OpenAI-compatible /v1/audio/transcriptions endpoint. For whisper.cpp, start whisper-server with -l auto --inference-path /v1/audio/transcriptions.",
       "llmHint": "Any server with an OpenAI-compatible /v1/chat/completions endpoint. Give it a context window of at least 8K tokens (Ollama: num_ctx).",
       "url": "Server address",
       "model": "Model",
@@ -524,6 +524,7 @@
       "download-failed": "The download failed. Check your connection and try again.",
       "checksum-mismatch": "The downloaded file was damaged and has been removed. Try again.",
       "model-in-use": "This model is busy. Try again in a moment.",
+      "input-too-long": "This text is too long for the model. Select less text, or use a cloud provider for long texts.",
       "not-configured": "Add your server address and model in Settings › {{page}}.",
       "unreachable": "Couldn't reach your server. Check that it's running and the address is right.",
       "unauthorized": "Your server rejected the API key.",

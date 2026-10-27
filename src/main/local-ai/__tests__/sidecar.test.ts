@@ -132,6 +132,18 @@ describe('SidecarServer', () => {
     await expect(s.run(launch(), async () => 'back')).resolves.toBe('back')
   })
 
+  it('keeps a stop and a new request in order', async () => {
+    const s = server()
+    const first = await s.run(launch(), pidOf)
+    // e.g. the idle timer firing just as a recording starts
+    const stopping = s.stop()
+    const next = s.run(launch(), pidOf)
+    await stopping
+    const pid = await next
+    expect(pid).not.toBe(first)
+    expect(s.getStatus()).toMatchObject({ state: 'ready', modelId: 'model-ok' })
+  })
+
   it('unloads the model after the idle timeout', async () => {
     const s = server()
     await s.run(launch('ok', { idleUnloadMs: 100 }), async () => undefined)

@@ -1,7 +1,10 @@
 /** Request/response helpers shared by the local servers and self-hosted ones */
 import { LocalAiError } from './errors'
-import { stripThinking } from '../../shared/local-ai/catalog'
-import type { LocalAiErrorCode, TranscribeInput } from '../../shared/local-ai/types'
+import { LOCAL_LLM_MAX_OUTPUT_TOKENS, stripThinking } from '../../shared/local-ai/catalog'
+import type { ChatInput, LocalAiErrorCode, TranscribeInput } from '../../shared/local-ai/types'
+
+/** CPU generation of a long answer can take minutes on older machines */
+export const CHAT_TIMEOUT_MS = 5 * 60_000
 
 /** Throw a coded error for a non-2xx HTTP response */
 export async function assertOk(res: Response): Promise<void> {
@@ -36,6 +39,11 @@ export function transcriptionForm(
 /** Timeout for transcribing `seconds` of audio: CPU decoding can take a few times real time */
 export function transcriptionTimeout(seconds: number, minimumMs: number): AbortSignal {
   return AbortSignal.timeout(Math.max(minimumMs, seconds * 3000))
+}
+
+/** Requested answer length, capped so prompt + answer fit an 8K context */
+export function outputTokens(input: ChatInput): number {
+  return Math.min(input.maxTokens ?? LOCAL_LLM_MAX_OUTPUT_TOKENS, LOCAL_LLM_MAX_OUTPUT_TOKENS)
 }
 
 /** The assistant text of an OpenAI-style chat completion */

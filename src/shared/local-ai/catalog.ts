@@ -43,6 +43,12 @@ export const DEFAULT_LOCAL_AI_SETTINGS: LocalAiSettings = {
   keepWarm: false
 }
 
+/** Where the self-hosted servers' optional keys live in the encrypted apiKeys */
+export const SELF_HOSTED_KEY_IDS: Record<LocalModelKind, 'selfHostedStt' | 'selfHostedLlm'> = {
+  stt: 'selfHostedStt',
+  llm: 'selfHostedLlm'
+}
+
 export const DEFAULT_SELF_HOSTED: SelfHostedSettings = {
   stt: { baseUrl: '', model: '' },
   llm: { baseUrl: '', model: '' }
@@ -54,12 +60,16 @@ export const DISK_HEADROOM_BYTES = 500 * 1024 ** 2
 /** Context window the local llama-server is started with */
 export const LOCAL_LLM_CONTEXT_TOKENS = 8192
 
+/** Longest answer requested from a local or self-hosted model (room kept in the context) */
+export const LOCAL_LLM_MAX_OUTPUT_TOKENS = 2048
+
 /**
  * Characters of input a local or self-hosted model can take in one request:
  * the context minus room for the answer and the prompt, at ~3 chars per token
  * (conservative for non-English text).
  */
-export const LOCAL_LLM_MAX_INPUT_CHARS = (LOCAL_LLM_CONTEXT_TOKENS - 2048 - 512) * 3
+export const LOCAL_LLM_MAX_INPUT_CHARS =
+  (LOCAL_LLM_CONTEXT_TOKENS - LOCAL_LLM_MAX_OUTPUT_TOKENS - 512) * 3
 
 const GB = 1024 ** 3
 

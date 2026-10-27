@@ -157,6 +157,7 @@ export type LocalAiErrorCode =
   | 'download-failed'
   | 'checksum-mismatch'
   | 'model-in-use'
+  | 'input-too-long'
   | 'not-configured'
   | 'unreachable'
   | 'unauthorized'

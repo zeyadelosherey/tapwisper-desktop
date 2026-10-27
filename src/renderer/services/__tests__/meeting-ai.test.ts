@@ -93,6 +93,15 @@ describe('recapRecent', () => {
 })
 
 describe('askMeeting', () => {
+  it('never sends more than the model can read, even with long notes', async () => {
+    maxInputChars = 5000
+    processText.mockResolvedValue({ result: 'answer', provider: 'local', model: 'm' })
+    const long = Array.from({ length: 300 }, (_, i) => seg('others', i * 5000, `line ${i} here`))
+    await askMeeting('Q?', { segments: long, summary: 's'.repeat(8000), notes: 'n'.repeat(7000) })
+    const sent = processText.mock.calls[0][0].text as string
+    expect(sent.length).toBeLessThanOrEqual(5000)
+  })
+
   it('sends only the most recent transcript that fits the model', async () => {
     maxInputChars = 5000
     processText.mockResolvedValue({ result: 'answer', provider: 'local', model: 'm' })

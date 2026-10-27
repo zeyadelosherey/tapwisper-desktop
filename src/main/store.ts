@@ -110,6 +110,8 @@ export interface AppConfig {
   }
   /** Set once the old Option+Space default has been moved to the platform default */
   shortcutDefaultsMigrated?: boolean
+  /** Set once AI-chat triggers on the old default provider were moved to 'default' */
+  triggerProvidersMigrated?: boolean
 
   // Snippets
   snippets: SnippetEntry[]

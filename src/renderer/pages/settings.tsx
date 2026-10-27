@@ -44,6 +44,7 @@ import { MicrophonePicker } from '../components/microphone-picker'
 import { NotetakerSettings } from '../components/meeting/notetaker-settings'
 import { LanguageSelect } from '../components/meeting/translate-control'
 import { EngineSettings } from '../components/settings/engine-settings'
+import { SELF_HOSTED_KEY_IDS } from '../../shared/local-ai/catalog'
 
 type Theme = 'system' | 'dark' | 'light'
 export type SettingsTab =
@@ -1257,8 +1258,8 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
             kind="stt"
             cloud={renderCloudSpeech()}
             languages={speechLanguages}
-            selfHostedKey={apiKeys.selfHostedStt ?? ''}
-            onSelfHostedKeyChange={(value) => handleKeyChange('selfHostedStt', value)}
+            selfHostedKey={apiKeys[SELF_HOSTED_KEY_IDS.stt] ?? ''}
+            onSelfHostedKeyChange={(value) => handleKeyChange(SELF_HOSTED_KEY_IDS.stt, value)}
           />
         )}
         {activeTab === 'language-models' && (
@@ -1266,8 +1267,8 @@ export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Elem
             kind="llm"
             cloud={renderCloudLanguageModel()}
             languages={[]}
-            selfHostedKey={apiKeys.selfHostedLlm ?? ''}
-            onSelfHostedKeyChange={(value) => handleKeyChange('selfHostedLlm', value)}
+            selfHostedKey={apiKeys[SELF_HOSTED_KEY_IDS.llm] ?? ''}
+            onSelfHostedKeyChange={(value) => handleKeyChange(SELF_HOSTED_KEY_IDS.llm, value)}
           />
         )}
         {activeTab === 'shortcuts' && renderShortcutsTab()}

@@ -130,6 +130,15 @@ function accelerationFor(gpu: GpuInfo, appleSilicon: boolean): GpuAcceleration {
   return 'cpu'
 }
 
+function isAppleSilicon(cpuModel: string): boolean {
+  return process.platform === 'darwin' && (process.arch === 'arm64' || /apple/i.test(cpuModel))
+}
+
+/** GPU backend the runtimes should use on this computer */
+export async function gpuAcceleration(): Promise<GpuAcceleration> {
+  return accelerationFor(await detectGpu(), isAppleSilicon(os.cpus()[0]?.model ?? ''))
+}
+
 async function modelsDirWarning(dir: string): Promise<ModelsDirWarning | undefined> {
   try {
     await mkdir(dir, { recursive: true })
@@ -145,8 +154,7 @@ async function modelsDirWarning(dir: string): Promise<ModelsDirWarning | undefin
 export async function getDeviceProfile(): Promise<DeviceProfile> {
   const cpus = os.cpus()
   const cpuModel = cpus[0]?.model.trim() ?? ''
-  const appleSilicon =
-    process.platform === 'darwin' && (process.arch === 'arm64' || /apple/i.test(cpuModel))
+  const appleSilicon = isAppleSilicon(cpuModel)
   const dir = modelsDir()
   const [gpu, freeBytes, warning, stt, llm] = await Promise.all([
     detectGpu(),

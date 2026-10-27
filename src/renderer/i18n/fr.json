@@ -341,7 +341,7 @@
     },
     "selfHosted": {
       "server": "Serveur",
-      "sttHint": "Tout serveur proposant un point d’accès /v1/audio/transcriptions compatible OpenAI. Avec whisper.cpp, lancez whisper-server avec --inference-path /v1/audio/transcriptions.",
+      "sttHint": "Tout serveur proposant un point d’accès /v1/audio/transcriptions compatible OpenAI. Avec whisper.cpp, lancez whisper-server avec -l auto --inference-path /v1/audio/transcriptions.",
       "llmHint": "Tout serveur proposant un point d’accès /v1/chat/completions compatible OpenAI. Donnez-lui une fenêtre de contexte d’au moins 8K jetons (Ollama : num_ctx).",
       "url": "Adresse du serveur",
       "model": "Modèle",
@@ -531,6 +531,7 @@
       "download-failed": "Le téléchargement a échoué. Vérifiez votre connexion et réessayez.",
       "checksum-mismatch": "Le fichier téléchargé était endommagé et a été supprimé. Réessayez.",
       "model-in-use": "Ce modèle est occupé. Réessayez dans un instant.",
+      "input-too-long": "Ce texte est trop long pour le modèle. Sélectionnez moins de texte ou utilisez un fournisseur cloud pour les textes longs.",
       "not-configured": "Indiquez l’adresse de votre serveur et le modèle dans Paramètres › {{page}}.",
       "unreachable": "Impossible de joindre votre serveur. Vérifiez qu’il fonctionne et que l’adresse est correcte.",
       "unauthorized": "Votre serveur a refusé la clé API.",

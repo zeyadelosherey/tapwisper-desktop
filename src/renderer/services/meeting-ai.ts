@@ -24,6 +24,20 @@ const MAX_CHUNK_CHARS = 60_000
 /** Rounds of condensing a very long meeting into notes before the final summary */
 const MAX_CONDENSE_ROUNDS = 3
 
+/** Characters kept for instructions and the conversation around the material */
+const PROMPT_ROOM_CHARS = 2000
+
+/** The first `max` characters (the notes and summary are read from the top) */
+function clipStart(text: string, max: number): string {
+  return text.length > max ? text.slice(0, Math.max(max, 0)) : text
+}
+
+/** The last `max` characters (in a transcript, the most recent part matters most) */
+function clipEnd(text: string, max: number): string {
+  if (text.length <= max) return text
+  return max > 0 ? text.slice(-max) : ''
+}
+
 export function speakerLabel(
   source: SegmentSource,
   names?: Partial<Record<SegmentSource, string>>
@@ -138,11 +152,17 @@ export async function generateMeetingSummary(
   ]
     .filter(Boolean)
     .join(' ')
-  const notesBlock = ctx.notes?.trim() ? `\n\nNOTE-TAKER'S OWN NOTES:\n${ctx.notes.trim()}` : ''
+  // The user's notes go into the final request too, so they share its budget
+  const limit = await getMaxInputChars()
+  const notes = clipStart(ctx.notes?.trim() ?? '', limit / 4)
+  const notesBlock = notes ? `\n\nNOTE-TAKER'S OWN NOTES:\n${notes}` : ''
 
   // Map: condense parts into dense notes (keeping timestamps for ordering) until
   // everything fits in one request — local models may need more than one round
-  const maxChars = Math.min(MAX_CHUNK_CHARS, await getMaxInputChars())
+  const maxChars = Math.min(
+    MAX_CHUNK_CHARS,
+    Math.max(limit - notesBlock.length - PROMPT_ROOM_CHARS, limit / 2)
+  )
   let material = transcript
   let condensed = false
   for (let round = 0; material.length > maxChars && round < MAX_CONDENSE_ROUNDS; round++) {
@@ -202,14 +222,15 @@ export async function askMeeting(
   history: ChatTurn[] = []
 ): Promise<string> {
   const transcript = transcriptToText(ctx.segments, ctx.speakerNames)
+  const limit = await getMaxInputChars()
+  const summary = clipStart(ctx.summary?.trim() ?? '', limit / 4)
+  const notes = clipStart(ctx.notes?.trim() ?? '', limit / 4)
   // Most recent part wins when the meeting is longer than the model can read
-  const room =
-    (await getMaxInputChars()) - (ctx.summary?.length ?? 0) - (ctx.notes?.length ?? 0) - 2000
-  const clipped = transcript.length > room ? transcript.slice(-Math.max(room, 0)) : transcript
+  const room = limit - summary.length - notes.length - PROMPT_ROOM_CHARS
   const context = [
-    ctx.summary?.trim() ? `SUMMARY:\n${ctx.summary.trim()}` : '',
-    ctx.notes?.trim() ? `NOTE-TAKER'S NOTES:\n${ctx.notes.trim()}` : '',
-    `TRANSCRIPT:\n${clipped}`
+    summary ? `SUMMARY:\n${summary}` : '',
+    notes ? `NOTE-TAKER'S NOTES:\n${notes}` : '',
+    `TRANSCRIPT:\n${clipEnd(transcript, room)}`
   ]
     .filter(Boolean)
     .join('\n\n')

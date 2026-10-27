@@ -356,7 +356,7 @@
     },
     "selfHosted": {
       "server": "الخادم",
-      "sttHint": "أي خادم يوفّر نقطة /v1/audio/transcriptions متوافقة مع OpenAI. مع whisper.cpp شغّل whisper-server مع ‎--inference-path /v1/audio/transcriptions.",
+      "sttHint": "أي خادم يوفّر نقطة /v1/audio/transcriptions متوافقة مع OpenAI. مع whisper.cpp شغّل whisper-server مع ‎-l auto --inference-path /v1/audio/transcriptions.",
       "llmHint": "أي خادم يوفّر نقطة /v1/chat/completions متوافقة مع OpenAI. اضبط نافذة السياق على 8K رمز على الأقل (في Ollama: num_ctx).",
       "url": "عنوان الخادم",
       "model": "النموذج",
@@ -552,6 +552,7 @@
       "download-failed": "فشل التنزيل. تحقّق من اتصالك وحاول مجددًا.",
       "checksum-mismatch": "الملف الذي تم تنزيله تالف وقد حُذف. حاول مجددًا.",
       "model-in-use": "هذا النموذج مشغول. حاول بعد لحظات.",
+      "input-too-long": "هذا النص أطول مما يستطيع النموذج معالجته. حدّد نصًا أقصر، أو استخدم مزودًا سحابيًا للنصوص الطويلة.",
       "not-configured": "أضف عنوان خادمك والنموذج في الإعدادات › {{page}}.",
       "unreachable": "تعذّر الوصول إلى خادمك. تأكد من أنه يعمل وأن العنوان صحيح.",
       "unauthorized": "رفض خادمك مفتاح API.",

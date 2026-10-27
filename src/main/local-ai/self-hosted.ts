@@ -6,8 +6,19 @@
 import { net } from 'electron'
 import { getConfigValue } from '../store'
 import { LocalAiError } from './errors'
-import { assertOk, readChatReply, transcriptionForm, transcriptionTimeout } from './http'
-import { normalizeBaseUrl, toChatMessages } from '../../shared/local-ai/catalog'
+import {
+  assertOk,
+  CHAT_TIMEOUT_MS,
+  outputTokens,
+  readChatReply,
+  transcriptionForm,
+  transcriptionTimeout
+} from './http'
+import {
+  normalizeBaseUrl,
+  SELF_HOSTED_KEY_IDS,
+  toChatMessages
+} from '../../shared/local-ai/catalog'
 import type {
   ChatInput,
   LocalModelKind,
@@ -18,19 +29,21 @@ import type {
 } from '../../shared/local-ai/types'
 
 const TEST_TIMEOUT_MS = 10_000
-const CHAT_TIMEOUT_MS = 5 * 60_000
 
 export interface SelfHostedTarget extends SelfHostedEndpoint {
   apiKey: string
 }
 
-const KEY_IDS: Record<LocalModelKind, string> = { stt: 'selfHostedStt', llm: 'selfHostedLlm' }
-
 /** The saved server for a feature, with its key from the encrypted key store */
 export function savedTarget(kind: LocalModelKind): SelfHostedTarget {
   const settings = getConfigValue('selfHosted') as SelfHostedSettings | undefined
   const keys = getConfigValue('apiKeys') as Record<string, string> | undefined
-  return { baseUrl: '', model: '', ...settings?.[kind], apiKey: keys?.[KEY_IDS[kind]] ?? '' }
+  return {
+    baseUrl: '',
+    model: '',
+    ...settings?.[kind],
+    apiKey: keys?.[SELF_HOSTED_KEY_IDS[kind]] ?? ''
+  }
 }
 
 function baseUrlOf(target: SelfHostedTarget): string {
@@ -93,7 +106,7 @@ export async function selfHostedChat(input: ChatInput): Promise<string> {
       model: target.model,
       messages: toChatMessages(input),
       temperature: input.temperature ?? 0.7,
-      max_tokens: input.maxTokens ?? 2048
+      max_tokens: outputTokens(input)
     }),
     signal: AbortSignal.timeout(CHAT_TIMEOUT_MS)
   })

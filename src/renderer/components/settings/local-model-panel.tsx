@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useMemo, useState } from 'react'
+import { type JSX, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Download, ExternalLink, FolderOpen, RotateCcw, Trash2, X } from 'lucide-react'
@@ -59,6 +59,10 @@ export function LocalModelPanel({
   const { t } = useTranslation()
   const { confirm, dialog } = useConfirmDialog()
   const { profile, installed, downloads } = local
+  const [notice, setNotice] = useState<string | null>(null)
+  // Downloads take minutes; read the active model when one finishes, not when it started
+  const activeRef = useRef(activeId)
+  activeRef.current = activeId
 
   const models = useMemo(() => MODEL_CATALOG.filter((m) => m.kind === kind), [kind])
   const families = [...new Set(models.map((m) => m.family))]
@@ -99,7 +103,7 @@ export function LocalModelPanel({
       if (!ok) return
     }
     const result = await local.download(model.id)
-    if (result.ok && !activeId) onActivate(model.id)
+    if (result.ok && !activeRef.current) onActivate(model.id)
   }
 
   const remove = async (model: LocalModelEntry): Promise<void> => {
@@ -115,7 +119,8 @@ export function LocalModelPanel({
     })
     if (!ok) return
     const result = await local.remove(model.id)
-    if (result.ok && model.id === activeId) onActivate(null)
+    setNotice(result.ok ? null : localAiErrorMessage(result.code, kind))
+    if (result.ok && model.id === activeRef.current) onActivate(null)
   }
 
   // Models that don't fit the user's languages go last (stable sort keeps catalog order)
@@ -138,6 +143,11 @@ export function LocalModelPanel({
       </Section>
 
       <Section title={t('settings.localModels.available', 'Available models')}>
+        {notice && (
+          <div className="mb-2.5">
+            <Callout tone="danger">{notice}</Callout>
+          </div>
+        )}
         {families.length > 1 && (
           <div className="mb-2.5">
             <Segmented
@@ -260,6 +270,14 @@ function ServerStatus({
     busy: t('settings.localModels.ready', 'Model loaded and ready'),
     stopped: t('settings.localModels.stopped', 'The model loads when you start recording.')
   }
+  // Stopped after a crash: say so rather than "loads when you start recording"
+  if (status.state === 'stopped' && status.error) {
+    return (
+      <p className="mt-2 text-[12px] text-danger" role="status">
+        {localAiErrorMessage(status.error, kind)}
+      </p>
+    )
+  }
   return (
     <p className="mt-2 flex items-center gap-2 text-[12px] text-ink-muted" role="status">
       {status.state === 'starting' && <Spinner className="h-3.5 w-3.5" />}
@@ -350,14 +368,17 @@ function ModelRow({
             ? t('settings.localModels.verifying', 'Checking…')
             : `${percent}%`}
         </span>
-        <button
-          type="button"
-          onClick={onCancel}
-          aria-label={t('settings.localModels.cancel', 'Cancel download')}
-          className="icon-btn h-7 w-7"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+        {/* Checking the hash can't be interrupted */}
+        {progress?.state === 'downloading' && (
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label={t('settings.localModels.cancel', 'Cancel download')}
+            className="icon-btn h-7 w-7"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     )
   } else if (installed) {

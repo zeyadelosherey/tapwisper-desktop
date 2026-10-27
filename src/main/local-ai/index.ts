@@ -9,7 +9,13 @@ import path from 'path'
 import { getConfigValue } from '../store'
 import type { WindowManager } from '../windows'
 import { ok, SidecarStartError, toFailure } from './errors'
-import { checkRuntime, defaultThreads, getDeviceProfile, runtimeBinary } from './hardware'
+import {
+  checkRuntime,
+  defaultThreads,
+  getDeviceProfile,
+  gpuAcceleration,
+  runtimeBinary
+} from './hardware'
 import { llamaChat, llamaLaunch } from './llama'
 import {
   cancelDownload,
@@ -71,6 +77,8 @@ async function prepare(kind: LocalModelKind): Promise<LocalAiResult<Prepared>> {
   if (!(await isInstalled(model))) return { ok: false, code: 'model-not-downloaded' }
 
   const s = settings()
+  // Integrated graphics are usually slower than the CPU, so only a capable GPU is used
+  const gpuWanted = s.useGpu && (await gpuAcceleration()) !== 'cpu'
   const build = kind === 'stt' ? whisperLaunch : llamaLaunch
   const launch = (useGpu: boolean): SidecarLaunch => ({
     ...build({
@@ -82,9 +90,9 @@ async function prepare(kind: LocalModelKind): Promise<LocalAiResult<Prepared>> {
       threads: s.threads || defaultThreads(),
       idleUnloadMs: s.keepWarm ? 0 : s.idleUnloadMinutes * 60_000
     }),
-    cpuFallback: s.useGpu && !useGpu
+    cpuFallback: gpuWanted && !useGpu
   })
-  return ok({ model, launch, useGpu: s.useGpu && !gpuFailed.has(kind) })
+  return ok({ model, launch, useGpu: gpuWanted && !gpuFailed.has(kind) })
 }
 
 /** Run a request on the local server, falling back to the CPU once if the GPU can't load the model */
@@ -100,7 +108,9 @@ async function runLocal<T>(
   try {
     return ok(await server.run(launch(useGpu), (baseUrl) => task(baseUrl, model)))
   } catch (err) {
-    if (!(err instanceof SidecarStartError) || !useGpu) return toFailure(err)
+    // A model that is merely slow to load (timeout) isn't a GPU problem
+    const gpuFailure = err instanceof SidecarStartError && err.code !== 'timeout'
+    if (!gpuFailure || !useGpu) return toFailure(err)
     gpuFailed.add(kind)
     try {
       return ok(await server.run(launch(false), (baseUrl) => task(baseUrl, model)))
@@ -204,5 +214,5 @@ export function registerLocalAi(windowManager: WindowManager): void {
 
 /** Stop the inference servers; call on quit */
 export function stopLocalAi(): void {
-  for (const server of Object.values(servers ?? {})) void server.stop()
+  for (const server of Object.values(servers ?? {})) void server.shutdown()
 }

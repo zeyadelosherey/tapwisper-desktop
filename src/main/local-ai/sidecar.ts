@@ -40,7 +40,7 @@ export function loadTimeoutMs(modelBytes: number): number {
   return 30_000 + Math.ceil(modelBytes / 1024 ** 3) * 20_000
 }
 
-/** More crashes than this within the window marks the server as failed */
+/** This many crashes within the window marks the server as failed */
 const MAX_CRASHES = 3
 const CRASH_WINDOW_MS = 5 * 60_000
 const STOP_GRACE_MS = 2000
@@ -71,7 +71,7 @@ export class SidecarServer {
 
   /** Run `task` against a ready server. Requests are served one at a time. */
   run<T>(launch: SidecarLaunch, task: (baseUrl: string) => Promise<T>): Promise<T> {
-    const result = this.queue.then(async () => {
+    return this.enqueue(async () => {
       const baseUrl = await this.ensure(launch)
       this.clearIdleTimer()
       this.setState('busy')
@@ -84,8 +84,16 @@ export class SidecarServer {
         }
       }
     })
-    this.queue = result.catch(() => undefined)
-    return result
+  }
+
+  /** Stop the server once the requests ahead of this have finished */
+  stop(): Promise<void> {
+    return this.enqueue(() => this.terminate())
+  }
+
+  /** Stop now, without waiting for queued requests (app quit) */
+  shutdown(): Promise<void> {
+    return this.terminate()
   }
 
   /** Forget earlier crashes so the next request tries again (the UI's Retry) */
@@ -94,7 +102,14 @@ export class SidecarServer {
     if (this.status.state === 'failed') this.setState('stopped', { error: undefined })
   }
 
-  async stop(): Promise<void> {
+  /** Everything that starts or stops the process goes through here, so they never overlap */
+  private enqueue<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(work)
+    this.queue = result.catch(() => undefined)
+    return result
+  }
+
+  private async terminate(): Promise<void> {
     this.clearIdleTimer()
     const child = this.child
     if (!child) return
@@ -114,10 +129,11 @@ export class SidecarServer {
   private async ensure(launch: SidecarLaunch): Promise<string> {
     const key = [launch.binary, ...launch.args(0), launch.modelId].join('\0')
     if (this.child && this.launchKey === key) return this.baseUrl
-    await this.stop()
+    await this.terminate()
     this.crashes = this.crashes.filter((t) => Date.now() - t < CRASH_WINDOW_MS)
     if (this.crashes.length >= MAX_CRASHES) {
-      throw new SidecarStartError('server-failed', this.stderrTail)
+      // Not a start attempt, so callers don't mistake it for a GPU failure
+      throw new LocalAiError('server-failed', this.stderrTail)
     }
     return this.start(launch, key)
   }
@@ -157,7 +173,7 @@ export class SidecarServer {
       await Promise.race([waitForHealth(this.baseUrl, launch.loadTimeoutMs), ended])
     } catch (err) {
       this.crashes.push(Date.now())
-      await this.stop()
+      await this.terminate()
       const code = err instanceof LocalAiError ? err.code : 'server-failed'
       this.setState(this.crashes.length >= MAX_CRASHES ? 'failed' : 'stopped', { error: code })
       throw new SidecarStartError(code, this.stderrTail || (err as Error).message)

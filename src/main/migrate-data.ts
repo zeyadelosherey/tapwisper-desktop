@@ -162,6 +162,28 @@ function migrateShortcutDefault(): void {
 }
 
 /**
+ * AI-chat triggers used to require a cloud provider, defaulting to Gemini.
+ * Triggers still on the global provider without their own model become
+ * 'default', so they follow the engine chosen in Settings (local, self-hosted
+ * or cloud). Cloud users see no change; an explicit choice is kept.
+ */
+function migrateTriggerProviders(): void {
+  const store = getStore()
+  if (store.get('triggerProvidersMigrated')) return
+  const global = store.get('aiProvider') || 'gemini'
+  const triggers = store.get('triggers') ?? []
+  const migrated = triggers.map((trigger) => {
+    const config = trigger.actionConfig as { type?: string; provider?: string; model?: string }
+    const followsGlobal = config.type === 'ai-chat' && config.provider === global && !config.model
+    return followsGlobal
+      ? { ...trigger, actionConfig: { ...config, provider: 'default' } }
+      : trigger
+  })
+  store.set('triggers', migrated)
+  store.set('triggerProvidersMigrated', true)
+}
+
+/**
  * Run all migrations
  */
 export function runMigrations(): void {
@@ -172,6 +194,7 @@ export function runMigrations(): void {
     migrateSonioxModel,
     migrateSpeechSettings,
     migrateShortcutDefault,
+    migrateTriggerProviders,
     migrateApiKeysToSafeStorage
   ]) {
     try {

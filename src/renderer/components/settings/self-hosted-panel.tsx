@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useState } from 'react'
+import { type JSX, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff, Lock } from 'lucide-react'
 import { Callout, Section } from '../ui/primitives'
@@ -45,6 +45,9 @@ export function SelfHostedPanel({
   const [showKey, setShowKey] = useState(false)
   const [test, setTest] = useState<TestState>({ state: 'idle' })
   const endpoint = all[kind]
+  // Edits can land while a test is running; always build on the latest settings
+  const allRef = useRef(all)
+  allRef.current = all
 
   useEffect(() => {
     window.tapwisper.store
@@ -59,24 +62,31 @@ export function SelfHostedPanel({
   useEffect(() => setTest({ state: 'idle' }), [endpoint.baseUrl, apiKey])
 
   const update = (patch: Partial<SelfHostedEndpoint>): void => {
-    const next = { ...all, [kind]: { ...endpoint, ...patch } }
+    const current = allRef.current
+    const next = { ...current, [kind]: { ...current[kind], ...patch } }
+    allRef.current = next
     setAll(next)
     void window.tapwisper.store.set('selfHosted', next)
   }
 
   const runTest = async (): Promise<void> => {
     setTest({ state: 'testing' })
+    const tested = endpoint.baseUrl
     const result = await window.tapwisper.selfHosted.test(kind, {
       ...endpoint,
       apiKey: apiKey.trim()
     })
+    // The address changed meanwhile, so this result no longer applies
+    if (allRef.current[kind].baseUrl !== tested) return
     if (!result.ok) {
       setTest({ state: 'error', message: localAiErrorMessage(result.code, kind) })
       return
     }
     setTest({ state: 'ok', models: result.data.models })
     // Pick the only model the server offers so it works right away
-    if (!endpoint.model && result.data.models.length === 1) update({ model: result.data.models[0] })
+    if (!allRef.current[kind].model && result.data.models.length === 1) {
+      update({ model: result.data.models[0] })
+    }
   }
 
   const models = test.state === 'ok' ? test.models : []
@@ -88,7 +98,7 @@ export function SelfHostedPanel({
         kind === 'stt'
           ? t(
               'settings.selfHosted.sttHint',
-              'Any server with an OpenAI-compatible /v1/audio/transcriptions endpoint. For whisper.cpp, start whisper-server with --inference-path /v1/audio/transcriptions.'
+              'Any server with an OpenAI-compatible /v1/audio/transcriptions endpoint. For whisper.cpp, start whisper-server with -l auto --inference-path /v1/audio/transcriptions.'
             )
           : t(
               'settings.selfHosted.llmHint',

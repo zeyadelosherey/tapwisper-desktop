@@ -46,6 +46,8 @@ export function useLocalAi(): LocalAiState {
         if (progress.state === 'done' || progress.state === 'cancelled') delete next[progress.id]
         return next
       })
+      // Also covers downloads started before this page was opened
+      if (progress.state === 'done') void refresh().catch(() => {})
     })
     const offStatus = window.tapwisper.on('localAi:status', (value: unknown) => {
       const next = value as SidecarStatus
@@ -57,15 +59,8 @@ export function useLocalAi(): LocalAiState {
     }
   }, [refresh])
 
-  const download = useCallback(
-    async (id: string) => {
-      const result = await window.tapwisper.localAi.download(id)
-      // Disk space and the installed list changed
-      await refresh()
-      return result
-    },
-    [refresh]
-  )
+  // The 'done' progress event refreshes the installed list
+  const download = useCallback((id: string) => window.tapwisper.localAi.download(id), [])
 
   const remove = useCallback(
     async (id: string) => {
