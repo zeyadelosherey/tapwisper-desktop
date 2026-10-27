@@ -527,7 +527,7 @@ function ProviderTile({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`relative flex flex-col items-center gap-2.5 rounded-2xl border px-3 py-4 text-center transition-[border-color,box-shadow,background-color] duration-200 ease-out ${
+      className={`relative flex flex-col items-center gap-2.5 rounded-xl border px-3 py-4 text-center transition-[border-color,box-shadow,background-color] duration-200 ease-out ${
         selected
           ? 'border-signal bg-signal-tint/40 ring-4 ring-signal/10'
           : 'border-hairline bg-raised hover:border-hairline-strong'
@@ -538,7 +538,7 @@ function ProviderTile({
           <Check className="h-3 w-3" strokeWidth={3} />
         </span>
       )}
-      <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl">
+      <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl">
         {logoImage ? (
           <img src={logoImage} alt="" className="h-9 w-9 rounded-xl object-contain" />
         ) : (
@@ -631,7 +631,7 @@ function ModelList({
           )
         })}
         {visible.length === 0 && (
-          <div className="px-4 py-6 text-center text-[13px] text-ink-muted">
+          <div className="px-3 py-4 text-center text-[13px] text-ink-muted">
             {t('settings.noModelsFound', 'No models found')}
           </div>
         )}
@@ -932,7 +932,7 @@ export function Settings({
     <>
       <Section title={t('mic.device', 'Microphone')}>
         <RowGroup>
-          <div className="px-5 py-4">
+          <div className="px-3.5 py-2.5">
             <MicrophonePicker
               deviceId={microphoneId}
               onChange={handleMicrophoneChange}
@@ -981,7 +981,7 @@ export function Settings({
       </Section>
 
       <Section title={t('nav.dictionary', 'Dictionary')}>
-        <div className="card flex items-center gap-4 px-5 py-4">
+        <div className="card flex items-center gap-4 px-3.5 py-2.5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-signal-tint text-signal">
             <BookA className="h-5 w-5" />
           </span>
@@ -1008,7 +1008,7 @@ export function Settings({
 
   const renderApiKeyField = (keyId: string, label: string, footnote?: string): JSX.Element => (
     <Section title={t('settings.apiKey', 'API Key')}>
-      <div className="card px-5 py-4">
+      <div className="card px-3.5 py-2.5">
         <label htmlFor={`api-key-${keyId}`} className="mb-2 block text-[13px] font-medium text-ink">
           {label}
         </label>
@@ -1059,7 +1059,7 @@ export function Settings({
 
     return (
       <>
-        <div className="mb-8">
+        <div className="mb-5">
           <Segmented<ProviderSubTab>
             label={t('settings.tabAIProvider', 'AI Provider')}
             value={providerSubTab}
@@ -1184,7 +1184,7 @@ export function Settings({
             ) : undefined
           }
         >
-          <div className="mb-4 flex justify-center rounded-2xl border border-hairline bg-panel px-6 py-8">
+          <div className="mb-4 flex justify-center rounded-xl border border-hairline bg-panel px-4 py-5">
             <ShortcutKeys accelerator={shortcut} size="lg" />
           </div>
           <ShortcutPicker value={shortcut} onSave={saveShortcut} />
@@ -1220,10 +1220,10 @@ export function Settings({
 
   const renderAboutTab = (): JSX.Element => (
     <>
-      <div className="card mb-10 flex items-center gap-5 px-6 py-6">
-        <img src={appLogo} alt="" className="h-16 w-16 rounded-2xl object-contain" />
+      <div className="card mb-6 flex items-center gap-3 px-4 py-4">
+        <img src={appLogo} alt="" className="h-12 w-12 rounded-xl object-contain" />
         <div className="min-w-0">
-          <p className="font-display text-[26px] leading-tight text-ink">{t('app.name')}</p>
+          <p className="font-display text-[20px] leading-tight text-ink">{t('app.name')}</p>
           <p className="mt-1 text-[13px] text-ink-muted">
             {t('app.tagline', 'Voice Dictation with AI')}
           </p>
@@ -1246,7 +1246,7 @@ export function Settings({
       </div>
 
       <Section title={t('settings.contact', 'Contact & Support')}>
-        <div className="card flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+        <div className="card flex flex-wrap items-center justify-between gap-4 px-3.5 py-2.5">
           <p className="max-w-[440px] text-[13px] leading-relaxed text-ink-muted">
             {t(
               'settings.contactDesc',

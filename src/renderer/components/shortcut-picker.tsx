@@ -84,7 +84,7 @@ export function ShortcutPicker({
               aria-checked={selected}
               disabled={saving !== null}
               onClick={() => !selected && choose(option.value)}
-              className={`group relative flex flex-col items-center gap-3 rounded-2xl border px-3 pb-3.5 pt-5 text-center transition-[border-color,box-shadow,background-color] duration-200 ease-out disabled:cursor-wait ${
+              className={`group relative flex flex-col items-center gap-3 rounded-xl border px-3 pb-3.5 pt-5 text-center transition-[border-color,box-shadow,background-color] duration-200 ease-out disabled:cursor-wait ${
                 selected
                   ? 'border-signal bg-signal-tint/40 ring-4 ring-signal/10'
                   : 'border-hairline bg-raised hover:border-hairline-strong'

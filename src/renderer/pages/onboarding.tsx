@@ -219,13 +219,13 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
     <div className="flex h-screen flex-col bg-canvas">
       {/* Top bar: brand, language. Draggable on frameless windows. */}
       <header
-        className={`drag-region flex h-14 shrink-0 items-center justify-between gap-4 ${
+        className={`drag-region flex h-11 shrink-0 items-center justify-between gap-3 ${
           brandBesideTrafficLights ? 'ps-[84px]' : 'ps-5'
         } ${OS === 'win32' ? 'pr-[150px] rtl:pl-5' : 'pe-4'}`}
       >
         <div className="flex min-w-0 items-center gap-2">
           <img src={appLogo} alt="" className="h-[22px] w-[22px] rounded-md object-contain" />
-          <span className="font-display text-[18px] leading-none text-ink">{t('app.name')}</span>
+          <span className="font-display text-[16px] leading-none text-ink">{t('app.name')}</span>
         </div>
         <label className="no-drag relative flex items-center">
           <span className="sr-only">{t('settings.language', 'Language')}</span>
@@ -248,7 +248,7 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
         <Stepper current={stepIndex} />
 
         <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div key={step} className="mx-auto w-full max-w-[680px] px-8 pb-12 pt-10 animate-rise">
+          <div key={step} className="mx-auto w-full max-w-[600px] px-6 pb-6 pt-5 animate-rise">
             {step === 'welcome' && <WelcomeStep shortcut={shortcut} />}
 
             {step === 'permissions' && (
@@ -260,7 +260,7 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
                 )}
               >
                 {!platform || !permissions ? (
-                  <div className="flex justify-center py-10 text-ink-faint">
+                  <div className="flex justify-center py-6 text-ink-faint">
                     <Spinner className="h-5 w-5" />
                   </div>
                 ) : (
@@ -334,7 +334,7 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
         </div>
 
         {/* Footer: Back / Skip / Continue */}
-        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-hairline px-6 py-4">
+        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-hairline px-4 py-2.5">
           <div>
             {stepIndex > 0 && (
               <button type="button" className="btn-ghost" onClick={back}>
@@ -386,9 +386,9 @@ function Stepper({ current }: { current: number }): JSX.Element {
   return (
     <nav
       aria-label={t('onboarding.progress', 'Setup progress')}
-      className="shrink-0 border-b border-hairline px-6 py-3.5"
+      className="shrink-0 border-b border-hairline px-4 py-2"
     >
-      <ol className="mx-auto flex max-w-[880px] items-center gap-2">
+      <ol className="mx-auto flex max-w-[780px] items-center gap-1.5">
         {STEPS.map((s, i) => {
           const done = i < current
           const active = i === current
@@ -399,7 +399,7 @@ function Stepper({ current }: { current: number }): JSX.Element {
               aria-current={active ? 'step' : undefined}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold tabular transition-colors duration-200 ${
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold tabular transition-colors duration-200 ${
                   active
                     ? 'border-signal bg-signal text-on-signal'
                     : done
@@ -407,10 +407,10 @@ function Stepper({ current }: { current: number }): JSX.Element {
                       : 'border-hairline-strong text-ink-faint'
                 }`}
               >
-                {done ? <Check className="h-3.5 w-3.5" strokeWidth={2.75} /> : i + 1}
+                {done ? <Check className="h-3 w-3" strokeWidth={2.75} /> : i + 1}
               </span>
               <span
-                className={`shrink-0 whitespace-nowrap text-[12.5px] ${
+                className={`shrink-0 whitespace-nowrap text-[12px] ${
                   active ? 'font-medium text-ink' : done ? 'text-ink-muted' : 'text-ink-faint'
                 }`}
               >
@@ -443,13 +443,13 @@ function StepIntro({
 }): JSX.Element {
   return (
     <>
-      <h1 className="page-title text-[32px]">{title}</h1>
+      <h1 className="page-title">{title}</h1>
       {description && (
-        <p className="mt-2.5 max-w-[560px] text-[14.5px] leading-relaxed text-ink-muted text-pretty">
+        <p className="mt-1 max-w-[540px] text-[13px] leading-snug text-ink-muted text-pretty">
           {description}
         </p>
       )}
-      <div className="mt-8">{children}</div>
+      <div className="mt-4">{children}</div>
     </>
   )
 }
@@ -457,14 +457,14 @@ function StepIntro({
 function WelcomeStep({ shortcut }: { shortcut: string }): JSX.Element {
   const { t } = useTranslation()
   return (
-    <div className="pt-4">
+    <div className="pt-1">
       <p className="section-label">{t('onboarding.welcomeEyebrow', 'Welcome to TapWisper')}</p>
-      <h1 className="hero-title mt-4 text-[44px] text-balance">
+      <h1 className="hero-title mt-1.5 text-balance">
         <Trans i18nKey="onboarding.welcomeTitle" components={{ em: <em /> }}>
           Say it once. It&apos;s <em>written</em> everywhere.
         </Trans>
       </h1>
-      <p className="mt-4 max-w-[520px] text-[15px] leading-relaxed text-ink-muted text-pretty">
+      <p className="mt-2 max-w-[500px] text-[13.5px] leading-snug text-ink-muted text-pretty">
         {t(
           'onboarding.welcomeBody',
           'Hold a key, talk naturally, let go — your words appear in whatever app you are typing in. Mixed languages included.'
@@ -472,12 +472,12 @@ function WelcomeStep({ shortcut }: { shortcut: string }): JSX.Element {
       </p>
 
       {/* Illustration: a key being held and text arriving on paper */}
-      <div className="relative mt-10 overflow-hidden rounded-2xl border border-hairline bg-panel px-7 py-7">
-        <div className="flex items-center gap-5">
+      <div className="relative mt-5 overflow-hidden rounded-xl border border-hairline bg-panel px-4 py-4">
+        <div className="flex items-center gap-3">
           <ShortcutKeys accelerator={shortcut} size="lg" pressed />
-          <WaveLine className="h-12 min-w-0 flex-1" />
+          <WaveLine className="h-9 min-w-0 flex-1" />
         </div>
-        <div className="mt-6 rounded-xl border border-hairline bg-raised px-5 py-4 shadow-[0_1px_2px_rgb(27_26_23/0.05)]">
+        <div className="mt-3 rounded-lg border border-hairline bg-raised px-3.5 py-2.5 text-[13px] shadow-[0_1px_2px_rgb(27_26_23/0.05)]">
           <p className="text-[14px] leading-relaxed text-ink" dir="auto">
             {t(
               'onboarding.welcomeSample',
@@ -514,12 +514,12 @@ function PermissionCard({
   const { t } = useTranslation()
   return (
     <div
-      className={`flex items-start gap-4 rounded-2xl border px-5 py-4 transition-colors duration-200 ${
+      className={`flex items-start gap-3 rounded-xl border px-3.5 py-2.5 transition-colors duration-200 ${
         granted ? 'border-success/30 bg-success-tint/40' : 'border-hairline bg-raised'
       }`}
     >
       <span
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
           granted ? 'bg-success-tint text-success' : 'bg-sunken text-ink-muted'
         }`}
       >
@@ -585,8 +585,8 @@ function MicrophoneStep({
       <div ref={containerRef}>
         <MicrophonePicker deviceId={deviceId} onChange={onDeviceChange} variant="large" active />
       </div>
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-hairline px-5 py-4">
-        <p className="font-display text-[18px] text-ink">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-hairline px-3.5 py-2.5">
+        <p className="font-display text-[15px] text-ink">
           {t('onboarding.micQuestion', 'Do the bars move when you speak?')}
         </p>
         <div className="flex gap-2">
@@ -628,9 +628,9 @@ function ShortcutStep({
         'Hold it while you talk and let go to insert the text. Tap it once to keep listening hands-free.'
       )}
     >
-      <div className="flex flex-col items-center rounded-2xl border border-hairline bg-panel px-6 pb-7 pt-9">
+      <div className="flex flex-col items-center rounded-xl border border-hairline bg-panel px-4 pb-3 pt-4">
         <ShortcutKeys accelerator={shortcut} size="lg" pressed={pressed} />
-        <p className="mt-6 text-center text-[14px] text-ink" aria-live="polite">
+        <p className="mt-3 text-center text-[13px] text-ink" aria-live="polite">
           {pressed ? (
             <span className="inline-flex items-center gap-2 font-medium text-signal">
               <span className="ember-dot" />
@@ -655,7 +655,7 @@ function ShortcutStep({
         )}
       </div>
 
-      <div className="mt-8">
+      <div className="mt-4">
         <h2 className="section-label mb-3 flex items-center gap-2">
           <Keyboard className="h-3.5 w-3.5" />
           {t('onboarding.shortcutChoose', 'Choose another key')}
@@ -708,22 +708,22 @@ function DoneStep({
   ]
 
   return (
-    <div className="pt-4">
+    <div className="pt-1">
       <p className="section-label">{t('onboarding.doneEyebrow', 'Setup complete')}</p>
-      <h1 className="hero-title mt-4 text-balance">
+      <h1 className="hero-title mt-1.5 text-balance">
         <Trans i18nKey="onboarding.doneTitle" components={{ em: <em /> }}>
           You&apos;re all set. Now just <em>talk</em>.
         </Trans>
       </h1>
-      <p className="mt-4 max-w-[520px] text-[15px] leading-relaxed text-ink-muted">
+      <p className="mt-2 max-w-[500px] text-[13.5px] leading-snug text-ink-muted">
         {t(
           'onboarding.doneBody',
           'Click into any text field, hold your key and speak. Everything you dictate is kept in your history on this device.'
         )}
       </p>
-      <dl className="mt-8 divide-y divide-hairline rounded-2xl border border-hairline">
+      <dl className="mt-4 divide-y divide-hairline rounded-xl border border-hairline">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-center gap-4 px-5 py-3.5">
+          <div key={row.label} className="flex items-center gap-3 px-3.5 py-2">
             <dt className="flex w-40 shrink-0 items-center gap-2.5 text-[13px] text-ink-muted">
               <span className="text-ink-soft">{row.icon}</span>
               {row.label}

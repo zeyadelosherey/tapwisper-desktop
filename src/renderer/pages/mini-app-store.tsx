@@ -341,7 +341,7 @@ export function MiniAppStore(): JSX.Element {
       <PageHeader title={t('miniApps.title')} description={t('miniApps.subtitle')} />
 
       {/* Honest description of where these templates come from */}
-      <div className="flex items-start gap-3 p-3 mb-6 rounded-xl bg-theme-surface/30 border border-theme-border/30">
+      <div className="flex items-start gap-3 p-3 mb-4 rounded-xl bg-theme-surface/30 border border-theme-border/30">
         <Library className="w-4 h-4 text-theme-text-secondary shrink-0 mt-0.5" aria-hidden="true" />
         <div>
           <h2 className="text-sm font-medium text-theme-text">
@@ -364,7 +364,7 @@ export function MiniAppStore(): JSX.Element {
       )}
 
       {/* Search */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-theme-card rounded-xl border border-theme-border/50 mb-6">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-theme-card rounded-xl border border-theme-border/50 mb-4">
         <Search className="w-4 h-4 text-theme-text-muted" />
         <input
           type="text"
@@ -377,7 +377,7 @@ export function MiniAppStore(): JSX.Element {
       </div>
 
       {/* Category Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
         <button
           onClick={() => setSelectedCategory(null)}
           aria-pressed={!selectedCategory}
@@ -475,7 +475,7 @@ export function MiniAppStore(): JSX.Element {
       </div>
 
       {filteredPrompts.length === 0 && (
-        <div className="text-center py-12">
+        <div className="text-center py-6">
           <p className="text-theme-text-muted text-sm">{t('miniApps.noPrompts', 'No prompts found')}</p>
         </div>
       )}

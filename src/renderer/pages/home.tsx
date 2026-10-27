@@ -150,18 +150,18 @@ export function Home(): JSX.Element {
       {/* ── Hero ─────────────────────────────────────────── */}
       <section className="relative animate-rise">
         <p className="section-label">{longDate(i18n.language)}</p>
-        <h1 className="hero-title mt-3 max-w-[620px] text-balance">
+        <h1 className="hero-title mt-1 max-w-[620px] text-balance">
           <Trans i18nKey="home.hero" components={{ em: <em /> }}>
             Say it, and it&apos;s <em>on the page</em>.
           </Trans>
         </h1>
-        <p className="mt-5 text-[14.5px] leading-[2] text-ink-muted">
+        <p className="mt-2 text-[13px] leading-[1.9] text-ink-muted">
           {hintParts[0]}
           <ShortcutKeys accelerator={shortcut} size="sm" className="-translate-y-px" />
           {hintParts[1]}
         </p>
         <WaveLine
-          className="pointer-events-none absolute -top-2 end-0 hidden h-16 w-48 opacity-70 lg:block"
+          className="pointer-events-none absolute -top-1 end-0 hidden h-10 w-36 opacity-60 lg:block"
           strokeWidth={1.4}
         />
       </section>
@@ -169,7 +169,7 @@ export function Home(): JSX.Element {
       {/* ── Stats rail ───────────────────────────────────── */}
       <section
         aria-label={t('home.statsLabel', 'Your stats')}
-        className="card mt-9 grid grid-cols-2 overflow-hidden md:grid-cols-4 animate-rise [animation-delay:60ms]"
+        className="card mt-4 grid grid-cols-2 overflow-hidden md:grid-cols-4 animate-rise [animation-delay:60ms]"
       >
         <Stat
           label={t('home.statWords', 'Words dictated')}
@@ -236,13 +236,13 @@ function Stat({
   srHint?: string
 }): JSX.Element {
   return (
-    <div className="border-hairline px-5 py-4 [&:not(:first-child)]:border-s max-md:[&:nth-child(3)]:border-s-0 max-md:[&:nth-child(n+3)]:border-t">
+    <div className="border-hairline px-3.5 py-2.5 [&:not(:first-child)]:border-s max-md:[&:nth-child(3)]:border-s-0 max-md:[&:nth-child(n+3)]:border-t">
       <p className="section-label">{label}</p>
-      <p className="mt-2 flex items-baseline gap-1.5">
-        <span className="font-display text-[30px] leading-none text-ink tabular">{value}</span>
+      <p className="mt-1 flex items-baseline gap-1">
+        <span className="font-display text-[21px] leading-none text-ink tabular">{value}</span>
         {unit && <span className="text-[12px] text-ink-muted">{unit}</span>}
       </p>
-      <div className="mt-2 text-[11.5px] text-ink-soft">{hint}</div>
+      <div className="mt-1 text-[11px] text-ink-soft">{hint}</div>
       {srHint && <span className="sr-only">{srHint}</span>}
     </div>
   )
@@ -434,10 +434,10 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
   ).split(SLOT)
 
   return (
-    <section className="mt-12" aria-labelledby="history-title">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+    <section className="mt-6" aria-labelledby="history-title">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
         <div className="flex items-baseline gap-3">
-          <h2 id="history-title" className="font-display text-[24px] leading-none text-ink">
+          <h2 id="history-title" className="font-display text-[18px] leading-none text-ink">
             {t('home.historyTitle', 'History')}
           </h2>
           {totalCount > 0 && (
@@ -447,7 +447,7 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
           )}
         </div>
         {totalCount > 0 && (
-          <div className="relative w-72 max-w-full">
+          <div className="relative w-60 max-w-full">
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
             <input
               type="text"
@@ -478,15 +478,15 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
       )}
 
       {!items ? (
-        <div className="flex justify-center py-12 text-ink-faint">
+        <div className="flex justify-center py-6 text-ink-faint">
           <Spinner className="h-5 w-5" />
         </div>
       ) : totalCount === 0 && !debouncedSearch ? (
-        <div className="relative overflow-hidden rounded-2xl border border-dashed border-hairline-strong px-8 py-12 text-center">
+        <div className="relative overflow-hidden rounded-2xl border border-dashed border-hairline-strong px-6 py-6 text-center">
           <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-signal-tint text-signal">
             <HistoryIcon className="h-5 w-5" />
           </span>
-          <p className="font-display mt-4 text-[22px] text-ink">
+          <p className="font-display mt-2 text-[17px] text-ink">
             {t('home.emptyTitle', 'Your history starts with one sentence.')}
           </p>
           <p className="mx-auto mt-3 max-w-[460px] text-[13.5px] leading-[2] text-ink-muted text-balance">
@@ -496,7 +496,7 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
           </p>
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-hairline px-6 py-10 text-center">
+        <div className="rounded-xl border border-hairline px-5 py-6 text-center">
           <p className="text-[14px] font-medium text-ink">
             {t('home.noResults', 'No results found')}
           </p>
@@ -505,14 +505,14 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
           </p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-3">
           {groups.map((group) => (
             <div key={group.label}>
-              <h3 className="section-label mb-2 flex items-center gap-3">
+              <h3 className="section-label mb-0.5 flex items-center gap-2">
                 {group.label}
                 <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
               </h3>
-              <ul className="-mx-3">
+              <ul className="-mx-2">
                 {group.records.map((record) => (
                   <HistoryRow
                     key={record.id}
@@ -589,17 +589,17 @@ function HistoryRow({
   const edited = !!record.rawTranscription && record.rawTranscription !== record.transcription
 
   return (
-    <li className="group relative flex gap-4 rounded-xl px-3 py-3 transition-colors duration-200 hover:bg-panel focus-within:bg-panel">
+    <li className="group relative flex gap-3 rounded-lg px-2 py-1.5 transition-colors duration-200 hover:bg-panel focus-within:bg-panel">
       <time
         dateTime={new Date(record.timestamp).toISOString()}
-        className="w-[60px] shrink-0 pt-[3px] text-[12px] text-ink-soft tabular"
+        className="w-[54px] shrink-0 pt-[2px] text-[11px] text-ink-soft tabular"
       >
         {formatTime(record.timestamp)}
       </time>
 
       <div className="min-w-0 flex-1">
         {isAi && (
-          <p className="mb-1.5 flex min-w-0 items-center gap-2 text-[12px] text-ink-muted">
+          <p className="mb-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-muted">
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-signal-tint px-1.5 py-0.5 text-[11px] font-medium text-signal">
               <Sparkles className="h-3 w-3" />
               {record.llmAction ? displayActionName(t, record.llmAction) : t('home.aiAction', 'AI')}
@@ -614,7 +614,7 @@ function HistoryRow({
 
         {failed ? (
           <div className="flex flex-wrap items-center gap-3">
-            <p className="flex items-center gap-2 text-[14px] font-medium text-danger">
+            <p className="flex items-center gap-1.5 text-[13px] font-medium text-danger">
               <AlertTriangle className="h-4 w-4" />
               {t('home.failedTitle', 'Couldn’t transcribe')}
             </p>
@@ -641,7 +641,7 @@ function HistoryRow({
         ) : (
           <p
             dir="auto"
-            className={`whitespace-pre-wrap break-words text-left rtl:text-right text-[14.5px] leading-relaxed text-ink text-pretty ${
+            className={`whitespace-pre-wrap break-words text-left rtl:text-right text-[13px] leading-snug text-ink text-pretty ${
               long && !expanded ? 'line-clamp-3' : ''
             }`}
           >
@@ -651,7 +651,7 @@ function HistoryRow({
 
         {/* Meta */}
         {(record.appName || edited || long || isAi) && !failed && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <div className="mt-1 flex flex-wrap items-center gap-1">
             {record.appName && (
               <span
                 className="chip"
@@ -701,7 +701,7 @@ function HistoryRow({
         )}
 
         {showRaw && (
-          <div className="mt-2 rounded-lg border border-hairline bg-sunken/60 px-3 py-2.5 dark:bg-sunken">
+          <div className="mt-1 rounded-md border border-hairline bg-sunken/60 px-2.5 py-1.5 dark:bg-sunken">
             <p className="section-label mb-1">
               {isAi
                 ? t('home.originalInput', 'Original text')

@@ -140,12 +140,12 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
         role="dialog"
         aria-modal="true"
         aria-labelledby="trigger-modal-title"
-        className="shadow-pop bg-raised border border-hairline rounded-2xl w-[600px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col overflow-hidden animate-scale-up"
+        className="shadow-pop bg-raised border border-hairline rounded-xl w-[600px] max-w-[calc(100vw-32px)] max-h-[85vh] flex flex-col overflow-hidden animate-scale-up"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-theme-border/40">
           <div>
-            <h2 id="trigger-modal-title" className="font-display text-[22px] leading-tight text-ink">
+            <h2 id="trigger-modal-title" className="font-display text-[16px] leading-tight text-ink">
               {isEditing
                 ? t('triggerModal.editTitle', 'Edit Trigger')
                 : t('triggerModal.newTitle', 'New Trigger')}
@@ -170,7 +170,7 @@ export function TriggerModal({ trigger, onSave, onClose }: TriggerModalProps): J
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-4 py-3">
           {step === 'action-type' && (
             <ActionTypeStep
               selected={actionType}
@@ -400,7 +400,7 @@ function TriggerPhraseStep({
   const phrase = triggerPhrase.trim() || t('triggerModal.phraseWord', 'phrase')
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Example usage */}
       {triggerType === 'prefix' && (
         <div className="bg-theme-surface/30 rounded-xl p-4">
@@ -567,7 +567,7 @@ function WebSearchConfigForm({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* How it works */}
       <div className="bg-theme-surface/30 rounded-xl p-4">
         <p className="text-xs font-medium text-theme-text-muted mb-1">
@@ -717,7 +717,7 @@ function AIChatConfigForm({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* AI Provider */}
       <div>
         <SectionLabel>{t('triggerModal.aiProvider', 'AI Provider')}</SectionLabel>
@@ -831,7 +831,7 @@ function TerminalConfigForm({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Execution Mode */}
       <div>
         <SectionLabel>{t('triggerModal.executionMode', 'Execution Mode')}</SectionLabel>
@@ -972,7 +972,7 @@ function KeyboardConfigForm({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div>
         <SectionLabel>{t('triggerModal.keyboardShortcut', 'Keyboard Shortcut')}</SectionLabel>
         <p className="text-xs text-theme-text-muted mb-2">
@@ -1035,7 +1035,7 @@ function AppleShortcutConfigForm({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div>
         <SectionLabel>{actionTypeLabel(t, 'apple-shortcut')}</SectionLabel>
         <p className="text-xs text-theme-text-muted mb-2">
@@ -1255,7 +1255,7 @@ function WindowConfigForm({
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* How it works */}
       <div className="bg-theme-surface/30 rounded-xl p-4">
         <p className="text-xs font-medium text-theme-text-muted mb-1">
@@ -1330,7 +1330,7 @@ function LaunchAppConfigForm({
   )
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div>
         <SectionLabel>{t('triggerModal.application', 'Application')}</SectionLabel>
         <p className="text-xs text-theme-text-muted mb-2">

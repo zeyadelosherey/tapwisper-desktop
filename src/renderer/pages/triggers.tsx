@@ -192,11 +192,11 @@ export function Triggers(): JSX.Element {
 
       {/* Triggers List */}
       {triggers.length === 0 ? (
-        <div className="flex flex-col items-center rounded-2xl border border-dashed border-hairline-strong px-6 py-14 text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-signal-tint text-signal">
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-hairline-strong px-5 py-7 text-center">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal-tint text-signal">
             <AudioLines className="h-5 w-5" />
           </span>
-          <p className="font-display mt-4 text-[20px] text-ink">
+          <p className="font-display mt-4 text-[16px] text-ink">
             {t('triggers.noTriggers', 'No triggers yet')}
           </p>
           <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-ink-muted">
@@ -214,7 +214,7 @@ export function Triggers(): JSX.Element {
           {triggers.map((trigger) => (
             <div
               key={trigger.id}
-              className={`group flex items-center gap-4 px-5 py-4 transition-colors duration-200 hover:bg-panel ${
+              className={`group flex items-center gap-4 px-3.5 py-2.5 transition-colors duration-200 hover:bg-panel ${
                 trigger.enabled ? '' : 'opacity-60'
               }`}
             >

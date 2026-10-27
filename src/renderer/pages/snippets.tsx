@@ -118,7 +118,7 @@ export function Snippets(): JSX.Element {
 
   const renderForm = (): JSX.Element => (
     <form
-      className="card p-5"
+      className="card p-3.5"
       onSubmit={(e) => {
         e.preventDefault()
         saveDraft()
@@ -210,8 +210,8 @@ export function Snippets(): JSX.Element {
       />
 
       {/* How triggers are spoken */}
-      <div className="mb-8 grid gap-3 md:grid-cols-2">
-        <div className="well flex items-start gap-3 px-4 py-3.5">
+      <div className="mb-5 grid gap-3 md:grid-cols-2">
+        <div className="well flex items-start gap-3 px-3 py-2.5">
           <span className="chip shrink-0 !bg-signal-tint !text-signal !border-signal/20">/sig</span>
           <p className="text-[12.5px] leading-relaxed text-ink-muted">
             {t(
@@ -220,7 +220,7 @@ export function Snippets(): JSX.Element {
             )}
           </p>
         </div>
-        <div className="well flex items-start gap-3 px-4 py-3.5">
+        <div className="well flex items-start gap-3 px-3 py-2.5">
           <span className="chip shrink-0">{t('snippets.phraseExample', 'my calendar link')}</span>
           <p className="text-[12.5px] leading-relaxed text-ink-muted">
             {t('snippets.phraseExplainer', 'Or use a plain phrase and simply say it.')}
@@ -228,14 +228,14 @@ export function Snippets(): JSX.Element {
         </div>
       </div>
 
-      {mode?.kind === 'new' && <div className="mb-6">{renderForm()}</div>}
+      {mode?.kind === 'new' && <div className="mb-4">{renderForm()}</div>}
 
       {snippets.length === 0 && mode === null ? (
-        <div className="flex flex-col items-center rounded-2xl border border-dashed border-hairline-strong px-6 py-14 text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-signal-tint text-signal">
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-hairline-strong px-5 py-7 text-center">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal-tint text-signal">
             <TextQuote className="h-5 w-5" />
           </span>
-          <p className="font-display mt-4 text-[20px] text-ink">
+          <p className="font-display mt-4 text-[16px] text-ink">
             {t('snippets.noSnippets', 'No snippets yet')}
           </p>
           <p className="mt-1.5 max-w-[380px] text-[13px] leading-relaxed text-ink-muted">
@@ -257,7 +257,7 @@ export function Snippets(): JSX.Element {
               ) : (
                 <li
                   key={snippet.id}
-                  className="group flex items-center gap-4 px-5 py-3.5 transition-colors duration-200 hover:bg-panel"
+                  className="group flex items-center gap-4 px-3.5 py-2 transition-colors duration-200 hover:bg-panel"
                 >
                   <div className="w-48 shrink-0">
                     <span

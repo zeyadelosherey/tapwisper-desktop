@@ -486,7 +486,7 @@ export function ActionsConfig(): JSX.Element {
       />
 
       {/* Toolbar Preview */}
-      <section className="mb-8">
+      <section className="mb-5">
         <h2 className="section-label mb-3">{t('actions.toolbarPreview')}</h2>
         <div className="flex gap-2 p-4 bg-theme-card rounded-xl border border-theme-border/50 overflow-x-auto">
           {sortedCategories
@@ -508,7 +508,7 @@ export function ActionsConfig(): JSX.Element {
       </section>
 
       {/* Categories List */}
-      <section className="mb-6">
+      <section className="mb-4">
         <h2 className="section-label mb-3">{t('actions.categories', 'Categories')}</h2>
         <ul>
           {sortedCategories.map((category, index) => {

@@ -13,7 +13,7 @@ interface PageProps {
 export function Page({ children, width = 'normal', className = '' }: PageProps): JSX.Element {
   const max =
     width === 'narrow' ? 'max-w-[720px]' : width === 'wide' ? 'max-w-[1040px]' : 'max-w-[860px]'
-  return <div className={`mx-auto w-full ${max} px-10 pt-10 pb-16 ${className}`}>{children}</div>
+  return <div className={`mx-auto w-full ${max} px-6 pt-5 pb-8 ${className}`}>{children}</div>
 }
 
 interface PageHeaderProps {
@@ -25,12 +25,12 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, eyebrow, actions }: PageHeaderProps): JSX.Element {
   return (
-    <header className="mb-8 flex items-end justify-between gap-6 animate-rise">
+    <header className="mb-4 flex items-end justify-between gap-4 animate-rise">
       <div className="min-w-0">
-        {eyebrow && <p className="section-label mb-2">{eyebrow}</p>}
+        {eyebrow && <p className="section-label mb-1">{eyebrow}</p>}
         <h1 className="page-title">{title}</h1>
         {description && (
-          <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-ink-muted text-pretty">
+          <p className="mt-1 max-w-[560px] text-[13px] leading-snug text-ink-muted text-pretty">
             {description}
           </p>
         )}
@@ -57,13 +57,13 @@ export function Section({
   className = ''
 }: SectionProps): JSX.Element {
   return (
-    <section className={`mb-10 ${className}`}>
+    <section className={`mb-5 ${className}`}>
       {(title || action) && (
-        <div className="mb-3 flex items-end justify-between gap-4">
+        <div className="mb-1.5 flex items-end justify-between gap-3">
           <div className="min-w-0">
             {title && <h2 className="section-label">{title}</h2>}
             {description && (
-              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{description}</p>
+              <p className="mt-0.5 text-[12px] leading-snug text-ink-muted">{description}</p>
             )}
           </div>
           {action}
@@ -98,18 +98,18 @@ interface RowProps {
 /** One setting: label + help on the start side, control on the end side */
 export function Row({ title, description, control, children, htmlFor }: RowProps): JSX.Element {
   return (
-    <div className="px-5 py-4">
-      <div className="flex items-center justify-between gap-6">
+    <div className="px-3.5 py-2.5">
+      <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           {htmlFor ? (
-            <label htmlFor={htmlFor} className="text-[14px] font-medium text-ink">
+            <label htmlFor={htmlFor} className="text-[13px] font-medium text-ink">
               {title}
             </label>
           ) : (
-            <p className="text-[14px] font-medium text-ink">{title}</p>
+            <p className="text-[13px] font-medium text-ink">{title}</p>
           )}
           {description && (
-            <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted text-pretty">
+            <p className="mt-0.5 text-[12px] leading-snug text-ink-muted text-pretty">
               {description}
             </p>
           )}
@@ -139,13 +139,13 @@ export function Switch({ checked, onChange, label, disabled }: SwitchProps): JSX
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-[24px] w-[42px] shrink-0 items-center rounded-full border transition-colors duration-200 ease-out disabled:opacity-45 ${
+      className={`relative inline-flex h-[20px] w-[34px] shrink-0 items-center rounded-full border transition-colors duration-200 ease-out disabled:opacity-45 ${
         checked ? 'border-signal bg-signal' : 'border-hairline-strong bg-sunken'
       }`}
     >
       <span
-        className={`absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white shadow-[0_1px_3px_rgb(0_0_0/0.25)] transition-[inset-inline-start] duration-200 ease-out ${
-          checked ? 'start-[20px]' : 'start-[2px]'
+        className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-[0_1px_3px_rgb(0_0_0/0.25)] transition-[inset-inline-start] duration-200 ease-out ${
+          checked ? 'start-[16px]' : 'start-[2px]'
         }`}
       />
     </button>
@@ -181,7 +181,7 @@ export function Segmented<T extends string>({
             role="radio"
             aria-checked={active}
             onClick={() => onChange(o.value)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] px-3 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-out ${
+            className={`inline-flex h-7 items-center gap-1.5 rounded-[8px] px-2.5 text-[12.5px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-out ${
               active
                 ? 'bg-raised text-ink shadow-[0_1px_2px_rgb(27_26_23/0.12)]'
                 : 'text-ink-muted hover:text-ink'
@@ -224,7 +224,7 @@ export function Callout({
   }
   return (
     <div
-      className={`flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-[12.5px] leading-relaxed ${tones[tone]}`}
+      className={`flex items-start gap-2.5 rounded-lg border px-3 py-2 text-[12px] leading-snug ${tones[tone]}`}
     >
       {icon && <span className="mt-px shrink-0 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>}
       <div className="min-w-0 flex-1">{children}</div>

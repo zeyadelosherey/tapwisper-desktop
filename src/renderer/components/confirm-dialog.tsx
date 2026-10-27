@@ -87,7 +87,7 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={message ? messageId : undefined}
         onKeyDown={handleKeyDown}
-        className="shadow-pop w-full max-w-[400px] rounded-2xl border border-hairline bg-raised p-6 animate-scale-up"
+        className="shadow-pop w-full max-w-[400px] rounded-xl border border-hairline bg-raised p-4 animate-scale-up"
       >
         <div className="flex items-start gap-4">
           {destructive && (
@@ -96,7 +96,7 @@ export function ConfirmDialog({
             </div>
           )}
           <div className="flex-1 min-w-0 text-start">
-            <h2 id={titleId} className="font-display text-[20px] leading-snug text-ink">
+            <h2 id={titleId} className="font-display text-[16px] leading-snug text-ink">
               {title}
             </h2>
             {message && (
@@ -109,7 +109,7 @@ export function ConfirmDialog({
             )}
           </div>
         </div>
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-4 flex justify-end gap-2">
           <button ref={cancelRef} type="button" onClick={onCancel} className="btn-secondary">
             {cancelLabel ?? t('common.cancel', 'Cancel')}
           </button>

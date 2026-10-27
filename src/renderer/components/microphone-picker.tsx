@@ -145,7 +145,7 @@ function MicrophonePickerInner({
         {select}
       </div>
       {bluetoothWarning}
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-hairline bg-panel px-6 py-7">
+      <div className="flex flex-col items-center justify-center rounded-xl border border-hairline bg-panel px-6 py-7">
         <LevelBars levels={levels} height={72} barWidth={6} gap={5} idle={!!error || !active} />
         <p className="mt-4 flex items-center gap-2 text-[12.5px] text-ink-muted" aria-live="polite">
           {error ? (

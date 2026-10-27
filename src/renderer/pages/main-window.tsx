@@ -86,7 +86,7 @@ function NavButton({
       type="button"
       onClick={() => onSelect(item.id)}
       aria-current={active ? 'page' : undefined}
-      className={`group flex h-9 w-full items-center gap-3 rounded-[10px] border px-3 text-[13.5px] transition-[background-color,color,border-color] duration-200 ease-out ${
+      className={`group flex h-8 w-full items-center gap-2.5 rounded-[9px] border px-2.5 text-[13px] transition-[background-color,color,border-color] duration-200 ease-out ${
         active
           ? 'border-hairline bg-raised font-medium text-ink shadow-[0_1px_2px_rgb(27_26_23/0.06)]'
           : 'border-transparent text-ink-muted hover:bg-ink/[0.045] hover:text-ink'
@@ -221,19 +221,19 @@ export function MainWindow(): JSX.Element {
 
       <div className="flex min-h-0 flex-1">
         {/* ── Sidebar ─────────────────────────────────────── */}
-        <aside className="flex w-[232px] shrink-0 flex-col">
+        <aside className="flex w-[208px] shrink-0 flex-col">
           <div
             className={`drag-region flex shrink-0 items-center ${
-              IS_MAC ? 'h-[52px]' : 'h-14'
-            } ${brandBesideTrafficLights ? 'ps-[84px]' : 'ps-5'} pe-4`}
+              IS_MAC ? 'h-[46px]' : 'h-11'
+            } ${brandBesideTrafficLights ? 'ps-[76px]' : 'ps-4'} pe-2`}
           >
             <div className="flex min-w-0 items-center gap-2">
               <img
                 src={appLogo}
                 alt=""
-                className="h-[22px] w-[22px] shrink-0 rounded-md object-contain"
+                className="h-[18px] w-[18px] shrink-0 rounded-md object-contain"
               />
-              <span className="font-display truncate text-[18px] leading-none text-ink">
+              <span className="font-display truncate text-[16px] leading-none text-ink">
                 {t('app.name')}
               </span>
             </div>
@@ -241,7 +241,7 @@ export function MainWindow(): JSX.Element {
 
           <nav
             aria-label={t('nav.label', 'Main')}
-            className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-3 pb-3 pt-3"
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-2 pb-2 pt-1.5"
           >
             <div className="space-y-0.5">
               {MAIN_NAV.map((item) => (
@@ -255,7 +255,7 @@ export function MainWindow(): JSX.Element {
             </div>
 
             <div className="space-y-0.5">
-              <p className="section-label px-3 pb-1.5">{t('nav.automations', 'Automations')}</p>
+              <p className="section-label px-2.5 pb-1">{t('nav.automations', 'Automations')}</p>
               {AUTOMATION_NAV.map((item) => (
                 <NavButton
                   key={item.id}
@@ -266,12 +266,12 @@ export function MainWindow(): JSX.Element {
               ))}
             </div>
 
-            <div className="mt-auto space-y-3">
-              <div className="rounded-xl border border-hairline/80 bg-raised/60 px-3 py-3">
+            <div className="mt-auto space-y-2">
+              <div className="rounded-lg border border-hairline/80 bg-raised/60 px-2.5 py-2">
                 <p className="text-[11.5px] leading-snug text-ink-muted">
                   {t('nav.shortcutHint', 'Hold to dictate in any app')}
                 </p>
-                <ShortcutKeys accelerator={shortcut} size="sm" className="mt-2 flex-wrap" />
+                <ShortcutKeys accelerator={shortcut} size="sm" className="mt-1.5 flex-wrap" />
               </div>
               <NavButton
                 item={{ id: 'settings', labelKey: 'nav.settings', icon: SettingsIcon }}
@@ -279,7 +279,7 @@ export function MainWindow(): JSX.Element {
                 onSelect={selectPage}
               />
               {appVersion && (
-                <p className="px-3 text-[11px] text-ink-faint tabular">
+                <p className="px-2.5 text-[10.5px] text-ink-faint tabular">
                   {t('nav.version', 'Version {{version}}', { version: appVersion })}
                 </p>
               )}

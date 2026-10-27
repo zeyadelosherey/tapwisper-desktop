@@ -254,9 +254,9 @@ export function Notes(): JSX.Element {
       <PageHeader title={t('notes.title')} description={t('notes.subtitle')} />
 
       {/* Record Button */}
-      <div className="mb-6">
+      <div className="mb-4">
         {isRecording ? (
-          <div className="card flex items-center gap-4 border-ember/30 px-5 py-4">
+          <div className="card flex items-center gap-4 border-ember/30 px-3.5 py-2.5">
             <div className="flex flex-1 items-center gap-4">
               <span className="ember-dot animate-live-pulse" aria-hidden="true" />
               <div className="flex-1">
@@ -297,7 +297,7 @@ export function Notes(): JSX.Element {
             </button>
           </div>
         ) : isTranscribing ? (
-          <div role="status" className="card flex items-center gap-4 px-5 py-4">
+          <div role="status" className="card flex items-center gap-4 px-3.5 py-2.5">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-signal-tint text-signal">
               <Spinner className="h-4 w-4" />
             </span>
@@ -308,7 +308,7 @@ export function Notes(): JSX.Element {
         ) : (
           <button
             onClick={handleStartRecording}
-            className="card group flex w-full items-center gap-4 px-5 py-4 transition-[border-color,box-shadow] duration-200 ease-out hover:border-signal/40 hover:shadow-[0_0_0_4px_rgb(var(--signal)/0.08)]"
+            className="card group flex w-full items-center gap-4 px-3.5 py-2.5 transition-[border-color,box-shadow] duration-200 ease-out hover:border-signal/40 hover:shadow-[0_0_0_4px_rgb(var(--signal)/0.08)]"
           >
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-signal-tint text-signal transition-colors duration-200 group-hover:bg-signal group-hover:text-on-signal">
               <Mic className="h-[18px] w-[18px]" />
@@ -376,11 +376,11 @@ export function Notes(): JSX.Element {
       {/* Notes List */}
       <div>
         {notes.length === 0 ? (
-          <div className="flex flex-col items-center rounded-2xl border border-dashed border-hairline-strong px-6 py-14 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-signal-tint text-signal">
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-hairline-strong px-5 py-7 text-center">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal-tint text-signal">
               <NotebookPen className="h-5 w-5" />
             </span>
-            <p className="font-display mt-4 text-[20px] text-ink">{t('notes.noNotes')}</p>
+            <p className="font-display mt-4 text-[16px] text-ink">{t('notes.noNotes')}</p>
             <p className="mt-1.5 text-[13px] text-ink-muted">{t('notes.noNotesHint')}</p>
           </div>
         ) : (
@@ -440,7 +440,7 @@ export function Notes(): JSX.Element {
               ) : (
                 <div
                   key={note.id}
-                  className="card group px-5 py-4 transition-colors duration-200 hover:border-hairline-strong"
+                  className="card group px-3.5 py-2.5 transition-colors duration-200 hover:border-hairline-strong"
                 >
                   <div className="flex items-start gap-3">
                     {note.isVoice && (
@@ -452,7 +452,7 @@ export function Notes(): JSX.Element {
                       {note.title && (
                         <p
                           dir="auto"
-                          className="font-display mb-1 break-words text-[18px] leading-snug text-ink"
+                          className="font-display mb-1 break-words text-[15px] leading-snug text-ink"
                         >
                           {note.title}
                         </p>

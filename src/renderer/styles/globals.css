@@ -239,15 +239,15 @@
   }
 
   .hero-title {
-    @apply font-display text-[42px] leading-[1.08] text-ink;
+    @apply font-display text-[30px] leading-[1.12] text-ink;
   }
 
   .page-title {
-    @apply font-display text-[28px] leading-tight text-ink;
+    @apply font-display text-[22px] leading-tight text-ink;
   }
 
   .section-label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft;
+    @apply text-[10.5px] font-semibold uppercase tracking-[0.11em] text-ink-soft;
   }
 
   [dir='rtl'] .section-label {
@@ -257,17 +257,17 @@
   /* ── Buttons ────────────────────────────────────────────────── */
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 h-9 px-4 rounded-[10px] text-[13px] font-medium
+    @apply inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-[9px] text-[13px] font-medium
       whitespace-nowrap select-none transition-[background-color,color,box-shadow,border-color,transform] duration-200 ease-out
       disabled:opacity-45 disabled:pointer-events-none active:translate-y-px;
   }
 
   .btn-sm {
-    @apply h-8 px-3 text-xs rounded-lg;
+    @apply h-7 px-2.5 text-xs rounded-lg;
   }
 
   .btn-lg {
-    @apply h-11 px-6 text-sm rounded-xl;
+    @apply h-9 px-4 text-[13px] rounded-[10px];
   }
 
   /* Signal: the one loud button on a screen */
@@ -297,14 +297,14 @@
   }
 
   .icon-btn {
-    @apply inline-flex items-center justify-center w-8 h-8 rounded-lg text-ink-soft
+    @apply inline-flex items-center justify-center w-7 h-7 rounded-lg text-ink-soft
       transition-colors duration-200 ease-out hover:text-ink hover:bg-hover disabled:opacity-40 disabled:pointer-events-none;
   }
 
   /* ── Fields ─────────────────────────────────────────────────── */
 
   .field {
-    @apply w-full h-10 px-3 rounded-[10px] bg-raised border border-hairline text-sm text-ink
+    @apply w-full h-8 px-2.5 rounded-[9px] bg-raised border border-hairline text-[13px] text-ink
       transition-[border-color,box-shadow] duration-200 ease-out
       hover:border-hairline-strong focus:outline-none focus:border-signal focus:ring-4 focus:ring-signal/15;
   }
@@ -314,7 +314,7 @@
   }
 
   textarea.field {
-    @apply h-auto py-2.5 leading-relaxed;
+    @apply h-auto py-2 leading-relaxed;
   }
 
   select.field {
@@ -335,7 +335,7 @@
   }
 
   .card {
-    @apply bg-raised border border-hairline rounded-2xl;
+    @apply bg-raised border border-hairline rounded-xl;
   }
 
   .well {
@@ -347,7 +347,7 @@
   }
 
   .chip {
-    @apply inline-flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium bg-sunken text-ink-muted border border-hairline/70;
+    @apply inline-flex items-center gap-1 h-5 px-1.5 rounded-md text-[10.5px] font-medium bg-sunken text-ink-muted border border-hairline/70;
   }
 
   .dark .chip {

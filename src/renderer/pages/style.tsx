@@ -105,12 +105,12 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
 
       {/* Smart Formatting */}
       <div className="card overflow-hidden">
-        <div className="flex items-start gap-4 px-6 py-5">
+        <div className="flex items-start gap-4 px-4 py-3">
           <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-signal-tint text-signal">
             <WandSparkles className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="font-display text-[20px] leading-tight text-ink">
+            <p className="font-display text-[16px] leading-tight text-ink">
               {t('style.smartFormatting', 'Smart Formatting')}
             </p>
             <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted text-pretty">
@@ -127,7 +127,7 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
           />
         </div>
         {!hasKey && (
-          <div className="border-t border-hairline bg-panel px-6 py-3.5">
+          <div className="border-t border-hairline bg-panel px-4 py-2.5">
             <Callout tone="warning" icon={<AlertTriangle />}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span>
@@ -153,7 +153,7 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
       </div>
 
       {/* Per-category tone */}
-      <section className="mt-10" aria-disabled={!enabled}>
+      <section className="mt-6" aria-disabled={!enabled}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h2 className="section-label">{t('style.tonesLabel', 'Tone by app')}</h2>
@@ -216,7 +216,7 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
                 aria-checked={selected}
                 disabled={!enabled}
                 onClick={() => chooseTone(tone)}
-                className={`relative flex flex-col rounded-2xl border p-4 text-start transition-[border-color,box-shadow,background-color] duration-200 ease-out disabled:cursor-not-allowed ${
+                className={`relative flex flex-col rounded-xl border p-4 text-start transition-[border-color,box-shadow,background-color] duration-200 ease-out disabled:cursor-not-allowed ${
                   selected
                     ? 'border-signal bg-signal-tint/30 ring-4 ring-signal/10'
                     : 'border-hairline bg-raised enabled:hover:border-hairline-strong'
@@ -224,7 +224,7 @@ export function Style({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
               >
                 <span className="flex items-start justify-between gap-2">
                   <span>
-                    <span className="font-display block text-[19px] leading-tight text-ink">
+                    <span className="font-display block text-[15px] leading-tight text-ink">
                       {t(`style.tones.${TONE_KEY[tone]}`)}
                     </span>
                     <span className="mt-1 block text-[12px] text-ink-muted">

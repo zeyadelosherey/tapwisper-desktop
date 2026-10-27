@@ -147,7 +147,7 @@ export function Dictionary(): JSX.Element {
       />
 
       {/* List */}
-      <div className="mt-10">
+      <div className="mt-6">
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="section-label">
             {t('dictionary.countLabel', '{{count}} words', { count: entries.length })}
@@ -168,11 +168,11 @@ export function Dictionary(): JSX.Element {
         </div>
 
         {!loaded ? null : entries.length === 0 ? (
-          <div className="flex flex-col items-center rounded-2xl border border-dashed border-hairline-strong px-6 py-14 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-signal-tint text-signal">
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-hairline-strong px-5 py-7 text-center">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-signal-tint text-signal">
               <BookA className="h-5 w-5" />
             </span>
-            <p className="font-display mt-4 text-[20px] text-ink">
+            <p className="font-display mt-4 text-[16px] text-ink">
               {t('dictionary.emptyTitle', 'Your dictionary is empty')}
             </p>
             <p className="mt-1.5 max-w-[380px] text-[13px] leading-relaxed text-ink-muted">
@@ -183,7 +183,7 @@ export function Dictionary(): JSX.Element {
             </p>
           </div>
         ) : filtered.length === 0 ? (
-          <p className="py-10 text-center text-[13px] text-ink-muted">
+          <p className="py-6 text-center text-[13px] text-ink-muted">
             {t('home.noResults', 'No results found')}
           </p>
         ) : (
@@ -208,7 +208,7 @@ export function Dictionary(): JSX.Element {
               ) : (
                 <li
                   key={entry.id}
-                  className="group flex items-center gap-4 px-5 py-3.5 transition-colors duration-200 hover:bg-panel"
+                  className="group flex items-center gap-4 px-3.5 py-2 transition-colors duration-200 hover:bg-panel"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[14.5px] font-medium text-ink" dir="auto">
@@ -290,11 +290,11 @@ function EntryForm({
           onCancel()
         }
       }}
-      className={compact ? '' : 'card p-5'}
+      className={compact ? '' : 'card p-3.5'}
     >
-      <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <div className="grid items-end gap-2 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto]">
         <div>
-          <label htmlFor={termId} className="mb-1.5 block text-[12.5px] font-medium text-ink">
+          <label htmlFor={termId} className="mb-1 block text-[12px] font-medium text-ink">
             {t('dictionary.termLabel', 'Word or name')}
           </label>
           <input
@@ -313,7 +313,7 @@ function EntryForm({
           />
         </div>
         <div>
-          <span className="mb-1.5 block text-[12.5px] font-medium text-ink">
+          <span className="mb-1 block text-[12px] font-medium text-ink">
             {t('dictionary.aliasesLabel', 'Often misheard as')}
             <span className="ms-1.5 font-normal text-ink-faint">
               {t('dictionary.optional', 'optional')}
@@ -331,24 +331,26 @@ function EntryForm({
             )}
           />
         </div>
-      </div>
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <p id={errorId} role={error ? 'alert' : undefined} className="text-[12.5px] text-danger">
-          {error}
-        </p>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 gap-1.5">
           {onCancel && (
             <button type="button" className="btn-ghost" onClick={onCancel}>
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
               {t('common.cancel', 'Cancel')}
             </button>
           )}
           <button type="submit" className="btn-primary" disabled={!!error && !!draft.term.trim()}>
-            {!onCancel && <Plus className="h-4 w-4" />}
+            {!onCancel && <Plus className="h-3.5 w-3.5" />}
             {submitLabel}
           </button>
         </div>
       </div>
+      <p
+        id={errorId}
+        role={error ? 'alert' : undefined}
+        className={error ? 'mt-1.5 text-[12px] text-danger' : 'sr-only'}
+      >
+        {error}
+      </p>
     </form>
   )
 }

@@ -58,7 +58,7 @@ export function ChipsInput({
 
   return (
     <div
-      className="flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-[10px] border border-hairline bg-raised px-2 py-1.5 transition-[border-color,box-shadow] duration-200 ease-out hover:border-hairline-strong focus-within:border-signal focus-within:ring-4 focus-within:ring-signal/15 dark:bg-sunken"
+      className="flex min-h-8 w-full flex-wrap items-center gap-1 rounded-[9px] border border-hairline bg-raised px-1.5 py-1 transition-[border-color,box-shadow] duration-200 ease-out hover:border-hairline-strong focus-within:border-signal focus-within:ring-4 focus-within:ring-signal/15 dark:bg-sunken"
       onClick={(e) => (e.currentTarget.querySelector('input') as HTMLInputElement | null)?.focus()}
     >
       {values.map((value) => (
