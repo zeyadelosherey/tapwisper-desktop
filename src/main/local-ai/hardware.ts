@@ -164,10 +164,13 @@ function hasVulkanBackend(runtime: LocalRuntime): boolean {
 
 /** GPU backend `runtime` should use on this computer */
 export async function gpuAcceleration(runtime: LocalRuntime): Promise<GpuAcceleration> {
-  return accelerationFor(process.platform, await detectGpu(), {
+  const accel = accelerationFor(process.platform, await detectGpu(), {
     metal: metalUsable(),
     vulkan: hasVulkanBackend(runtime)
   })
+  // Parakeet transcribed garbage on Vulkan in CI, and it runs several times faster
+  // than real time on the CPU anyway
+  return runtime === 'parakeet' && accel === 'vulkan' ? 'cpu' : accel
 }
 
 async function modelsDirWarning(dir: string): Promise<ModelsDirWarning | undefined> {

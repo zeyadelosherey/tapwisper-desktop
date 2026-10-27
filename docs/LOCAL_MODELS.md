@@ -53,7 +53,7 @@ Models    <userData>/models/{stt,llm}/     or a folder the user picks
 | Mac with Apple Silicon | ✅ Metal GPU | Best experience. Recommended: Whisper Large v3 Turbo (Q5) and Qwen3.5 4B with 16 GB RAM or more. |
 | Intel Mac | ✅ CPU | Prefer Whisper Base/Small and a 1–2B language model. |
 | Intel build on Apple Silicon (Rosetta) | ⚠️ slow | The settings page asks you to install the Apple Silicon build. |
-| Windows x64 | ✅ Vulkan GPU | Every model uses the GPU on NVIDIA, AMD and Intel Arc. If the GPU fails to load a model, that runtime falls back to the CPU for the rest of the session. |
+| Windows x64 | ✅ Vulkan GPU | Whisper, Qwen3-ASR, Voxtral and the language models use the GPU on NVIDIA, AMD and Intel Arc; Parakeet runs on the CPU, where it's already several times faster than real time. If the GPU fails to load a model, that runtime falls back to the CPU for the rest of the session. |
 | Linux x64 | ✅ CPU, Vulkan GPU when built with `--vulkan` | Same GPU rules as Windows; needs a Vulkan driver (Mesa or NVIDIA's). |
 | Windows on ARM, Linux ARM, 32-bit | ❌ | Not built yet. Use Cloud or Self-hosted. |
 
@@ -133,7 +133,7 @@ You need git, CMake 3.21 or newer, and a C++17 compiler (Xcode Command Line Tool
 
 **Release builds.** The release workflow builds the runtimes for each platform and caches them.
 
-**CI checks.** `.github/workflows/local-runtimes.yml` builds the runtimes on Linux, macOS and Windows, plus a Linux Vulkan build that runs on Mesa's software Vulkan device, so the GPU code path is tested without a GPU. It then downloads Whisper Tiny, Parakeet, Qwen3-ASR 0.6B and Qwen3.5 0.8B with the app's own download code and runs them through the app's own launch and request code (`src/main/local-ai/__tests__/runtimes.smoke.test.ts`). To run that test locally, either let it download the models:
+**CI checks.** `.github/workflows/local-runtimes.yml` builds the runtimes on Linux, macOS and Windows, plus a Linux build with the Vulkan backend, which must load and fall back to the CPU on a runner without a GPU. It then downloads Whisper Tiny, Parakeet, Qwen3-ASR 0.6B and Qwen3.5 0.8B with the app's own download code and runs them through the app's own launch and request code (`src/main/local-ai/__tests__/runtimes.smoke.test.ts`). To run that test locally, either let it download the models:
 
 ```bash
 LOCAL_AI_SMOKE_DOWNLOAD=1 LOCAL_AI_SMOKE_EXPECT_TEXT=1 \
