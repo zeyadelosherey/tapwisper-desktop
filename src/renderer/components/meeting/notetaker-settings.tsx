@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Info, ShieldCheck } from 'lucide-react'
+import { Check, Info } from 'lucide-react'
 import { Callout, Row, RowGroup, Section, Switch } from '../ui/primitives'
 import { LanguageSelect, MEETING_TRANSLATE_KEY } from './translate-control'
 
@@ -75,13 +75,7 @@ export function NotetakerSettings(): JSX.Element {
 
   return (
     <>
-      <Section
-        title={t('settings.notetaker', 'Notetaker')}
-        description={t(
-          'settings.notetakerHint',
-          'Meeting notes from your microphone and the call’s audio — no bot joins the meeting.'
-        )}
-      >
+      <Section>
         <RowGroup>
           <Row
             title={t('settings.recognizeMeetings', 'Recognize meetings')}
@@ -155,13 +149,10 @@ export function NotetakerSettings(): JSX.Element {
       </Section>
 
       <Section title={t('settings.privacy', 'Privacy')}>
-        <ul className="card divide-y divide-hairline">
+        <ul className="space-y-1.5 pt-1">
           {privacy.map((item) => (
-            <li
-              key={item}
-              className="flex items-center gap-2.5 px-3.5 py-2 text-[12.5px] text-ink-muted"
-            >
-              <ShieldCheck className="h-4 w-4 shrink-0 text-success" />
+            <li key={item} className="flex items-center gap-2 text-[12.5px] text-ink-muted">
+              <Check className="h-3.5 w-3.5 shrink-0 text-ink-faint" />
               {item}
             </li>
           ))}

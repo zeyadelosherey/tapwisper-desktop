@@ -284,8 +284,6 @@
     "notetakerPrivacyAudio": "يُرسَل الصوت إلى مزود الصوت لتفريغه نصيًا ولا يُحفظ",
     "notetakerPrivacyLocal": "تبقى النصوص والملاحظات والملخصات على هذا الجهاز",
     "notetakerPrivacyConsent": "أخبر الآخرين دائمًا عندما تدوّن الملاحظات",
-    "notetaker": "مدوّن الاجتماعات",
-    "notetakerHint": "ملاحظات الاجتماعات من الميكروفون وصوت المكالمة — دون انضمام أي روبوت إلى الاجتماع.",
     "recognizeMeetings": "التعرّف على الاجتماعات",
     "recognizeMeetingsHint": "عند بدء مكالمة Zoom أو Meet أو Teams أو Slack، يعرض تدوين الملاحظات.",
     "captureMeetingAudio": "تسجيل صوت الاجتماع",

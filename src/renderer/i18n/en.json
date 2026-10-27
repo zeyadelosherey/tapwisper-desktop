@@ -264,8 +264,6 @@
     "notetakerPrivacyAudio": "Audio is sent to your voice provider for transcription and is not stored",
     "notetakerPrivacyLocal": "Transcripts, notes and summaries stay on this device",
     "notetakerPrivacyConsent": "Always let people know when you’re taking notes",
-    "notetaker": "Notetaker",
-    "notetakerHint": "Meeting notes from your microphone and the call’s audio — no bot joins the meeting.",
     "recognizeMeetings": "Recognize meetings",
     "recognizeMeetingsHint": "When a Zoom, Meet, Teams or Slack call starts, offer to take notes.",
     "captureMeetingAudio": "Record meeting audio",

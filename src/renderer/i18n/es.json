@@ -269,8 +269,6 @@
     "notetakerPrivacyAudio": "El audio se envía a tu proveedor de voz para transcribirlo y no se guarda",
     "notetakerPrivacyLocal": "Las transcripciones, notas y resúmenes se quedan en este dispositivo",
     "notetakerPrivacyConsent": "Avisa siempre a los demás cuando tomes notas",
-    "notetaker": "Notetaker",
-    "notetakerHint": "Notas de reunión a partir de tu micrófono y el audio de la llamada, sin bots en la reunión.",
     "recognizeMeetings": "Reconocer reuniones",
     "recognizeMeetingsHint": "Cuando empieza una llamada de Zoom, Meet, Teams o Slack, ofrece tomar notas.",
     "captureMeetingAudio": "Grabar el audio de la reunión",

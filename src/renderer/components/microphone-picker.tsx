@@ -100,24 +100,20 @@ function MicrophonePickerInner({
 
   if (variant === 'compact') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         <label htmlFor={selectId} className="sr-only">
           {t('mic.device', 'Microphone')}
         </label>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">{select}</div>
-          <div className="flex h-10 w-[92px] shrink-0 items-center justify-center rounded-[10px] border border-hairline bg-panel">
-            <LevelBars
-              levels={levels}
-              height={20}
-              barWidth={3}
-              gap={3}
-              idle={!testing || !!error}
-            />
-          </div>
+          {testing && (
+            <div className="flex h-8 w-[64px] shrink-0 items-center justify-center">
+              <LevelBars levels={levels} height={18} barWidth={3} gap={3} idle={!!error} />
+            </div>
+          )}
           <button
             type="button"
-            className="btn-secondary shrink-0"
+            className="btn-ghost shrink-0"
             onClick={() => setTesting((v) => !v)}
             aria-pressed={testing}
           >
@@ -139,13 +135,13 @@ function MicrophonePickerInner({
   return (
     <div className="space-y-4">
       <div>
-        <label htmlFor={selectId} className="mb-1.5 block text-[13px] font-medium text-ink">
+        <label htmlFor={selectId} className="section-label mb-1 block">
           {t('mic.device', 'Microphone')}
         </label>
         {select}
       </div>
       {bluetoothWarning}
-      <div className="flex flex-col items-center justify-center rounded-xl border border-hairline bg-panel px-6 py-7">
+      <div className="flex flex-col items-center justify-center px-6 py-5">
         <LevelBars levels={levels} height={72} barWidth={6} gap={5} idle={!!error || !active} />
         <p className="mt-4 flex items-center gap-2 text-[12.5px] text-ink-muted" aria-live="polite">
           {error ? (
