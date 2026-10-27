@@ -38,6 +38,15 @@ module.exports = {
           'text-muted': 'rgb(var(--color-theme-text-muted) / var(--tw-text-muted-alpha))'
         }
       },
+      // Extra steps used across the UI (e.g. bg-sky-accent/8, bg-white/12)
+      // that aren't on Tailwind's default 5%-step opacity scale.
+      opacity: {
+        8: '0.08',
+        12: '0.12'
+      },
+      spacing: {
+        4.5: '1.125rem'
+      },
       borderRadius: {
         panel: '12px',
         pill: '20px'
