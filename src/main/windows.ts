@@ -103,6 +103,9 @@ function topCenteredBounds(workArea: Rectangle, size: Size): Rectangle {
   }
 }
 
+/** Unload the hidden main window after this long (it is recreated on demand) */
+const MAIN_WINDOW_UNLOAD_MS = 5 * 60_000
+
 /** Meeting notepad default size */
 const NOTEPAD_SIZE = { width: 400, height: 640 }
 
@@ -117,8 +120,11 @@ function centeredBounds(workArea: Rectangle, size: Size): Rectangle {
   }
 }
 
-function windowWebPreferences(): BrowserWindowConstructorOptions['webPreferences'] {
+function windowWebPreferences(
+  options: { spellcheck?: boolean } = {}
+): BrowserWindowConstructorOptions['webPreferences'] {
   return {
+    spellcheck: options.spellcheck ?? true,
     preload: path.join(__dirname, '../preload/index.js'),
     sandbox: false,
     contextIsolation: true,
@@ -155,8 +161,15 @@ export class WindowManager {
    * messages arrive — causing the panel to flash and disappear.
    */
   warmUpOverlays(): void {
+    // Only what the first shortcut press needs. Every pre-created window is a
+    // renderer process (~45MB) — the command popup is warmed after the first
+    // dictation instead (warmCommandPopup), the AI panel on first use.
     this.ensurePinnedPanel()
     this.ensureRecordingPill()
+  }
+
+  /** Load the command popup ahead of use (called when a dictation finishes) */
+  warmCommandPopup(): void {
     this.ensureCommandPopup()
   }
 
@@ -196,6 +209,22 @@ export class WindowManager {
       ...titleBarOptions,
       backgroundColor: colors.background,
       webPreferences: windowWebPreferences()
+    })
+
+    // A dictation app lives in the tray: free the settings window's renderer
+    // (~60MB) after it has been hidden for a while; showMainWindow recreates it
+    mainWindow.on('hide', () => {
+      if (this.mainUnloadTimer) clearTimeout(this.mainUnloadTimer)
+      this.mainUnloadTimer = setTimeout(() => {
+        this.mainUnloadTimer = null
+        if (this.quitting || mainWindow.isDestroyed() || mainWindow.isVisible()) return
+        this.windows.delete('main')
+        mainWindow.destroy()
+      }, MAIN_WINDOW_UNLOAD_MS)
+    })
+    mainWindow.on('show', () => {
+      if (this.mainUnloadTimer) clearTimeout(this.mainUnloadTimer)
+      this.mainUnloadTimer = null
     })
 
     mainWindow.on('ready-to-show', () => {
@@ -259,7 +288,7 @@ export class WindowManager {
       resizable: false,
       hasShadow: false,
       type: 'panel',
-      webPreferences: windowWebPreferences()
+      webPreferences: windowWebPreferences({ spellcheck: false })
     })
 
     pill.setIgnoreMouseEvents(true)
@@ -284,7 +313,7 @@ export class WindowManager {
       skipTaskbar: true,
       hasShadow: false,
       type: 'panel',
-      webPreferences: windowWebPreferences()
+      webPreferences: windowWebPreferences({ spellcheck: false })
     })
 
     this.loadWindow(panel, 'pinned-panel')
@@ -306,7 +335,7 @@ export class WindowManager {
       resizable: false,
       skipTaskbar: true,
       hasShadow: true,
-      webPreferences: windowWebPreferences()
+      webPreferences: windowWebPreferences({ spellcheck: false })
     })
 
     this.loadWindow(popup, 'command-popup')
@@ -328,7 +357,7 @@ export class WindowManager {
       resizable: true,
       skipTaskbar: true,
       hasShadow: true,
-      webPreferences: windowWebPreferences()
+      webPreferences: windowWebPreferences({ spellcheck: false })
     })
 
     // The panel card is much smaller than the window; let clicks on the
@@ -414,6 +443,8 @@ export class WindowManager {
 
   /** Set before app quit so windows that normally hide on close can close */
   quitting = false
+
+  private mainUnloadTimer: ReturnType<typeof setTimeout> | null = null
 
   // ── Click-through for transparent overlays ────────────────────
 
@@ -559,9 +590,12 @@ export class WindowManager {
 
   showMainWindow(): void {
     const win = this.windows.get('main')
-    if (win) {
+    if (win && !win.isDestroyed()) {
       win.show()
       win.focus()
+    } else {
+      // Unloaded while hidden — recreate (it shows itself when ready)
+      this.createMainWindow()
     }
   }
 

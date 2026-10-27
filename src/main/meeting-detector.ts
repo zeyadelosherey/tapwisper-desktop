@@ -6,6 +6,7 @@
  * Detection is heuristic, from the frontmost app name and window title.
  */
 
+import { powerMonitor } from 'electron'
 import { getActiveApp } from './app-context'
 
 export interface DetectedMeeting {
@@ -48,6 +49,8 @@ export function matchMeeting(appName: string, title: string): DetectedMeeting | 
 }
 
 const POLL_MS = 5000
+/** Skip polling once the user has been idle this long (seconds) */
+const IDLE_SKIP_S = 120
 /** Don't offer the same call again for this long after it was offered */
 const SNOOZE_MS = 30 * 60_000
 
@@ -65,6 +68,8 @@ export function startMeetingDetector(
   stopMeetingDetector()
   timer = setInterval(async () => {
     if (isBusy()) return
+    // Nobody at the keyboard (or screen locked): don't spawn window lookups
+    if (powerMonitor.getSystemIdleTime() > IDLE_SKIP_S) return
     const active = await getActiveApp()
     if (!active) return
     const meeting = matchMeeting(active.name, active.title ?? '')

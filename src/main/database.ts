@@ -79,9 +79,9 @@ export function initDatabase(): Database.Database {
   // Enable WAL mode for better concurrency and performance
   db.pragma('journal_mode = WAL')
   db.pragma('synchronous = NORMAL') // Faster writes, still safe
-  db.pragma('cache_size = 10000') // 10MB cache
+  db.pragma('cache_size = -4000') // 4MB page cache (the database is small)
   db.pragma('temp_store = MEMORY')
-  db.pragma('mmap_size = 268435456') // 256MB memory-mapped I/O (sufficient for app-sized DB)
+  db.pragma('mmap_size = 67108864') // 64MB memory-mapped I/O (app-sized database)
 
   // Create schema
   createSchema(db)

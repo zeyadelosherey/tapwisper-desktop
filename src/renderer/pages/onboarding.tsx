@@ -485,7 +485,7 @@ function WelcomeStep({ shortcut }: { shortcut: string }): JSX.Element {
             )}
             <span
               aria-hidden="true"
-              className="ms-0.5 inline-block h-[1.1em] w-[2px] translate-y-[3px] bg-signal animate-live-pulse"
+              className="ms-0.5 inline-block h-[1.1em] w-[2px] translate-y-[3px] bg-signal"
             />
           </p>
         </div>

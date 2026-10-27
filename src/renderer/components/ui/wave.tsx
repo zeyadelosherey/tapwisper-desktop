@@ -59,7 +59,10 @@ export function LevelBars({
 
 interface WaveLineProps {
   className?: string
-  /** Drift slowly (disabled automatically for reduced motion) */
+  /**
+   * Drift slowly. Off by default: an endlessly animating decoration repaints
+   * the window every frame (measured ~13% renderer + ~10% GPU CPU while idle).
+   */
   animated?: boolean
   strokeWidth?: number
 }
@@ -67,7 +70,7 @@ interface WaveLineProps {
 /** Decorative sound-wave line in Signal, used as a quiet accent. */
 export function WaveLine({
   className = '',
-  animated = true,
+  animated = false,
   strokeWidth = 1.6
 }: WaveLineProps): JSX.Element {
   // Two identical periods side by side so a -50% translate loops seamlessly.

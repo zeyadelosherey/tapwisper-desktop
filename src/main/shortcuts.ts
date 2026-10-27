@@ -242,6 +242,8 @@ function openCommandPopup(): void {
  */
 export function setPostRecordingState(text: string): void {
   clearPostRecordingState()
+  // The next shortcut press may open the command popup — load it now
+  windowManagerRef?.warmCommandPopup()
   postRecordingActive = true
   postRecordingText = text
   postRecordingTimer = setTimeout(clearPostRecordingState, POST_RECORDING_TIMEOUT_MS)

@@ -393,28 +393,31 @@
       0 0 22px rgb(var(--signal) / 0.35);
   }
 
-  /* ── Overlay helpers (dark ink capsules, readable on any wallpaper) ── */
+  /* ── Overlay helpers (dark ink capsules, readable on any wallpaper) ──
+     No backdrop-filter: in a transparent Electron window it can't blur the
+     desktop (only the window's own transparent pixels), so it was invisible
+     at these opacities while costing extra GPU passes on every frame of the
+     live waveform — expensive on low-end and software-rendered machines. */
 
   .glass {
-    background-color: rgb(var(--raised) / 0.96);
+    background-color: rgb(var(--raised) / 0.985);
     border: 1px solid rgb(var(--hairline));
-    @apply backdrop-blur-xl;
   }
 
   .glass-surface {
-    background-color: rgb(var(--sunken) / 0.8);
+    background-color: rgb(var(--sunken) / 0.9);
     border: 1px solid rgb(var(--hairline) / 0.6);
-    @apply backdrop-blur-md;
   }
 
   .capsule {
-    background-color: rgb(var(--capsule) / 0.96);
+    background-color: rgb(var(--capsule) / 0.98);
     border: 1px solid rgb(255 255 255 / 0.08);
-    @apply backdrop-blur-xl;
   }
 
+  /* Heights are driven per frame by WaveformBars' spring; a CSS transition on
+     top would animate every change twice (and transition-all forces layout) */
   .waveform-bar {
-    @apply rounded-full transition-all duration-75 ease-out;
+    @apply rounded-full;
   }
 
   .pill-shadow {
