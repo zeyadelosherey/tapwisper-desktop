@@ -1,7 +1,6 @@
 {
   "app": {
-    "name": "TapWisper",
-    "tagline": "Voice Dictation with AI"
+    "name": "TapWisper"
   },
   "nav": {
     "home": "Home",
@@ -14,11 +13,9 @@
     "settings": "Settings",
     "dictionary": "Dictionary",
     "style": "Style",
-    "automations": "Automations",
     "label": "Main navigation",
-    "shortcutHint": "Hold to dictate in any app",
-    "version": "Version {{version}}",
-    "meetings": "Meetings"
+    "meetings": "Meetings",
+    "more": "More"
   },
   "home": {
     "originalInput": "Original Text",
@@ -27,10 +24,6 @@
     "delete": "Delete",
     "searchActivity": "Search history…",
     "noResults": "No results found",
-    "noResultsDesc": "Try adjusting your search query",
-    "activityCount": "{{count}} records",
-    "activityCount_one": "{{count}} record",
-    "activityCount_other": "{{count}} records",
     "clearSearch": "Clear search",
     "resultCount": "{{count}} results",
     "resultCount_one": "{{count}} result",
@@ -41,14 +34,10 @@
     "statWords": "Words dictated",
     "statWordsHint": "all time",
     "statPace": "Average pace",
-    "wpm": "wpm",
-    "statPaceHint": "words per minute",
-    "statStreak": "Day streak",
     "statSaved": "Time saved",
     "statSavedHint": "this week, vs. typing",
     "historyTitle": "History",
     "emptyTitle": "Your history starts with one sentence.",
-    "emptyBody": "Hold {{keys}} anywhere and say something. Your dictations will collect here, newest first.",
     "loadMore": "Show older",
     "failedTitle": "Couldn’t transcribe",
     "failedNoAudio": "The audio wasn’t kept.",
@@ -60,7 +49,6 @@
     "pause": "Stop playback",
     "deleteTitle": "Delete this entry?",
     "deleteMessage": "The text and its saved audio will be removed from this device.",
-    "edited": "Polished",
     "rawTranscript": "As heard",
     "showMore": "Show more",
     "showLess": "Show less",
@@ -68,7 +56,14 @@
     "aiAction": "AI",
     "statStreakHint": "{{count}} days in a row",
     "statStreakHint_one": "{{count}} day in a row",
-    "statStreakHint_other": "{{count}} days in a row"
+    "statStreakHint_other": "{{count}} days in a row",
+    "statsWords": "{{value}} words",
+    "statsPace": "{{value}} wpm",
+    "statsStreak": "{{count}}-day streak",
+    "statsStreak_one": "{{count}}-day streak",
+    "statsStreak_other": "{{count}}-day streak",
+    "statsSaved": "{{value}} saved",
+    "emptyHint": "Your dictations will collect here, newest first."
   },
   "recording": {
     "tapToSpeak": "Tap to speak",
@@ -200,7 +195,6 @@
   },
   "settings": {
     "title": "Settings",
-    "subtitle": "App preferences and configuration",
     "language": "Language",
     "appearance": "Appearance",
     "system": "System",
@@ -209,15 +203,12 @@
     "keyboardShortcuts": "Keyboard Shortcuts",
     "reset": "Reset",
     "shortcutRecord": "Record",
-    "shortcutRecordDesc": "Hold to record (push-to-talk), tap to toggle",
     "shortcutPinnedPanel": "Pinned Panel",
     "shortcutPinnedPanelDesc": "Open pinned recording panel",
     "shortcutPinnedPanelNote": "Pinned panel shortcut is automatically set to Record + Space",
     "pressKeys": "Press keys...",
     "launchAtStartup": "Launch at startup",
-    "launchHint": "Start TapWisper when you log in",
     "privacy": "Privacy",
-    "privacyText": "Your data stays on your device.",
     "privacyEncrypted": "API keys are encrypted and stored locally",
     "privacyAudio": "Audio recordings are deleted after transcription",
     "privacyNoTelemetry": "No telemetry or analytics data is collected",
@@ -225,17 +216,16 @@
     "selectProvider": "Select Provider",
     "selectModel": "Select Model",
     "llm": "LLM",
-    "apiKey": "API Key",
     "about": "About",
     "contact": "Contact & Support",
-    "contactDesc": "Have a question, found a bug, or want to request a feature? Reach out to us.",
+    "contactDesc": "Questions, bugs or ideas",
     "aiProvider": "AI Provider",
     "apiKeyPlaceholder": "Enter your API key",
-    "apiPrivacyNote": "API keys are stored locally on your device and encrypted. They are never sent to any server other than the respective AI provider.",
+    "apiPrivacyNote": "Encrypted on this device; only sent to the provider.",
     "electronInfo": "Electron: {{value}}",
     "hideApiKey": "Hide API key",
     "keepMicWarm": "Keep microphone ready",
-    "keepMicWarmHint": "Starts recording instantly, but keeps the microphone open (mic indicator stays on; Bluetooth headsets switch to call quality).",
+    "keepMicWarmHint": "Starts instantly, but the mic stays open.",
     "keySaved": "Key saved",
     "noModelsFound": "No models found",
     "openaiWhisperSharesKey": "OpenAI Whisper uses the same API key as OpenAI.",
@@ -259,18 +249,14 @@
     },
     "whisperSharesKey": "Whisper uses the same API key as Together AI.",
     "tabSpeech": "Speech",
-    "languageHint": "The language of TapWisper itself.",
     "theme": "Theme",
     "speechLanguages": "Spoken languages",
-    "speechLanguagesHint": "Pick the languages you dictate in. Auto-detect works for most people; choosing helps short phrases come out in the right language.",
+    "speechLanguagesHint": "Auto-detect works for most people.",
     "keepRecordings": "Keep recordings for replay",
-    "keepRecordingsHint": "Lets you replay a dictation or transcribe it again from History. Audio never leaves this device, and only the last 50 are kept.",
-    "dictionaryMoved": "Names, brands and jargon you want recognized now live in your Dictionary, along with the misspellings to fix.",
-    "openDictionary": "Open Dictionary",
+    "keepRecordingsHint": "The last 50, on this device only.",
     "privacyAudioKept": "Audio of your last 50 dictations stays on this device for replay",
     "translation": "Translation",
     "dictationTranslate": "Translate dictation into",
-    "dictationTranslateHint": "Speak in any language; TapWisper pastes the translation.",
     "translateOff": "Off",
     "notetakerPermissionMac": "To hear the other participants, TapWisper needs Screen & System Audio Recording (System Settings → Privacy & Security). Only audio is used — nothing on your screen is recorded.",
     "notetakerPermissionLinux": "Linux can’t capture app audio directly. TapWisper uses a “Monitor of …” input (PulseAudio / PipeWire) when one is available; otherwise only your microphone is recorded.",
@@ -288,7 +274,8 @@
     "autoSummarizeHint": "Write a summary with decisions and next steps when you stop.",
     "meetingTranslate": "Translate transcripts into",
     "meetingTranslateHint": "Shows a live translation under each line. Uses your AI provider.",
-    "tabNotetaker": "Notetaker"
+    "tabNotetaker": "Notetaker",
+    "advanced": "Advanced"
   },
   "miniApps": {
     "title": "Mini Apps",
@@ -698,9 +685,7 @@
     "toggleTrigger": "Enable trigger {{name}}"
   },
   "shortcut": {
-    "comboTitle": "Key combination",
     "comboHint": "Hold to talk, tap to lock",
-    "singleHint": "Hold to talk",
     "recommended": "Recommended",
     "custom": "Custom…",
     "customHint": "Press a modifier plus a key, e.g. Ctrl + Shift + D. Esc cancels.",
@@ -708,7 +693,10 @@
     "unsupported": "That key can't be used as a shortcut. Try another one.",
     "saveFailed": "Couldn't save the shortcut. Please try again.",
     "right": "Right {{key}}",
-    "rightCaption": "right {{key}}"
+    "rightCaption": "right {{key}}",
+    "holdHint": "Hold to talk · add Space for hands-free",
+    "fnTip": "Tip: in System Settings → Keyboard, set “Press 🌐 key to” Do Nothing.",
+    "fnUnavailable": "fn needs TapWisper’s helper, which isn’t installed — Ctrl + Option works meanwhile."
   },
   "mic": {
     "device": "Microphone",
@@ -726,9 +714,10 @@
     "summaryAuto": "Auto-detect: the language is recognized each time you speak.",
     "summaryOne": "Always transcribed as {{language}}.",
     "summaryMixed": "Mixed: you can switch between {{languages}} mid-sentence.",
-    "mixTitle": "I mix languages (e.g. Arabic + English)",
-    "mixBody": "Select every language you speak. With two or more selected, TapWisper keeps each word in the language you said it in — nothing gets translated.",
-    "usePreset": "Use {{languages}}"
+    "usePreset": "Use {{languages}}",
+    "more": "More languages…",
+    "fewer": "Fewer languages",
+    "mixHint": "Mix languages? Select each one you speak."
   },
   "dictionary": {
     "title": "Dictionary",

@@ -1,7 +1,6 @@
 {
   "app": {
-    "name": "TapWisper",
-    "tagline": "Dettatura vocale con IA"
+    "name": "TapWisper"
   },
   "nav": {
     "home": "Home",
@@ -14,11 +13,9 @@
     "settings": "Impostazioni",
     "dictionary": "Dizionario",
     "style": "Stile",
-    "automations": "Automazioni",
     "label": "Navigazione principale",
-    "shortcutHint": "Tieni premuto per dettare in qualsiasi app",
-    "version": "Versione {{version}}",
-    "meetings": "Riunioni"
+    "meetings": "Riunioni",
+    "more": "Altro"
   },
   "home": {
     "originalInput": "Testo originale",
@@ -27,11 +24,6 @@
     "delete": "Elimina",
     "searchActivity": "Cerca nella cronologia…",
     "noResults": "Nessun risultato",
-    "noResultsDesc": "Prova a modificare la ricerca",
-    "activityCount": "{{count}} voci",
-    "activityCount_one": "{{count}} voce",
-    "activityCount_many": "{{count}} voci",
-    "activityCount_other": "{{count}} voci",
     "clearSearch": "Cancella ricerca",
     "resultCount": "{{count}} risultati",
     "resultCount_one": "{{count}} risultato",
@@ -43,14 +35,10 @@
     "statWords": "Parole dettate",
     "statWordsHint": "in totale",
     "statPace": "Ritmo medio",
-    "wpm": "parole/min",
-    "statPaceHint": "parole al minuto",
-    "statStreak": "Giorni di fila",
     "statSaved": "Tempo risparmiato",
     "statSavedHint": "questa settimana, rispetto alla digitazione",
     "historyTitle": "Cronologia",
     "emptyTitle": "La tua cronologia inizia con una frase.",
-    "emptyBody": "Tieni premuto {{keys}} ovunque e di’ qualcosa. I tuoi dettati si raccoglieranno qui, dai più recenti.",
     "loadMore": "Mostra precedenti",
     "failedTitle": "Trascrizione non riuscita",
     "failedNoAudio": "L’audio non è stato conservato.",
@@ -62,7 +50,6 @@
     "pause": "Interrompi riproduzione",
     "deleteTitle": "Eliminare questa voce?",
     "deleteMessage": "Il testo e il relativo audio salvato verranno rimossi da questo dispositivo.",
-    "edited": "Rifinito",
     "rawTranscript": "Come ascoltato",
     "showMore": "Mostra di più",
     "showLess": "Mostra meno",
@@ -71,7 +58,15 @@
     "statStreakHint": "{{count}} giorni di fila",
     "statStreakHint_one": "{{count}} giorno di fila",
     "statStreakHint_many": "{{count}} giorni di fila",
-    "statStreakHint_other": "{{count}} giorni di fila"
+    "statStreakHint_other": "{{count}} giorni di fila",
+    "statsWords": "{{value}} parole",
+    "statsPace": "{{value}} parole/min",
+    "statsStreak": "serie di {{count}} giorni",
+    "statsStreak_one": "serie di {{count}} giorno",
+    "statsStreak_many": "serie di {{count}} giorni",
+    "statsStreak_other": "serie di {{count}} giorni",
+    "statsSaved": "{{value}} risparmiati",
+    "emptyHint": "Le tue dettature compariranno qui, dalle più recenti."
   },
   "recording": {
     "tapToSpeak": "Tocca per parlare",
@@ -205,7 +200,6 @@
   },
   "settings": {
     "title": "Impostazioni",
-    "subtitle": "Preferenze e configurazione",
     "language": "Lingua",
     "appearance": "Aspetto",
     "system": "Sistema",
@@ -214,15 +208,12 @@
     "keyboardShortcuts": "Scorciatoie da tastiera",
     "reset": "Ripristina",
     "shortcutRecord": "Registra",
-    "shortcutRecordDesc": "Tieni premuto per registrare, tocca per alternare",
     "shortcutPinnedPanel": "Pannello fissato",
     "shortcutPinnedPanelDesc": "Apri il pannello di registrazione",
     "shortcutPinnedPanelNote": "La scorciatoia è impostata automaticamente su Registra + Spazio",
     "pressKeys": "Premi i tasti...",
     "launchAtStartup": "Avvio automatico",
-    "launchHint": "Avvia TapWisper all'accesso",
     "privacy": "Privacy",
-    "privacyText": "I tuoi dati restano sul tuo dispositivo.",
     "privacyEncrypted": "Le chiavi API sono crittografate e archiviate localmente",
     "privacyAudio": "Le registrazioni audio vengono eliminate dopo la trascrizione",
     "privacyNoTelemetry": "Non vengono raccolti dati di telemetria o analisi",
@@ -230,17 +221,16 @@
     "selectProvider": "Seleziona provider",
     "selectModel": "Seleziona modello",
     "llm": "LLM",
-    "apiKey": "Chiave API",
     "about": "Info",
     "contact": "Contatti e supporto",
-    "contactDesc": "Hai una domanda, trovato un bug o vuoi richiedere una funzione? Contattaci.",
+    "contactDesc": "Domande, bug o idee",
     "aiProvider": "Provider AI",
     "apiKeyPlaceholder": "Inserisci la tua chiave API",
-    "apiPrivacyNote": "Le chiavi API sono archiviate localmente sul tuo dispositivo e crittografate. Non vengono mai inviate a server diversi da quello del rispettivo provider AI.",
+    "apiPrivacyNote": "Cifrata su questo dispositivo; inviata solo al fornitore.",
     "electronInfo": "Electron: {{value}}",
     "hideApiKey": "Nascondi chiave API",
     "keepMicWarm": "Tieni pronto il microfono",
-    "keepMicWarmHint": "La registrazione parte subito, ma il microfono resta aperto (l'indicatore del microfono resta acceso; le cuffie Bluetooth passano alla qualità chiamata).",
+    "keepMicWarmHint": "Parte subito, ma il microfono resta aperto.",
     "keySaved": "Chiave salvata",
     "noModelsFound": "Nessun modello trovato",
     "openaiWhisperSharesKey": "OpenAI Whisper usa la stessa chiave API di OpenAI.",
@@ -264,18 +254,14 @@
     },
     "whisperSharesKey": "Whisper usa la stessa chiave API di Together AI.",
     "tabSpeech": "Voce",
-    "languageHint": "La lingua dell’interfaccia di TapWisper.",
     "theme": "Tema",
     "speechLanguages": "Lingue parlate",
-    "speechLanguagesHint": "Scegli le lingue in cui detti. Il rilevamento automatico va bene per quasi tutti; sceglierle aiuta le frasi brevi a uscire nella lingua giusta.",
+    "speechLanguagesHint": "Il rilevamento automatico va bene per quasi tutti.",
     "keepRecordings": "Conserva le registrazioni per riascoltarle",
-    "keepRecordingsHint": "Ti permette di riascoltare un dettato o trascriverlo di nuovo dalla cronologia. L’audio non lascia mai questo dispositivo e vengono conservati solo gli ultimi 50.",
-    "dictionaryMoved": "Nomi, marchi e termini da riconoscere ora si trovano nel Dizionario, insieme agli errori da correggere.",
-    "openDictionary": "Apri dizionario",
+    "keepRecordingsHint": "Le ultime 50, solo su questo dispositivo.",
     "privacyAudioKept": "L’audio degli ultimi 50 dettati resta su questo dispositivo per il riascolto",
     "translation": "Traduzione",
     "dictationTranslate": "Traduci la dettatura in",
-    "dictationTranslateHint": "Parla in qualsiasi lingua; TapWisper incolla la traduzione.",
     "translateOff": "Disattivato",
     "notetakerPermissionMac": "Per sentire gli altri partecipanti, TapWisper ha bisogno di Registrazione schermo e audio di sistema (Impostazioni di Sistema → Privacy e sicurezza). Viene usato solo l’audio: nulla del tuo schermo viene registrato.",
     "notetakerPermissionLinux": "Linux non può catturare direttamente l’audio delle app. TapWisper usa un ingresso «Monitor of …» (PulseAudio / PipeWire) se disponibile; altrimenti viene registrato solo il microfono.",
@@ -293,7 +279,8 @@
     "autoSummarizeHint": "Scrive un riepilogo con decisioni e prossimi passi quando ti fermi.",
     "meetingTranslate": "Traduci le trascrizioni in",
     "meetingTranslateHint": "Mostra una traduzione dal vivo sotto ogni riga. Usa il tuo provider IA.",
-    "tabNotetaker": "Notetaker"
+    "tabNotetaker": "Notetaker",
+    "advanced": "Avanzate"
   },
   "miniApps": {
     "title": "Mini App",
@@ -705,9 +692,7 @@
     "toggleTrigger": "Attiva il trigger {{name}}"
   },
   "shortcut": {
-    "comboTitle": "Combinazione di tasti",
     "comboHint": "Tieni premuto per parlare, tocca per bloccare",
-    "singleHint": "Tieni premuto per parlare",
     "recommended": "Consigliato",
     "custom": "Personalizzato…",
     "customHint": "Premi un modificatore più un tasto, ad es. Ctrl + Maiusc + D. Esc annulla.",
@@ -715,7 +700,10 @@
     "unsupported": "Questo tasto non può essere usato come scorciatoia. Provane un altro.",
     "saveFailed": "Impossibile salvare la scorciatoia. Riprova.",
     "right": "{{key}} destro",
-    "rightCaption": "{{key}} destro"
+    "rightCaption": "{{key}} destro",
+    "holdHint": "Tieni premuto per parlare · aggiungi Spazio per il vivavoce",
+    "fnTip": "Suggerimento: in Impostazioni di Sistema → Tastiera, imposta «Premi il tasto 🌐 per» su «Non fare nulla».",
+    "fnUnavailable": "fn richiede l’helper di TapWisper, che non è installato: nel frattempo funziona Ctrl + Option."
   },
   "mic": {
     "device": "Microfono",
@@ -733,9 +721,10 @@
     "summaryAuto": "Rilevamento automatico: la lingua viene riconosciuta ogni volta che parli.",
     "summaryOne": "Trascritto sempre in {{language}}.",
     "summaryMixed": "Misto: puoi alternare {{languages}} a metà frase.",
-    "mixTitle": "Mescolo le lingue (ad es. arabo + inglese)",
-    "mixBody": "Seleziona tutte le lingue che parli. Con due o più, TapWisper mantiene ogni parola nella lingua in cui l’hai detta: nulla viene tradotto.",
-    "usePreset": "Usa {{languages}}"
+    "usePreset": "Usa {{languages}}",
+    "more": "Altre lingue…",
+    "fewer": "Meno lingue",
+    "mixHint": "Mescoli le lingue? Seleziona ognuna che parli."
   },
   "dictionary": {
     "title": "Dizionario",

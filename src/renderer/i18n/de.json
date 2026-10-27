@@ -1,7 +1,6 @@
 {
   "app": {
-    "name": "TapWisper",
-    "tagline": "Sprachdiktat mit KI"
+    "name": "TapWisper"
   },
   "nav": {
     "home": "Start",
@@ -14,11 +13,9 @@
     "settings": "Einstellungen",
     "dictionary": "Wörterbuch",
     "style": "Stil",
-    "automations": "Automatisierungen",
     "label": "Hauptnavigation",
-    "shortcutHint": "Gedrückt halten, um in jeder App zu diktieren",
-    "version": "Version {{version}}",
-    "meetings": "Meetings"
+    "meetings": "Meetings",
+    "more": "Mehr"
   },
   "home": {
     "originalInput": "Originaltext",
@@ -27,10 +24,6 @@
     "delete": "Löschen",
     "searchActivity": "Verlauf durchsuchen …",
     "noResults": "Keine Ergebnisse gefunden",
-    "noResultsDesc": "Versuche es mit einem anderen Suchbegriff",
-    "activityCount": "{{count}} Einträge",
-    "activityCount_one": "{{count}} Eintrag",
-    "activityCount_other": "{{count}} Einträge",
     "clearSearch": "Suche löschen",
     "resultCount": "{{count}} Ergebnisse",
     "resultCount_one": "{{count}} Ergebnis",
@@ -41,14 +34,10 @@
     "statWords": "Diktierte Wörter",
     "statWordsHint": "insgesamt",
     "statPace": "Ø Tempo",
-    "wpm": "WpM",
-    "statPaceHint": "Wörter pro Minute",
-    "statStreak": "Tage in Folge",
     "statSaved": "Gesparte Zeit",
     "statSavedHint": "diese Woche, ggü. Tippen",
     "historyTitle": "Verlauf",
     "emptyTitle": "Dein Verlauf beginnt mit einem Satz.",
-    "emptyBody": "Halte {{keys}} irgendwo gedrückt und sag etwas. Deine Diktate sammeln sich hier, die neuesten zuerst.",
     "loadMore": "Ältere anzeigen",
     "failedTitle": "Transkription fehlgeschlagen",
     "failedNoAudio": "Die Aufnahme wurde nicht behalten.",
@@ -60,7 +49,6 @@
     "pause": "Wiedergabe stoppen",
     "deleteTitle": "Diesen Eintrag löschen?",
     "deleteMessage": "Der Text und die gespeicherte Aufnahme werden von diesem Gerät entfernt.",
-    "edited": "Überarbeitet",
     "rawTranscript": "Wie gehört",
     "showMore": "Mehr anzeigen",
     "showLess": "Weniger anzeigen",
@@ -68,7 +56,14 @@
     "aiAction": "KI",
     "statStreakHint": "{{count}} Tage in Folge",
     "statStreakHint_one": "{{count}} Tag in Folge",
-    "statStreakHint_other": "{{count}} Tage in Folge"
+    "statStreakHint_other": "{{count}} Tage in Folge",
+    "statsWords": "{{value}} Wörter",
+    "statsPace": "{{value}} WpM",
+    "statsStreak": "{{count}} Tage in Folge",
+    "statsStreak_one": "{{count}} Tag in Folge",
+    "statsStreak_other": "{{count}} Tage in Folge",
+    "statsSaved": "{{value}} gespart",
+    "emptyHint": "Deine Diktate sammeln sich hier, die neuesten zuerst."
   },
   "recording": {
     "tapToSpeak": "Tippen zum Sprechen",
@@ -200,7 +195,6 @@
   },
   "settings": {
     "title": "Einstellungen",
-    "subtitle": "App-Einstellungen und Konfiguration",
     "language": "Sprache",
     "appearance": "Erscheinungsbild",
     "system": "System",
@@ -209,15 +203,12 @@
     "keyboardShortcuts": "Tastaturkürzel",
     "reset": "Zurücksetzen",
     "shortcutRecord": "Aufnehmen",
-    "shortcutRecordDesc": "Halten zum Aufnehmen, tippen zum Umschalten",
     "shortcutPinnedPanel": "Angeheftetes Panel",
     "shortcutPinnedPanelDesc": "Aufnahmepanel öffnen",
     "shortcutPinnedPanelNote": "Das Kürzel wird automatisch auf Aufnehmen + Leertaste gesetzt",
     "pressKeys": "Tasten drücken...",
     "launchAtStartup": "Beim Start öffnen",
-    "launchHint": "TapWisper beim Anmelden starten",
     "privacy": "Datenschutz",
-    "privacyText": "Deine Daten bleiben auf deinem Gerät.",
     "privacyEncrypted": "API-Schlüssel werden verschlüsselt und lokal gespeichert",
     "privacyAudio": "Audioaufnahmen werden nach der Transkription gelöscht",
     "privacyNoTelemetry": "Es werden keine Telemetrie- oder Analysedaten gesammelt",
@@ -225,17 +216,16 @@
     "selectProvider": "Anbieter auswählen",
     "selectModel": "Modell auswählen",
     "llm": "LLM",
-    "apiKey": "API-Schlüssel",
     "about": "Über",
     "contact": "Kontakt & Support",
-    "contactDesc": "Hast du eine Frage, einen Fehler gefunden oder möchtest eine Funktion vorschlagen? Kontaktiere uns.",
+    "contactDesc": "Fragen, Fehler oder Ideen",
     "aiProvider": "KI-Anbieter",
     "apiKeyPlaceholder": "API-Schlüssel eingeben",
-    "apiPrivacyNote": "API-Schlüssel werden lokal auf deinem Gerät gespeichert und verschlüsselt. Sie werden nie an einen anderen Server als den jeweiligen KI-Anbieter gesendet.",
+    "apiPrivacyNote": "Verschlüsselt auf diesem Gerät; nur an den Anbieter gesendet.",
     "electronInfo": "Electron: {{value}}",
     "hideApiKey": "API-Schlüssel verbergen",
     "keepMicWarm": "Mikrofon bereithalten",
-    "keepMicWarmHint": "Die Aufnahme startet sofort, aber das Mikrofon bleibt geöffnet (die Mikrofonanzeige bleibt an; Bluetooth-Headsets wechseln in Gesprächsqualität).",
+    "keepMicWarmHint": "Startet sofort, aber das Mikrofon bleibt offen.",
     "keySaved": "Schlüssel gespeichert",
     "noModelsFound": "Keine Modelle gefunden",
     "openaiWhisperSharesKey": "OpenAI Whisper verwendet denselben API-Schlüssel wie OpenAI.",
@@ -259,18 +249,14 @@
     },
     "whisperSharesKey": "Whisper verwendet denselben API-Schlüssel wie Together AI.",
     "tabSpeech": "Sprache",
-    "languageHint": "Die Sprache der TapWisper-Oberfläche.",
     "theme": "Design",
     "speechLanguages": "Gesprochene Sprachen",
-    "speechLanguagesHint": "Wähle die Sprachen, in denen du diktierst. Die automatische Erkennung passt für die meisten; eine Auswahl hilft, dass kurze Sätze in der richtigen Sprache ankommen.",
+    "speechLanguagesHint": "Automatische Erkennung passt für die meisten.",
     "keepRecordings": "Aufnahmen zum Abspielen behalten",
-    "keepRecordingsHint": "So kannst du ein Diktat im Verlauf abspielen oder erneut transkribieren. Der Ton verlässt nie dieses Gerät, und nur die letzten 50 werden behalten.",
-    "dictionaryMoved": "Namen, Marken und Fachbegriffe, die erkannt werden sollen, findest du jetzt im Wörterbuch – zusammen mit den Schreibfehlern, die korrigiert werden.",
-    "openDictionary": "Wörterbuch öffnen",
+    "keepRecordingsHint": "Die letzten 50, nur auf diesem Gerät.",
     "privacyAudioKept": "Der Ton deiner letzten 50 Diktate bleibt zum Abspielen auf diesem Gerät",
     "translation": "Übersetzung",
     "dictationTranslate": "Diktat übersetzen ins",
-    "dictationTranslateHint": "Sprich in einer beliebigen Sprache; TapWisper fügt die Übersetzung ein.",
     "translateOff": "Aus",
     "notetakerPermissionMac": "Um die anderen Teilnehmenden zu hören, braucht TapWisper die Bildschirm- & Systemaudioaufnahme (Systemeinstellungen → Datenschutz & Sicherheit). Es wird nur Audio verwendet – dein Bildschirm wird nicht aufgezeichnet.",
     "notetakerPermissionLinux": "Linux kann App-Audio nicht direkt aufnehmen. TapWisper nutzt einen „Monitor of …“-Eingang (PulseAudio / PipeWire), falls vorhanden; sonst wird nur dein Mikrofon aufgenommen.",
@@ -288,7 +274,8 @@
     "autoSummarizeHint": "Schreibt beim Stoppen eine Zusammenfassung mit Entscheidungen und nächsten Schritten.",
     "meetingTranslate": "Transkripte übersetzen ins",
     "meetingTranslateHint": "Zeigt unter jeder Zeile eine Live-Übersetzung. Nutzt deinen KI-Anbieter.",
-    "tabNotetaker": "Notetaker"
+    "tabNotetaker": "Notetaker",
+    "advanced": "Erweitert"
   },
   "miniApps": {
     "title": "Mini-Apps",
@@ -698,9 +685,7 @@
     "toggleTrigger": "Auslöser {{name}} aktivieren"
   },
   "shortcut": {
-    "comboTitle": "Tastenkombination",
     "comboHint": "Halten zum Sprechen, tippen zum Fixieren",
-    "singleHint": "Zum Sprechen gedrückt halten",
     "recommended": "Empfohlen",
     "custom": "Eigene…",
     "customHint": "Drücke eine Sondertaste plus eine Taste, z. B. Strg + Umschalt + D. Esc bricht ab.",
@@ -708,7 +693,10 @@
     "unsupported": "Diese Taste kann nicht als Kürzel verwendet werden. Versuche eine andere.",
     "saveFailed": "Das Kürzel konnte nicht gespeichert werden. Bitte versuche es erneut.",
     "right": "{{key}} rechts",
-    "rightCaption": "{{key}} rechts"
+    "rightCaption": "{{key}} rechts",
+    "holdHint": "Halten zum Sprechen · Leertaste dazu für freihändig",
+    "fnTip": "Tipp: Stelle unter Systemeinstellungen → Tastatur „🌐-Taste drücken, um“ auf „Keine Aktion“.",
+    "fnUnavailable": "fn braucht das TapWisper-Hilfsprogramm, das nicht installiert ist – bis dahin funktioniert Ctrl + Option."
   },
   "mic": {
     "device": "Mikrofon",
@@ -726,9 +714,10 @@
     "summaryAuto": "Automatisch: Die Sprache wird bei jedem Diktat erkannt.",
     "summaryOne": "Wird immer als {{language}} transkribiert.",
     "summaryMixed": "Gemischt: Du kannst mitten im Satz zwischen {{languages}} wechseln.",
-    "mixTitle": "Ich mische Sprachen (z. B. Arabisch + Englisch)",
-    "mixBody": "Wähle jede Sprache, die du sprichst. Mit zwei oder mehr bleibt jedes Wort in der Sprache, in der du es gesagt hast – nichts wird übersetzt.",
-    "usePreset": "{{languages}} verwenden"
+    "usePreset": "{{languages}} verwenden",
+    "more": "Weitere Sprachen…",
+    "fewer": "Weniger Sprachen",
+    "mixHint": "Du mischst Sprachen? Wähle jede, die du sprichst."
   },
   "dictionary": {
     "title": "Wörterbuch",

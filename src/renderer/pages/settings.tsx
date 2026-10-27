@@ -1,27 +1,18 @@
-import { type JSX, useEffect, useState, useCallback, useRef, type ReactNode } from 'react'
+import { type JSX, useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
-  Info,
   Monitor,
   Moon,
   Sun,
-  Keyboard,
   RotateCcw,
   Eye,
   EyeOff,
   Check,
-  Cpu,
-  Settings2,
-  Mic,
   Search,
   X,
   Mail,
-  ShieldCheck,
-  BookA,
-  ArrowRight,
-  Lock,
-  Users
+  Lock
 } from 'lucide-react'
 import { updateDirection } from '../i18n'
 import { testApiKey, type KeyProvider, type KeyTestResult } from '../services/key-test'
@@ -38,6 +29,7 @@ import { useRecordShortcut } from '../hooks/use-record-shortcut'
 import { ShortcutKeys, Keycap } from '../components/ui/keycap'
 import {
   Callout,
+  Disclosure,
   Page,
   PageHeader,
   Row,
@@ -51,7 +43,6 @@ import { SpeechLanguagePicker } from '../components/speech-language-picker'
 import { MicrophonePicker } from '../components/microphone-picker'
 import { NotetakerSettings } from '../components/meeting/notetaker-settings'
 import { LanguageSelect } from '../components/meeting/translate-control'
-import type { Navigate } from './main-window'
 
 type Theme = 'system' | 'dark' | 'light'
 export type SettingsTab = 'general' | 'speech' | 'notetaker' | 'ai-provider' | 'shortcuts' | 'about'
@@ -428,43 +419,13 @@ const VOICE_API_KEY_ID: Record<VoiceProvider, string> = {
 
 // ── Tabs ─────────────────────────────────────────────────────────
 
-const TABS: { id: SettingsTab; labelKey: string; fallback: string; icon: ReactNode }[] = [
-  {
-    id: 'general',
-    labelKey: 'settings.tabGeneral',
-    fallback: 'General',
-    icon: <Settings2 className="h-4 w-4" />
-  },
-  {
-    id: 'speech',
-    labelKey: 'settings.tabSpeech',
-    fallback: 'Speech',
-    icon: <Mic className="h-4 w-4" />
-  },
-  {
-    id: 'notetaker',
-    labelKey: 'settings.tabNotetaker',
-    fallback: 'Notetaker',
-    icon: <Users className="h-4 w-4" />
-  },
-  {
-    id: 'ai-provider',
-    labelKey: 'settings.tabAIProvider',
-    fallback: 'AI Provider',
-    icon: <Cpu className="h-4 w-4" />
-  },
-  {
-    id: 'shortcuts',
-    labelKey: 'settings.tabShortcuts',
-    fallback: 'Shortcuts',
-    icon: <Keyboard className="h-4 w-4" />
-  },
-  {
-    id: 'about',
-    labelKey: 'settings.tabAbout',
-    fallback: 'About',
-    icon: <Info className="h-4 w-4" />
-  }
+const TABS: { id: SettingsTab; labelKey: string; fallback: string }[] = [
+  { id: 'general', labelKey: 'settings.tabGeneral', fallback: 'General' },
+  { id: 'speech', labelKey: 'settings.tabSpeech', fallback: 'Speech' },
+  { id: 'notetaker', labelKey: 'settings.tabNotetaker', fallback: 'Notetaker' },
+  { id: 'ai-provider', labelKey: 'settings.tabAIProvider', fallback: 'AI Provider' },
+  { id: 'shortcuts', labelKey: 'settings.tabShortcuts', fallback: 'Shortcuts' },
+  { id: 'about', labelKey: 'settings.tabAbout', fallback: 'About' }
 ]
 
 function applyTheme(value: Theme): void {
@@ -536,34 +497,28 @@ function ProviderTile({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`relative flex flex-col items-center gap-2.5 rounded-xl border px-3 py-4 text-center transition-[border-color,box-shadow,background-color] duration-200 ease-out ${
+      title={description}
+      className={`flex h-9 items-center gap-2 rounded-[10px] border px-2.5 text-start transition-[border-color,background-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 ${
         selected
-          ? 'border-signal bg-signal-tint/40 ring-4 ring-signal/10'
+          ? 'border-signal bg-signal-tint/40'
           : 'border-hairline bg-raised hover:border-hairline-strong'
       }`}
     >
-      {selected && (
-        <span className="absolute end-2.5 top-2.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-signal text-on-signal">
-          <Check className="h-3 w-3" strokeWidth={3} />
-        </span>
-      )}
-      <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md">
         {logoImage ? (
-          <img src={logoImage} alt="" className="h-9 w-9 rounded-xl object-contain" />
+          <img src={logoImage} alt="" className="h-5 w-5 rounded-md object-contain" />
         ) : (
-          <LogoComponent className="h-8 w-8" />
+          <LogoComponent className="h-5 w-5" />
         )}
       </span>
-      <span className="block">
-        <span className="block text-[13px] font-medium text-ink">{label}</span>
-        {description && (
-          <span className="mt-0.5 block text-[11px] leading-snug text-ink-muted">
-            {description}
-          </span>
-        )}
-      </span>
+      <span className="truncate text-[13px] text-ink">{label}</span>
+      {selected && <Check className="ms-auto h-3.5 w-3.5 shrink-0 text-signal" strokeWidth={2.5} />}
     </button>
   )
+}
+
+function modelLabel(models: { id: string; label: string }[], id: string): string {
+  return models.find((m) => m.id === id)?.label ?? id
 }
 
 /** Searchable radio list of models */
@@ -607,7 +562,10 @@ function ModelList({
           )}
         </div>
       )}
-      <div role="radiogroup" className="card max-h-80 divide-y divide-hairline overflow-y-auto">
+      <div
+        role="radiogroup"
+        className="max-h-80 divide-y divide-hairline/70 overflow-y-auto border-y border-hairline/70"
+      >
         {visible.map((model) => {
           const isSelected = selectedId === model.id
           return (
@@ -617,25 +575,17 @@ function ModelList({
               role="radio"
               aria-checked={isSelected}
               onClick={() => onSelect(model.id)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-start transition-colors duration-200 hover:bg-panel"
+              className="flex w-full items-center gap-3 px-1 py-2 text-start transition-colors duration-200 hover:bg-panel"
             >
-              <span
-                className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${
-                  isSelected ? 'border-signal bg-signal text-on-signal' : 'border-hairline-strong'
-                }`}
-              >
-                {isSelected && <Check className="h-3 w-3" strokeWidth={3} />}
-              </span>
               <span className="min-w-0 flex-1">
-                <span
-                  className={`block text-[13.5px] font-medium ${isSelected ? 'text-signal' : 'text-ink'}`}
-                >
+                <span className={`block text-[13px] ${isSelected ? 'text-signal' : 'text-ink'}`}>
                   {model.label}
                 </span>
-                <span className="block text-[12px] text-ink-muted">
+                <span className="block truncate text-[12px] text-ink-soft">
                   {modelDescription(t, model.description)}
                 </span>
               </span>
+              {isSelected && <Check className="h-4 w-4 shrink-0 text-signal" strokeWidth={2.5} />}
             </button>
           )
         })}
@@ -651,13 +601,7 @@ function ModelList({
 
 // ── Main Settings Component ─────────────────────────────────────
 
-export function Settings({
-  onNavigate,
-  initialTab
-}: {
-  onNavigate?: Navigate
-  initialTab?: SettingsTab
-}): JSX.Element {
+export function Settings({ initialTab }: { initialTab?: SettingsTab }): JSX.Element {
   const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? 'general')
 
@@ -894,14 +838,13 @@ export function Settings({
         <RowGroup>
           <Row
             title={t('settings.language', 'Language')}
-            description={t('settings.languageHint', 'The language of TapWisper itself.')}
             htmlFor="ui-language"
             control={
               <select
                 id="ui-language"
                 value={language}
                 onChange={(e) => handleLanguageChange(e.target.value)}
-                className="field h-9 w-56"
+                className="field w-56"
               >
                 {UI_LANGUAGES.map((lang) => {
                   const localized = languageName(lang.code, i18n.language, lang.label)
@@ -945,7 +888,6 @@ export function Settings({
           />
           <Row
             title={t('settings.launchAtStartup', 'Launch at startup')}
-            description={t('settings.launchHint', 'Start TapWisper when you log in')}
             control={
               <Switch
                 checked={autoLaunch}
@@ -956,58 +898,22 @@ export function Settings({
           />
         </RowGroup>
       </Section>
-      <PrivacySection keepRecordings={keepRecordings} />
     </>
   )
 
   const renderSpeechTab = (): JSX.Element => (
     <>
       <Section title={t('mic.device', 'Microphone')}>
-        <RowGroup>
-          <div className="px-3.5 py-2.5">
-            <MicrophonePicker
-              deviceId={microphoneId}
-              onChange={handleMicrophoneChange}
-              variant="compact"
-            />
-          </div>
-          <Row
-            title={t('settings.keepMicWarm', 'Keep microphone ready')}
-            description={t(
-              'settings.keepMicWarmHint',
-              'Starts recording instantly, but keeps the microphone open (mic indicator stays on; Bluetooth headsets switch to call quality).'
-            )}
-            control={
-              <Switch
-                checked={keepMicWarm}
-                onChange={handleKeepMicWarmChange}
-                label={t('settings.keepMicWarm', 'Keep microphone ready')}
-              />
-            }
-          />
-          <Row
-            title={t('settings.keepRecordings', 'Keep recordings for replay')}
-            description={t(
-              'settings.keepRecordingsHint',
-              'Lets you replay a dictation or transcribe it again from History. Audio never leaves this device, and only the last 50 are kept.'
-            )}
-            control={
-              <Switch
-                checked={keepRecordings}
-                onChange={handleKeepRecordingsChange}
-                label={t('settings.keepRecordings', 'Keep recordings for replay')}
-              />
-            }
-          />
-        </RowGroup>
+        <MicrophonePicker
+          deviceId={microphoneId}
+          onChange={handleMicrophoneChange}
+          variant="compact"
+        />
       </Section>
 
       <Section
         title={t('settings.speechLanguages', 'Spoken languages')}
-        description={t(
-          'settings.speechLanguagesHint',
-          'Pick the languages you dictate in. Auto-detect works for most people; choosing helps short phrases come out in the right language.'
-        )}
+        description={t('settings.speechLanguagesHint', 'Auto-detect works for most people.')}
       >
         <SpeechLanguagePicker value={speechLanguages} onChange={handleSpeechLanguagesChange} />
       </Section>
@@ -1016,10 +922,6 @@ export function Settings({
         <RowGroup>
           <Row
             title={t('settings.dictationTranslate', 'Translate dictation into')}
-            description={t(
-              'settings.dictationTranslateHint',
-              'Speak in any language; TapWisper pastes the translation.'
-            )}
             htmlFor="dictation-translate"
             control={
               <LanguageSelect
@@ -1035,36 +937,39 @@ export function Settings({
         </RowGroup>
       </Section>
 
-      <Section title={t('nav.dictionary', 'Dictionary')}>
-        <div className="card flex items-center gap-4 px-3.5 py-2.5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-signal-tint text-signal">
-            <BookA className="h-5 w-5" />
-          </span>
-          <p className="min-w-0 flex-1 text-[13px] leading-relaxed text-ink-muted">
-            {t(
-              'settings.dictionaryMoved',
-              'Names, brands and jargon you want recognized now live in your Dictionary, along with the misspellings to fix.'
-            )}
-          </p>
-          {onNavigate && (
-            <button
-              type="button"
-              className="btn-secondary shrink-0"
-              onClick={() => onNavigate('dictionary')}
-            >
-              {t('settings.openDictionary', 'Open Dictionary')}
-              <ArrowRight className="h-4 w-4 rtl-flip" />
-            </button>
-          )}
-        </div>
-      </Section>
+      <Disclosure label={t('settings.advanced', 'Advanced')}>
+        <RowGroup>
+          <Row
+            title={t('settings.keepMicWarm', 'Keep microphone ready')}
+            description={t('settings.keepMicWarmHint', 'Starts instantly, but the mic stays open.')}
+            control={
+              <Switch
+                checked={keepMicWarm}
+                onChange={handleKeepMicWarmChange}
+                label={t('settings.keepMicWarm', 'Keep microphone ready')}
+              />
+            }
+          />
+          <Row
+            title={t('settings.keepRecordings', 'Keep recordings for replay')}
+            description={t('settings.keepRecordingsHint', 'The last 50, on this device only.')}
+            control={
+              <Switch
+                checked={keepRecordings}
+                onChange={handleKeepRecordingsChange}
+                label={t('settings.keepRecordings', 'Keep recordings for replay')}
+              />
+            }
+          />
+        </RowGroup>
+      </Disclosure>
     </>
   )
 
   const renderApiKeyField = (keyId: string, label: string, footnote?: string): JSX.Element => (
-    <Section title={t('settings.apiKey', 'API Key')}>
-      <div className="card px-3.5 py-2.5">
-        <label htmlFor={`api-key-${keyId}`} className="mb-2 block text-[13px] font-medium text-ink">
+    <Section>
+      <div>
+        <label htmlFor={`api-key-${keyId}`} className="section-label mb-1 block">
           {label}
         </label>
         <div className="flex items-center gap-2">
@@ -1088,20 +993,17 @@ export function Settings({
                 : t('settings.showApiKey', 'Show API key')
             }
             aria-pressed={!!visibleKeys[keyId]}
-            className="icon-btn h-10 w-10 shrink-0 border border-hairline"
+            className="icon-btn h-8 w-8 shrink-0"
           >
             {visibleKeys[keyId] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
         {apiKeys[keyId] && <ApiKeyStatus provider={keyId as KeyProvider} apiKey={apiKeys[keyId]} />}
-        {footnote && <p className="mt-2.5 text-[12px] text-ink-muted">{footnote}</p>}
+        {footnote && <p className="mt-2 text-[12px] text-ink-soft">{footnote}</p>}
       </div>
-      <div className="mt-3">
+      <div className="mt-2">
         <Callout tone="info" icon={<Lock />}>
-          {t(
-            'settings.apiPrivacyNote',
-            'API keys are stored locally on your device and encrypted. They are never sent to any server other than the respective AI provider.'
-          )}
+          {t('settings.apiPrivacyNote', 'Encrypted on this device; only sent to the provider.')}
         </Callout>
       </div>
     </Section>
@@ -1120,15 +1022,10 @@ export function Settings({
             value={providerSubTab}
             onChange={setProviderSubTab}
             options={[
-              {
-                value: 'ai',
-                label: t('settings.aiProvider', 'AI Provider'),
-                icon: <Cpu className="h-3.5 w-3.5" />
-              },
+              { value: 'ai', label: t('settings.aiProvider', 'AI Provider') },
               {
                 value: 'transcription',
-                label: t('settings.transcriptionProvider', 'Transcription'),
-                icon: <Mic className="h-3.5 w-3.5" />
+                label: t('settings.transcriptionProvider', 'Transcription')
               }
             ]}
           />
@@ -1137,7 +1034,11 @@ export function Settings({
         {providerSubTab === 'ai' ? (
           <>
             <Section title={t('settings.selectProvider', 'Select Provider')}>
-              <div role="radiogroup" className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+              <div
+                role="radiogroup"
+                aria-label={t('settings.selectProvider', 'Select Provider')}
+                className="grid grid-cols-2 gap-2 md:grid-cols-4"
+              >
                 {LLM_PROVIDERS.map((provider) => (
                   <ProviderTile
                     key={provider.id}
@@ -1149,7 +1050,18 @@ export function Settings({
                 ))}
               </div>
             </Section>
-            <Section title={`${t('settings.llm', 'LLM')} — ${currentLLMProvider.shortLabel}`}>
+            {renderApiKeyField(
+              selectedLLM,
+              t('settings.providerApiKey', '{{provider}} API Key', {
+                provider: LLM_API_KEY_PROVIDERS[selectedLLM]
+              })
+            )}
+            <Disclosure
+              label={`${t('settings.llm', 'LLM')} — ${currentLLMProvider.shortLabel}: ${modelLabel(
+                PROVIDER_MODELS[selectedLLM],
+                models[selectedLLM] || DEFAULT_MODELS[selectedLLM]
+              )}`}
+            >
               <ModelList
                 models={PROVIDER_MODELS[selectedLLM]}
                 selectedId={models[selectedLLM] || DEFAULT_MODELS[selectedLLM]}
@@ -1157,18 +1069,16 @@ export function Settings({
                 search={modelSearch}
                 onSearch={setModelSearch}
               />
-            </Section>
-            {renderApiKeyField(
-              selectedLLM,
-              t('settings.providerApiKey', '{{provider}} API Key', {
-                provider: LLM_API_KEY_PROVIDERS[selectedLLM]
-              })
-            )}
+            </Disclosure>
           </>
         ) : (
           <>
             <Section title={t('settings.selectProvider', 'Select Provider')}>
-              <div role="radiogroup" className="grid grid-cols-3 gap-2.5">
+              <div
+                role="radiogroup"
+                aria-label={t('settings.selectProvider', 'Select Provider')}
+                className="grid grid-cols-3 gap-2"
+              >
                 {VOICE_PROVIDERS.map((provider) => (
                   <ProviderTile
                     key={provider.id}
@@ -1184,17 +1094,6 @@ export function Settings({
                 ))}
               </div>
             </Section>
-            <Section
-              title={`${t('settings.selectModel', 'Select Model')} — ${currentVoiceProvider.shortLabel}`}
-            >
-              <ModelList
-                models={VOICE_PROVIDER_MODELS[selectedVoice]}
-                selectedId={voiceModels[selectedVoice] || DEFAULT_VOICE_MODELS[selectedVoice]}
-                onSelect={(id) => handleVoiceModelChange(selectedVoice, id)}
-                search={voiceModelSearch}
-                onSearch={setVoiceModelSearch}
-              />
-            </Section>
             {renderApiKeyField(
               VOICE_API_KEY_ID[selectedVoice],
               t('settings.providerApiKey', '{{provider}} API Key', {
@@ -1209,6 +1108,20 @@ export function Settings({
                     )
                   : undefined
             )}
+            <Disclosure
+              label={`${t('settings.selectModel', 'Select Model')} — ${currentVoiceProvider.shortLabel}: ${modelLabel(
+                VOICE_PROVIDER_MODELS[selectedVoice],
+                voiceModels[selectedVoice] || DEFAULT_VOICE_MODELS[selectedVoice]
+              )}`}
+            >
+              <ModelList
+                models={VOICE_PROVIDER_MODELS[selectedVoice]}
+                selectedId={voiceModels[selectedVoice] || DEFAULT_VOICE_MODELS[selectedVoice]}
+                onSelect={(id) => handleVoiceModelChange(selectedVoice, id)}
+                search={voiceModelSearch}
+                onSearch={setVoiceModelSearch}
+              />
+            </Disclosure>
           </>
         )}
       </>
@@ -1222,10 +1135,6 @@ export function Settings({
       <>
         <Section
           title={t('settings.shortcutRecord', 'Record')}
-          description={t(
-            'settings.shortcutRecordDesc',
-            'Hold to record (push-to-talk), tap to toggle'
-          )}
           action={
             shortcut !== DEFAULT_RECORD_SHORTCUT ? (
               <button
@@ -1239,7 +1148,7 @@ export function Settings({
             ) : undefined
           }
         >
-          <div className="mb-4 flex justify-center rounded-xl border border-hairline bg-panel px-4 py-5">
+          <div className="mb-3 mt-1">
             <ShortcutKeys accelerator={shortcut} size="lg" />
           </div>
           <ShortcutPicker value={shortcut} onSave={saveShortcut} />
@@ -1275,14 +1184,11 @@ export function Settings({
 
   const renderAboutTab = (): JSX.Element => (
     <>
-      <div className="card mb-6 flex items-center gap-3 px-4 py-4">
-        <img src={appLogo} alt="" className="h-12 w-12 rounded-xl object-contain" />
+      <div className="mb-7 flex items-center gap-3">
+        <img src={appLogo} alt="" className="h-10 w-10 rounded-xl object-contain" />
         <div className="min-w-0">
-          <p className="font-display text-[20px] leading-tight text-ink">{t('app.name')}</p>
-          <p className="mt-1 text-[13px] text-ink-muted">
-            {t('app.tagline', 'Voice Dictation with AI')}
-          </p>
-          <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-soft tabular">
+          <p className="font-display text-[18px] leading-tight text-ink">{t('app.name')}</p>
+          <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-soft tabular">
             <span>
               {t('settings.version', 'Version')} {appVersion}
             </span>
@@ -1301,18 +1207,17 @@ export function Settings({
       </div>
 
       <Section title={t('settings.contact', 'Contact & Support')}>
-        <div className="card flex flex-wrap items-center justify-between gap-4 px-3.5 py-2.5">
-          <p className="max-w-[440px] text-[13px] leading-relaxed text-ink-muted">
-            {t(
-              'settings.contactDesc',
-              'Have a question, found a bug, or want to request a feature? Reach out to us.'
-            )}
-          </p>
-          <a href="mailto:support@tapwisper.ai" className="btn-secondary">
-            <Mail className="h-4 w-4" />
-            support@tapwisper.ai
-          </a>
-        </div>
+        <RowGroup>
+          <Row
+            title={t('settings.contactDesc', 'Questions, bugs or ideas')}
+            control={
+              <a href="mailto:support@tapwisper.ai" className="btn-ghost btn-sm">
+                <Mail className="h-3.5 w-3.5" />
+                support@tapwisper.ai
+              </a>
+            }
+          />
+        </RowGroup>
       </Section>
 
       <PrivacySection keepRecordings={keepRecordings} />
@@ -1323,15 +1228,12 @@ export function Settings({
 
   return (
     <Page>
-      <PageHeader
-        title={t('settings.title', 'Settings')}
-        description={t('settings.subtitle', 'App preferences and configuration')}
-      />
+      <PageHeader title={t('settings.title', 'Settings')} />
 
       <div
         role="tablist"
         aria-label={t('settings.title', 'Settings')}
-        className="mb-9 flex gap-1 border-b border-hairline"
+        className="mb-6 flex gap-1 border-b border-hairline"
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id
@@ -1342,13 +1244,10 @@ export function Settings({
               role="tab"
               aria-selected={active}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative -mb-px flex items-center gap-2 border-b-2 px-3 pb-3 pt-1 text-[13.5px] font-medium transition-colors duration-200 ${
-                active
-                  ? 'border-signal text-ink'
-                  : 'border-transparent text-ink-muted hover:text-ink'
+              className={`relative -mb-px flex items-center border-b-2 px-2.5 pb-2.5 pt-1 text-[13px] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 ${
+                active ? 'border-ink text-ink' : 'border-transparent text-ink-soft hover:text-ink'
               }`}
             >
-              <span className={active ? 'text-signal' : 'text-ink-soft'}>{tab.icon}</span>
               {t(tab.labelKey, tab.fallback)}
             </button>
           )
@@ -1381,14 +1280,11 @@ function PrivacySection({ keepRecordings }: { keepRecordings: boolean }): JSX.El
     t('settings.privacyDirect', 'All AI requests go directly to your configured provider')
   ]
   return (
-    <Section
-      title={t('settings.privacy', 'Privacy')}
-      description={t('settings.privacyText', 'Your data stays on your device.')}
-    >
-      <ul className="card divide-y divide-hairline">
+    <Section title={t('settings.privacy', 'Privacy')}>
+      <ul className="space-y-1.5 pt-1">
         {items.map((item) => (
-          <li key={item} className="flex items-center gap-3 px-5 py-3 text-[13px] text-ink-muted">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-success" />
+          <li key={item} className="flex items-center gap-2 text-[12.5px] text-ink-muted">
+            <Check className="h-3.5 w-3.5 shrink-0 text-ink-faint" />
             {item}
           </li>
         ))}

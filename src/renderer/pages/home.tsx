@@ -4,11 +4,10 @@ import type { TFunction } from 'i18next'
 import {
   AlertTriangle,
   Check,
-  ChevronDown,
   Copy,
-  History as HistoryIcon,
   Pause,
   Play,
+  Quote,
   RotateCw,
   Search,
   Sparkles,
@@ -25,7 +24,6 @@ import { computeStreak, type StreakInfo } from '../utils/streak'
 import { useRecordShortcut } from '../hooks/use-record-shortcut'
 import { useConfirmDialog } from '../components/confirm-dialog'
 import { ShortcutKeys } from '../components/ui/keycap'
-import { WaveLine } from '../components/ui/wave'
 import { Page, Spinner } from '../components/ui/primitives'
 
 const PAGE_SIZE = 40
@@ -36,6 +34,8 @@ const STREAK_WINDOW_DAYS = 90
 const LONG_TEXT = 260
 /** Placeholder used to put a component in the middle of a translated sentence */
 const SLOT = '\u0000'
+/** With this many entries the history search starts open */
+const SEARCH_OPEN_AT = 300
 
 interface AllTimeStats {
   words: number
@@ -50,15 +50,6 @@ function isFailed(record: TranscriptionRecord): boolean {
 function primaryText(record: TranscriptionRecord): string {
   if (record.type === 'voice-with-llm' && record.llmResult) return record.llmResult
   return record.transcription || record.llmInput || ''
-}
-
-function longDate(lang: string): string {
-  const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' }
-  try {
-    return new Date().toLocaleDateString(lang, options)
-  } catch {
-    return new Date().toLocaleDateString(undefined, options)
-  }
 }
 
 function retryErrorMessage(t: TFunction, err: unknown): string {
@@ -81,7 +72,7 @@ function retryErrorMessage(t: TFunction, err: unknown): string {
 // ── Page ─────────────────────────────────────────────────────────
 
 export function Home(): JSX.Element {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { shortcut } = useRecordShortcut()
   const { loadStats, voiceTimeSavedSeconds, aiTimeSavedSeconds } = useStatsStore()
   const { records, totalCount, isLoaded, loadRecords } = useActivityStore()
@@ -145,65 +136,70 @@ export function Home(): JSX.Element {
     keys: SLOT
   }).split(SLOT)
 
+  // One quiet line of stats; each item explains itself on hover
+  const stats: { key: string; text: string; title: string }[] = []
+  if (allTime && allTime.words > 0) {
+    stats.push({
+      key: 'words',
+      text: t('home.statsWords', '{{value}} words', {
+        value: formatCompactNumber(allTime.words)
+      }),
+      title: `${t('home.statWords', 'Words dictated')} · ${t('home.statWordsHint', 'all time')}`
+    })
+  }
+  if (wpm > 0) {
+    stats.push({
+      key: 'pace',
+      text: t('home.statsPace', '{{value}} wpm', { value: wpm }),
+      title: t('home.statPace', 'Average pace')
+    })
+  }
+  if (streak.streak > 0) {
+    stats.push({
+      key: 'streak',
+      text: t('home.statsStreak', '{{count}}-day streak', { count: streak.streak }),
+      title: t('home.statStreakHint', '{{count}} days in a row', { count: streak.streak })
+    })
+  }
+  if (savedSeconds > 0) {
+    stats.push({
+      key: 'saved',
+      text: t('home.statsSaved', '{{value}} saved', { value: formatDuration(savedSeconds) }),
+      title: `${t('home.statSaved', 'Time saved')} · ${t('home.statSavedHint', 'this week, vs. typing')}`
+    })
+  }
+
   return (
     <Page>
       {/* ── Hero ─────────────────────────────────────────── */}
-      <section className="relative animate-rise">
-        <p className="section-label">{longDate(i18n.language)}</p>
-        <h1 className="hero-title mt-1 max-w-[620px] text-balance">
+      <section className="animate-rise">
+        <h1 className="hero-title max-w-[620px] text-[26px] text-balance">
           <Trans i18nKey="home.hero" components={{ em: <em /> }}>
             Say it, and it&apos;s <em>on the page</em>.
           </Trans>
         </h1>
-        <p className="mt-2 text-[13px] leading-[1.9] text-ink-muted">
+        <p className="mt-1 text-[13px] leading-[1.9] text-ink-muted">
           {hintParts[0]}
           <ShortcutKeys accelerator={shortcut} size="sm" className="-translate-y-px" />
           {hintParts[1]}
         </p>
-        <WaveLine
-          className="pointer-events-none absolute -top-1 end-0 hidden h-10 w-36 opacity-60 lg:block"
-          strokeWidth={1.4}
-        />
-      </section>
-
-      {/* ── Stats rail ───────────────────────────────────── */}
-      <section
-        aria-label={t('home.statsLabel', 'Your stats')}
-        className="card mt-4 grid grid-cols-2 overflow-hidden md:grid-cols-4 animate-rise [animation-delay:60ms]"
-      >
-        <Stat
-          label={t('home.statWords', 'Words dictated')}
-          value={allTime ? formatCompactNumber(allTime.words) : '–'}
-          hint={t('home.statWordsHint', 'all time')}
-        />
-        <Stat
-          label={t('home.statPace', 'Average pace')}
-          value={wpm > 0 ? String(wpm) : '–'}
-          unit={wpm > 0 ? t('home.wpm', 'wpm') : undefined}
-          hint={t('home.statPaceHint', 'words per minute')}
-        />
-        <Stat
-          label={t('home.statStreak', 'Day streak')}
-          value={String(streak.streak)}
-          hint={
-            <span className="flex items-center gap-1" aria-hidden="true">
-              {streak.lastWeek.map((active, i) => (
-                <span
-                  key={i}
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    active ? (i === 6 ? 'bg-ember' : 'bg-signal') : 'bg-hairline-strong'
-                  }`}
-                />
-              ))}
-            </span>
-          }
-          srHint={t('home.statStreakHint', '{{count}} days in a row', { count: streak.streak })}
-        />
-        <Stat
-          label={t('home.statSaved', 'Time saved')}
-          value={formatDuration(savedSeconds)}
-          hint={t('home.statSavedHint', 'this week, vs. typing')}
-        />
+        {stats.length > 0 && (
+          <ul
+            aria-label={t('home.statsLabel', 'Your stats')}
+            className="mt-2 flex flex-wrap items-center gap-y-1 text-[12.5px] text-ink-soft tabular"
+          >
+            {stats.map((s, i) => (
+              <li key={s.key} title={s.title} className="flex items-center">
+                {i > 0 && (
+                  <span aria-hidden="true" className="px-2 text-ink-faint">
+                    ·
+                  </span>
+                )}
+                {s.text}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* ── History ──────────────────────────────────────── */}
@@ -212,39 +208,9 @@ export function Home(): JSX.Element {
           <Spinner className="h-5 w-5" />
         </div>
       ) : (
-        <HistoryList
-          totalCount={totalCount}
-          refreshToken={`${totalCount}-${latestId}`}
-          shortcut={shortcut}
-        />
+        <HistoryList totalCount={totalCount} refreshToken={`${totalCount}-${latestId}`} />
       )}
     </Page>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  unit,
-  hint,
-  srHint
-}: {
-  label: string
-  value: string
-  unit?: string
-  hint: React.ReactNode
-  srHint?: string
-}): JSX.Element {
-  return (
-    <div className="border-hairline px-3.5 py-2.5 [&:not(:first-child)]:border-s max-md:[&:nth-child(3)]:border-s-0 max-md:[&:nth-child(n+3)]:border-t">
-      <p className="section-label">{label}</p>
-      <p className="mt-1 flex items-baseline gap-1">
-        <span className="font-display text-[21px] leading-none text-ink tabular">{value}</span>
-        {unit && <span className="text-[12px] text-ink-muted">{unit}</span>}
-      </p>
-      <div className="mt-1 text-[11px] text-ink-soft">{hint}</div>
-      {srHint && <span className="sr-only">{srHint}</span>}
-    </div>
   )
 }
 
@@ -254,7 +220,6 @@ interface HistoryListProps {
   totalCount: number
   /** Changes whenever records are added/removed so the list is re-queried */
   refreshToken: string
-  shortcut: string
 }
 
 interface RetryState {
@@ -262,7 +227,7 @@ interface RetryState {
   error?: string
 }
 
-function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): JSX.Element {
+function HistoryList({ totalCount, refreshToken }: HistoryListProps): JSX.Element {
   const { t } = useTranslation()
   const { confirm, dialog } = useConfirmDialog()
   const { queryRecords, patchRecord, deleteRecord } = useActivityStore()
@@ -276,6 +241,8 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [retry, setRetry] = useState<Record<string, RetryState>>({})
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioUrlRef = useRef<string | null>(null)
   const checkedRef = useRef<Set<string>>(new Set())
@@ -425,54 +392,67 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
     return out
   }, [items])
 
-  const hintParts = t(
-    'home.emptyBody',
-    'Hold {{keys}} anywhere and say something. Your dictations will collect here, newest first.',
-    {
-      keys: SLOT
-    }
-  ).split(SLOT)
+  const showSearch = searchOpen || !!search || totalCount >= SEARCH_OPEN_AT
+  const openSearch = (): void => {
+    setSearchOpen(true)
+    requestAnimationFrame(() => searchRef.current?.focus())
+  }
+  const closeSearch = (): void => {
+    setSearch('')
+    setSearchOpen(false)
+  }
 
   return (
-    <section className="mt-6" aria-labelledby="history-title">
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-        <div className="flex items-baseline gap-3">
-          <h2 id="history-title" className="font-display text-[18px] leading-none text-ink">
-            {t('home.historyTitle', 'History')}
-          </h2>
-          {totalCount > 0 && (
-            <span className="text-[12px] text-ink-soft tabular">
-              {t('home.activityCount', '{{count}} records', { count: totalCount })}
-            </span>
-          )}
-        </div>
-        {totalCount > 0 && (
-          <div className="relative w-60 max-w-full">
-            <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('home.searchActivity', 'Search history…')}
+    <section className="mt-7" aria-labelledby="history-title">
+      <div className="mb-1 flex min-h-8 items-center justify-between gap-3">
+        <h2 id="history-title" className="font-display text-[17px] leading-none text-ink">
+          {t('home.historyTitle', 'History')}
+        </h2>
+        {totalCount > 0 &&
+          (showSearch ? (
+            <div className="relative w-56 max-w-full">
+              <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onBlur={() => {
+                  if (!search) setSearchOpen(false)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') closeSearch()
+                }}
+                placeholder={t('home.searchActivity', 'Search history…')}
+                aria-label={t('home.searchActivity', 'Search history…')}
+                className="field pe-8 ps-8"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={closeSearch}
+                  aria-label={t('home.clearSearch', 'Clear search')}
+                  className="icon-btn absolute end-0.5 top-1/2 h-7 w-7 -translate-y-1/2"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openSearch}
               aria-label={t('home.searchActivity', 'Search history…')}
-              className="field h-9 pe-9 ps-9"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label={t('home.clearSearch', 'Clear search')}
-                className="icon-btn absolute end-1 top-1/2 h-7 w-7 -translate-y-1/2"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        )}
+              title={t('home.searchActivity', 'Search history…')}
+              className="icon-btn"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          ))}
       </div>
 
       {debouncedSearch && items && (
-        <p className="mb-3 text-[12.5px] text-ink-muted" aria-live="polite">
+        <p className="mb-2 text-[12px] text-ink-soft" aria-live="polite">
           {t('home.resultCount', '{{count}} results', { count: matching })}
         </p>
       )}
@@ -482,36 +462,23 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
           <Spinner className="h-5 w-5" />
         </div>
       ) : totalCount === 0 && !debouncedSearch ? (
-        <div className="relative overflow-hidden rounded-2xl border border-dashed border-hairline-strong px-6 py-6 text-center">
-          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-signal-tint text-signal">
-            <HistoryIcon className="h-5 w-5" />
-          </span>
-          <p className="font-display mt-2 text-[17px] text-ink">
+        <div className="py-10 text-center">
+          <p className="font-display text-[17px] text-ink">
             {t('home.emptyTitle', 'Your history starts with one sentence.')}
           </p>
-          <p className="mx-auto mt-3 max-w-[460px] text-[13.5px] leading-[2] text-ink-muted text-balance">
-            {hintParts[0]}
-            <ShortcutKeys accelerator={shortcut} size="sm" className="-translate-y-px" />
-            {hintParts[1]}
+          <p className="mt-1 text-[13px] text-ink-soft">
+            {t('home.emptyHint', 'Your dictations will collect here, newest first.')}
           </p>
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-xl border border-hairline px-5 py-6 text-center">
-          <p className="text-[14px] font-medium text-ink">
-            {t('home.noResults', 'No results found')}
-          </p>
-          <p className="mt-1 text-[12.5px] text-ink-muted">
-            {t('home.noResultsDesc', 'Try adjusting your search query')}
-          </p>
-        </div>
+        <p className="py-8 text-center text-[13px] text-ink-muted">
+          {t('home.noResults', 'No results found')}
+        </p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {groups.map((group) => (
             <div key={group.label}>
-              <h3 className="section-label mb-0.5 flex items-center gap-2">
-                {group.label}
-                <span className="h-px flex-1 bg-hairline" aria-hidden="true" />
-              </h3>
+              <h3 className="px-0 pb-0.5 pt-2 text-[12px] text-ink-soft">{group.label}</h3>
               <ul className="-mx-2">
                 {group.records.map((record) => (
                   <HistoryRow
@@ -535,7 +502,7 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
             <div className="flex justify-center">
               <button
                 type="button"
-                className="btn-secondary"
+                className="btn-ghost btn-sm"
                 disabled={loadingMore}
                 onClick={() => {
                   setLoadingMore(true)
@@ -588,20 +555,29 @@ function HistoryRow({
   const long = text.length > LONG_TEXT || text.split('\n').length > 4
   const edited = !!record.rawTranscription && record.rawTranscription !== record.transcription
 
+  const toggleLabel = isAi
+    ? t('home.originalInput', 'Original text')
+    : t('home.rawTranscript', 'As heard')
+
   return (
     <li className="group relative flex gap-3 rounded-lg px-2 py-1.5 transition-colors duration-200 hover:bg-panel focus-within:bg-panel">
       <time
         dateTime={new Date(record.timestamp).toISOString()}
-        className="w-[54px] shrink-0 pt-[2px] text-[11px] text-ink-soft tabular"
+        title={
+          record.appName
+            ? t('home.appChip', 'Dictated into {{app}}', { app: record.appName })
+            : undefined
+        }
+        className="w-[60px] shrink-0 whitespace-nowrap pt-[2px] text-[11.5px] text-ink-soft tabular"
       >
         {formatTime(record.timestamp)}
       </time>
 
       <div className="min-w-0 flex-1">
         {isAi && (
-          <p className="mb-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-muted">
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-signal-tint px-1.5 py-0.5 text-[11px] font-medium text-signal">
-              <Sparkles className="h-3 w-3" />
+          <p className="mb-0.5 flex min-w-0 items-center gap-1.5 text-[12px] text-ink-soft">
+            <Sparkles className="h-3 w-3 shrink-0 text-signal" aria-hidden="true" />
+            <span className="shrink-0">
               {record.llmAction ? displayActionName(t, record.llmAction) : t('home.aiAction', 'AI')}
             </span>
             {record.transcription && (
@@ -614,8 +590,8 @@ function HistoryRow({
 
         {failed ? (
           <div className="flex flex-wrap items-center gap-3">
-            <p className="flex items-center gap-1.5 text-[13px] font-medium text-danger">
-              <AlertTriangle className="h-4 w-4" />
+            <p className="flex items-center gap-1.5 text-[13px] text-danger">
+              <AlertTriangle className="h-3.5 w-3.5" />
               {t('home.failedTitle', 'Couldn’t transcribe')}
             </p>
             {hasAudio ? (
@@ -633,7 +609,7 @@ function HistoryRow({
                 {retry?.busy ? t('home.retrying', 'Transcribing…') : t('common.retry', 'Retry')}
               </button>
             ) : (
-              <span className="text-[12.5px] text-ink-muted">
+              <span className="text-[12.5px] text-ink-soft">
                 {t('home.failedNoAudio', 'The audio wasn’t kept.')}
               </span>
             )}
@@ -649,64 +625,20 @@ function HistoryRow({
           </p>
         )}
 
-        {/* Meta */}
-        {(record.appName || edited || long || isAi) && !failed && (
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            {record.appName && (
-              <span
-                className="chip"
-                title={t('home.appChip', 'Dictated into {{app}}', { app: record.appName })}
-              >
-                {record.appName}
-              </span>
-            )}
-            {edited && (
-              <button
-                type="button"
-                onClick={() => setShowRaw((v) => !v)}
-                aria-expanded={showRaw}
-                className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-ink-soft transition-colors duration-200 hover:bg-hover hover:text-ink"
-              >
-                <WandSparkles className="h-3 w-3 text-signal" />
-                {t('home.edited', 'Polished')}
-                <ChevronDown
-                  className={`h-3 w-3 transition-transform duration-200 ${showRaw ? 'rotate-180' : ''}`}
-                />
-              </button>
-            )}
-            {isAi && record.llmInput && (
-              <button
-                type="button"
-                onClick={() => setShowRaw((v) => !v)}
-                aria-expanded={showRaw}
-                className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-ink-soft transition-colors duration-200 hover:bg-hover hover:text-ink"
-              >
-                {t('home.originalInput', 'Original text')}
-                <ChevronDown
-                  className={`h-3 w-3 transition-transform duration-200 ${showRaw ? 'rotate-180' : ''}`}
-                />
-              </button>
-            )}
-            {long && (
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                aria-expanded={expanded}
-                className="inline-flex h-6 items-center rounded-md px-1.5 text-[11px] font-medium text-signal hover:bg-signal-tint"
-              >
-                {expanded ? t('home.showLess', 'Show less') : t('home.showMore', 'Show more')}
-              </button>
-            )}
-          </div>
+        {long && !failed && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="mt-0.5 rounded text-[12px] text-ink-soft transition-colors duration-200 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40"
+          >
+            {expanded ? t('home.showLess', 'Show less') : t('home.showMore', 'Show more')}
+          </button>
         )}
 
         {showRaw && (
-          <div className="mt-1 rounded-md border border-hairline bg-sunken/60 px-2.5 py-1.5 dark:bg-sunken">
-            <p className="section-label mb-1">
-              {isAi
-                ? t('home.originalInput', 'Original text')
-                : t('home.rawTranscript', 'As heard')}
-            </p>
+          <div className="mt-1 border-s-2 border-hairline-strong ps-2.5">
+            <p className="text-[11.5px] text-ink-soft">{toggleLabel}</p>
             <p
               dir="auto"
               className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-muted"
@@ -726,9 +658,29 @@ function HistoryRow({
       {/* Actions: visible on hover and keyboard focus */}
       <div
         className={`flex shrink-0 items-start gap-0.5 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 ${
-          playing ? 'opacity-100' : 'opacity-0'
+          playing || showRaw ? 'opacity-100' : 'opacity-0'
         }`}
       >
+        {record.appName && !failed && (
+          <span
+            className="me-1 max-w-[120px] truncate pt-[5px] text-[11.5px] text-ink-faint"
+            title={t('home.appChip', 'Dictated into {{app}}', { app: record.appName })}
+          >
+            {record.appName}
+          </span>
+        )}
+        {(edited || (isAi && !!record.llmInput)) && !failed && (
+          <button
+            type="button"
+            className={`icon-btn ${showRaw ? '!text-signal' : ''}`}
+            onClick={() => setShowRaw((v) => !v)}
+            aria-pressed={showRaw}
+            aria-label={toggleLabel}
+            title={toggleLabel}
+          >
+            {isAi ? <Quote className="h-4 w-4" /> : <WandSparkles className="h-4 w-4" />}
+          </button>
+        )}
         {hasAudio && (
           <button
             type="button"

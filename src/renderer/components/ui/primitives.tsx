@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
+import { ChevronRight } from 'lucide-react'
 
 // ── Page scaffolding ─────────────────────────────────────────────
 
@@ -18,19 +19,18 @@ export function Page({ children, width = 'normal', className = '' }: PageProps):
 
 interface PageHeaderProps {
   title: ReactNode
+  /** One short line at most */
   description?: ReactNode
-  eyebrow?: ReactNode
   actions?: ReactNode
 }
 
-export function PageHeader({ title, description, eyebrow, actions }: PageHeaderProps): JSX.Element {
+export function PageHeader({ title, description, actions }: PageHeaderProps): JSX.Element {
   return (
-    <header className="mb-4 flex items-end justify-between gap-4 animate-rise">
+    <header className="mb-5 flex items-center justify-between gap-4 animate-rise">
       <div className="min-w-0">
-        {eyebrow && <p className="section-label mb-1">{eyebrow}</p>}
         <h1 className="page-title">{title}</h1>
         {description && (
-          <p className="mt-1 max-w-[560px] text-[13px] leading-snug text-ink-muted text-pretty">
+          <p className="mt-0.5 max-w-[560px] text-[12.5px] leading-snug text-ink-soft text-pretty">
             {description}
           </p>
         )}
@@ -57,13 +57,13 @@ export function Section({
   className = ''
 }: SectionProps): JSX.Element {
   return (
-    <section className={`mb-5 ${className}`}>
+    <section className={`mb-7 ${className}`}>
       {(title || action) && (
-        <div className="mb-1.5 flex items-end justify-between gap-3">
+        <div className="mb-1 flex items-end justify-between gap-3">
           <div className="min-w-0">
             {title && <h2 className="section-label">{title}</h2>}
             {description && (
-              <p className="mt-0.5 text-[12px] leading-snug text-ink-muted">{description}</p>
+              <p className="mt-0.5 text-[12px] leading-snug text-ink-soft">{description}</p>
             )}
           </div>
           {action}
@@ -74,7 +74,7 @@ export function Section({
   )
 }
 
-/** Rows separated by hairlines inside a bordered card */
+/** Rows separated by faint hairlines — no box around them */
 export function RowGroup({
   children,
   className = ''
@@ -82,9 +82,7 @@ export function RowGroup({
   children: ReactNode
   className?: string
 }): JSX.Element {
-  return (
-    <div className={`card divide-y divide-hairline overflow-hidden ${className}`}>{children}</div>
-  )
+  return <div className={`divide-y divide-hairline/70 ${className}`}>{children}</div>
 }
 
 interface RowProps {
@@ -98,18 +96,18 @@ interface RowProps {
 /** One setting: label + help on the start side, control on the end side */
 export function Row({ title, description, control, children, htmlFor }: RowProps): JSX.Element {
   return (
-    <div className="px-3.5 py-2.5">
-      <div className="flex items-center justify-between gap-4">
+    <div className="py-2.5">
+      <div className="flex min-h-8 items-center justify-between gap-4">
         <div className="min-w-0">
           {htmlFor ? (
-            <label htmlFor={htmlFor} className="text-[13px] font-medium text-ink">
+            <label htmlFor={htmlFor} className="text-[13px] text-ink">
               {title}
             </label>
           ) : (
-            <p className="text-[13px] font-medium text-ink">{title}</p>
+            <p className="text-[13px] text-ink">{title}</p>
           )}
           {description && (
-            <p className="mt-0.5 text-[12px] leading-snug text-ink-muted text-pretty">
+            <p className="mt-0.5 text-[12px] leading-snug text-ink-soft text-pretty">
               {description}
             </p>
           )}
@@ -206,7 +204,7 @@ export function Spinner({ className = 'w-4 h-4' }: { className?: string }): JSX.
   )
 }
 
-/** Hairline-framed note: info (Signal), warning or danger */
+/** A note. Info/success are a plain faint line; only warnings and errors get a tinted box. */
 export function Callout({
   tone = 'info',
   icon,
@@ -217,17 +215,54 @@ export function Callout({
   children: ReactNode
 }): JSX.Element {
   const tones = {
-    info: 'bg-signal-tint/60 border-signal/20 text-ink-muted [&_svg]:text-signal',
-    warning: 'bg-warning-tint border-warning/25 text-ink-muted [&_svg]:text-warning',
-    danger: 'bg-danger-tint border-danger/25 text-ink [&_svg]:text-danger',
-    success: 'bg-success-tint border-success/25 text-ink-muted [&_svg]:text-success'
+    info: 'text-ink-soft [&_svg]:text-ink-faint',
+    success: 'text-ink-soft [&_svg]:text-success',
+    warning:
+      'rounded-lg border px-3 py-2 bg-warning-tint border-warning/25 text-ink-muted [&_svg]:text-warning',
+    danger:
+      'rounded-lg border px-3 py-2 bg-danger-tint border-danger/25 text-ink [&_svg]:text-danger'
   }
   return (
-    <div
-      className={`flex items-start gap-2.5 rounded-lg border px-3 py-2 text-[12px] leading-snug ${tones[tone]}`}
-    >
-      {icon && <span className="mt-px shrink-0 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>}
+    <div className={`flex items-start gap-2 text-[12px] leading-snug ${tones[tone]}`}>
+      {icon && <span className="mt-px shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>}
       <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  )
+}
+
+/** Quiet "Advanced"-style disclosure for rarely changed options */
+export function Disclosure({
+  label,
+  children,
+  defaultOpen = false,
+  className = ''
+}: {
+  label: ReactNode
+  children: ReactNode
+  defaultOpen?: boolean
+  className?: string
+}): JSX.Element {
+  const [open, setOpen] = useState(defaultOpen)
+  const id = useId()
+  return (
+    <div className={className}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((v) => !v)}
+        className="-ms-1 inline-flex h-7 items-center gap-1 rounded-md px-1 text-[12.5px] text-ink-soft transition-colors duration-200 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40"
+      >
+        <ChevronRight
+          className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? 'rotate-90' : 'rtl-flip'}`}
+        />
+        {label}
+      </button>
+      {open && (
+        <div id={id} className="mt-1">
+          {children}
+        </div>
+      )}
     </div>
   )
 }

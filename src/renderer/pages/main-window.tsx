@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   Settings as SettingsIcon,
   Users,
+  ChevronRight,
   type LucideProps
 } from 'lucide-react'
 import appLogo from '../assets/logo.png'
@@ -27,8 +28,6 @@ import { Meetings } from './meetings'
 import { MeetingBanners } from '../components/meeting/meeting-banners'
 import { Onboarding } from './onboarding'
 import { useStatsStore } from '../store/stats'
-import { useRecordShortcut } from '../hooks/use-record-shortcut'
-import { ShortcutKeys } from '../components/ui/keycap'
 import { Spinner } from '../components/ui/primitives'
 
 export type Page =
@@ -55,13 +54,14 @@ interface NavItem {
 const MAIN_NAV: NavItem[] = [
   { id: 'home', labelKey: 'nav.home', icon: HomeIcon },
   { id: 'meetings', labelKey: 'nav.meetings', icon: Users },
+  { id: 'notes', labelKey: 'nav.notes', icon: NotebookPen },
   { id: 'dictionary', labelKey: 'nav.dictionary', icon: BookA },
   { id: 'snippets', labelKey: 'nav.snippets', icon: TextQuote },
-  { id: 'style', labelKey: 'nav.style', icon: Feather },
-  { id: 'notes', labelKey: 'nav.notes', icon: NotebookPen }
+  { id: 'style', labelKey: 'nav.style', icon: Feather }
 ]
 
-const AUTOMATION_NAV: NavItem[] = [
+/** Power-user pages, folded under "More" */
+const MORE_NAV: NavItem[] = [
   { id: 'triggers', labelKey: 'nav.triggers', icon: AudioLines },
   { id: 'actions', labelKey: 'nav.actions', icon: Sparkles },
   { id: 'mini-apps', labelKey: 'nav.miniApps', icon: LayoutGrid }
@@ -74,6 +74,16 @@ const AUTOMATION_NAV: NavItem[] = [
 const OS = window.tapwisper.platform.os
 const IS_MAC = OS === 'darwin'
 const HAS_CONTROLS_OVERLAY = OS === 'win32'
+
+const MORE_OPEN_KEY = 'nav.moreOpen'
+
+function readMoreOpen(): boolean {
+  try {
+    return localStorage.getItem(MORE_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 function NavButton({
   item,
@@ -89,17 +99,16 @@ function NavButton({
   return (
     <button
       type="button"
+      data-nav={item.id}
       onClick={() => onSelect(item.id)}
       aria-current={active ? 'page' : undefined}
-      className={`group flex h-8 w-full items-center gap-2.5 rounded-[9px] border px-2.5 text-[13px] transition-[background-color,color,border-color] duration-200 ease-out ${
-        active
-          ? 'border-hairline bg-raised font-medium text-ink shadow-[0_1px_2px_rgb(27_26_23/0.06)]'
-          : 'border-transparent text-ink-muted hover:bg-ink/[0.045] hover:text-ink'
+      className={`group flex h-8 w-full items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] transition-[background-color,color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 ${
+        active ? 'bg-ink/[0.06] text-ink' : 'text-ink-muted hover:bg-ink/[0.04] hover:text-ink'
       }`}
     >
       <Icon
-        className={`h-[17px] w-[17px] shrink-0 transition-colors duration-200 ${
-          active ? 'text-signal' : 'text-ink-soft group-hover:text-ink-muted'
+        className={`h-4 w-4 shrink-0 transition-colors duration-200 ${
+          active ? 'text-ink' : 'text-ink-soft group-hover:text-ink-muted'
         }`}
         strokeWidth={1.8}
       />
@@ -114,17 +123,18 @@ export function MainWindow(): JSX.Element {
   const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(undefined)
   const [meetingId, setMeetingId] = useState<string | undefined>(undefined)
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
-  const [appVersion, setAppVersion] = useState('')
+  const [moreOpen, setMoreOpen] = useState(readMoreOpen)
   const loadStats = useStatsStore((s) => s.loadStats)
-  const { shortcut } = useRecordShortcut()
 
-  useEffect(() => {
-    window.tapwisper.app
-      .getVersion()
-      .then(setAppVersion)
-      .catch(() => {
-        // Version is informational only
-      })
+  const toggleMore = useCallback(() => {
+    setMoreOpen((open) => {
+      try {
+        localStorage.setItem(MORE_OPEN_KEY, open ? '0' : '1')
+      } catch {
+        // Remembering the fold is a convenience only
+      }
+      return !open
+    })
   }, [])
 
   // Check if onboarding has been completed
@@ -211,7 +221,7 @@ export function MainWindow(): JSX.Element {
       case 'snippets':
         return <Snippets />
       case 'settings':
-        return <Settings onNavigate={navigate} initialTab={settingsTab} />
+        return <Settings initialTab={settingsTab} />
       default:
         return <Home />
     }
@@ -232,6 +242,8 @@ export function MainWindow(): JSX.Element {
 
   // macOS traffic lights sit at the top-left: in LTR the brand moves past them
   const brandBesideTrafficLights = IS_MAC && i18n.dir() === 'ltr'
+  const moreActive = MORE_NAV.some((item) => item.id === activePage)
+  const showMore = moreOpen || moreActive
 
   return (
     <div className="flex h-screen flex-col bg-canvas">
@@ -274,34 +286,42 @@ export function MainWindow(): JSX.Element {
             </div>
 
             <div className="space-y-0.5">
-              <p className="section-label px-2.5 pb-1">{t('nav.automations', 'Automations')}</p>
-              {AUTOMATION_NAV.map((item) => (
-                <NavButton
-                  key={item.id}
-                  item={item}
-                  active={activePage === item.id}
-                  onSelect={selectPage}
+              <button
+                type="button"
+                data-nav-more=""
+                onClick={toggleMore}
+                aria-expanded={showMore}
+                aria-controls="nav-more"
+                disabled={moreActive}
+                className="flex h-7 w-full items-center gap-1 rounded-[9px] px-2.5 text-[12px] text-ink-soft transition-colors duration-200 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 disabled:pointer-events-none"
+              >
+                {t('nav.more', 'More')}
+                <ChevronRight
+                  className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                    showMore ? 'rotate-90' : 'rtl-flip'
+                  }`}
                 />
-              ))}
+              </button>
+              {showMore && (
+                <div id="nav-more" className="space-y-0.5">
+                  {MORE_NAV.map((item) => (
+                    <NavButton
+                      key={item.id}
+                      item={item}
+                      active={activePage === item.id}
+                      onSelect={selectPage}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="mt-auto space-y-2">
-              <div className="rounded-lg border border-hairline/80 bg-raised/60 px-2.5 py-2">
-                <p className="text-[11.5px] leading-snug text-ink-muted">
-                  {t('nav.shortcutHint', 'Hold to dictate in any app')}
-                </p>
-                <ShortcutKeys accelerator={shortcut} size="sm" className="mt-1.5 flex-wrap" />
-              </div>
+            <div className="mt-auto">
               <NavButton
                 item={{ id: 'settings', labelKey: 'nav.settings', icon: SettingsIcon }}
                 active={activePage === 'settings'}
                 onSelect={selectPage}
               />
-              {appVersion && (
-                <p className="px-2.5 text-[10.5px] text-ink-faint tabular">
-                  {t('nav.version', 'Version {{version}}', { version: appVersion })}
-                </p>
-              )}
             </div>
           </nav>
         </aside>

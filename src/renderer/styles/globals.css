@@ -246,12 +246,9 @@
     @apply font-display text-[22px] leading-tight text-ink;
   }
 
+  /* Quiet group heading: sentence case, muted, no tracking */
   .section-label {
-    @apply text-[10.5px] font-semibold uppercase tracking-[0.11em] text-ink-soft;
-  }
-
-  [dir='rtl'] .section-label {
-    @apply tracking-normal text-xs;
+    @apply text-[12px] font-medium text-ink-soft;
   }
 
   /* ── Buttons ────────────────────────────────────────────────── */
