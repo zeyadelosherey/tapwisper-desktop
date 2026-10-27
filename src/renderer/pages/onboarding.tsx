@@ -318,8 +318,19 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
             `}
           >
             {t('onboarding.continue')}
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4 rtl-flip" />
           </button>
+
+          {/* Skip — lets users continue when a permission can't be detected */}
+          {!allGranted && (
+            <button
+              type="button"
+              onClick={onComplete}
+              className="text-xs text-theme-text-tertiary hover:text-theme-text underline underline-offset-2 transition-colors"
+            >
+              {t('onboarding.skipForNow', 'Skip for now')}
+            </button>
+          )}
         </div>
       </div>
     </div>
