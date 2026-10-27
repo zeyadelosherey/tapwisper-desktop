@@ -1,14 +1,17 @@
 /**
- * Downloaded model files: where they live, downloading (resumable, verified)
- * and deleting. Models are plain data files, so they need no code signing.
+ * Downloaded model files: where they live, downloading (resumable, pinned to a
+ * Hugging Face commit, verified) and deleting. Models are plain data files, so
+ * they need no code signing.
  */
 import { app, net } from 'electron'
-import { createHash } from 'crypto'
+import { createHash, type Hash } from 'crypto'
 import { createReadStream, createWriteStream, type WriteStream } from 'fs'
 import { mkdir, rename, rm, stat, statfs } from 'fs/promises'
 import { once } from 'events'
 import path from 'path'
 import { getConfigValue } from '../store'
+import { LocalAiError } from './errors'
+import { resolveSource, type FileRole, type RemoteFile } from './hf'
 import { DISK_HEADROOM_BYTES, MODEL_CATALOG, getModel } from '../../shared/local-ai/catalog'
 import type {
   DownloadProgress,
@@ -28,8 +31,20 @@ export function modelsDir(): string {
   return settings?.modelsDir || path.join(app.getPath('userData'), 'models')
 }
 
-export function modelPath(model: LocalModelEntry): string {
-  return path.join(modelsDir(), model.kind, model.fileName)
+/**
+ * Where a model's files live. Named after the catalog id, not the upstream
+ * file, so a renamed upstream file never orphans a download.
+ */
+export function modelFiles(model: LocalModelEntry): Record<FileRole, string | null> {
+  const base = path.join(modelsDir(), model.kind, model.id)
+  return {
+    model: `${base}.${model.runtime === 'llama' ? 'gguf' : 'bin'}`,
+    mmproj: model.source.mmproj ? `${base}.mmproj.gguf` : null
+  }
+}
+
+function localPaths(model: LocalModelEntry): string[] {
+  return Object.values(modelFiles(model)).filter((p): p is string => p !== null)
 }
 
 async function fileSize(file: string): Promise<number | null> {
@@ -41,21 +56,26 @@ async function fileSize(file: string): Promise<number | null> {
 }
 
 export async function isInstalled(model: LocalModelEntry): Promise<boolean> {
-  return (await fileSize(modelPath(model))) !== null
+  const sizes = await Promise.all(localPaths(model).map(fileSize))
+  return sizes.every((size) => size !== null)
 }
 
 /** Ids of the catalog models present on disk; also clears out stale partial files */
 export async function listInstalled(): Promise<string[]> {
-  const installed: string[] = []
-  for (const model of MODEL_CATALOG) {
-    if (await isInstalled(model)) installed.push(model.id)
-    const part = `${modelPath(model)}.part`
-    const partStat = await stat(part).catch(() => null)
-    if (partStat && Date.now() - partStat.mtimeMs > STALE_PART_MS && !downloads.has(model.id)) {
-      await rm(part, { force: true })
-    }
+  const results = await Promise.all(
+    MODEL_CATALOG.map(async (model) => {
+      if (!downloads.has(model.id)) await removeStaleParts(model)
+      return (await isInstalled(model)) ? model.id : null
+    })
+  )
+  return results.filter((id): id is string => id !== null)
+}
+
+async function removeStaleParts(model: LocalModelEntry): Promise<void> {
+  for (const file of localPaths(model)) {
+    const part = await stat(`${file}.part`).catch(() => null)
+    if (part && Date.now() - part.mtimeMs > STALE_PART_MS) await rm(`${file}.part`, { force: true })
   }
-  return installed
 }
 
 /** Free bytes on the volume holding `dir` (or its nearest existing parent) */
@@ -75,9 +95,9 @@ export async function freeDiskBytes(dir: string): Promise<number | null> {
 
 // ── Downloading ───────────────────────────────────────────────────
 
-class DownloadError extends Error {
+class DownloadError extends LocalAiError {
   constructor(
-    readonly code: LocalAiErrorCode,
+    code: LocalAiErrorCode,
     readonly retryable = false
   ) {
     super(code)
@@ -99,8 +119,7 @@ export function downloadModel(
   const running = downloads.get(id)
   if (running) return running.done
   const model = getModel(id)
-  if (!model)
-    return Promise.resolve({ ok: false, code: 'download-failed', detail: 'unknown model' })
+  if (!model) return Promise.resolve({ ok: false, code: 'model-unavailable' })
 
   const controller = new AbortController()
   const done = runDownload(model, controller.signal, onProgress).finally(() => downloads.delete(id))
@@ -117,38 +136,38 @@ async function runDownload(
   signal: AbortSignal,
   onProgress: (progress: DownloadProgress) => void
 ): Promise<LocalAiResult<void>> {
-  const target = modelPath(model)
-  const part = `${target}.part`
-  const report = new ProgressReporter(model, onProgress)
+  const report = new ProgressReporter(model.id, onProgress)
   try {
     if (await isInstalled(model)) return { ok: true, data: undefined }
-    await mkdir(path.dirname(target), { recursive: true })
+    const remote = await resolveSource(model.source)
+    const targets = modelFiles(model)
+    const total = remote.reduce((sum, f) => sum + (f.size ?? 0), 0) || model.sizeBytes
 
-    const existing = (await fileSize(part)) ?? 0
-    const free = await freeDiskBytes(path.dirname(target))
-    if (free !== null && free < model.sizeBytes - existing + DISK_HEADROOM_BYTES) {
+    // Disk space for what is still missing, across all files
+    const dir = path.dirname(targets.model!)
+    await mkdir(dir, { recursive: true })
+    const have = await Promise.all(
+      remote.map(async (f) => {
+        const target = targets[f.role]!
+        return (await fileSize(target)) ?? (await fileSize(`${target}.part`)) ?? 0
+      })
+    )
+    const free = await freeDiskBytes(dir)
+    const missing = total - have.reduce((a, b) => a + b, 0)
+    if (free !== null && free < missing + DISK_HEADROOM_BYTES) {
       throw new DownloadError('insufficient-disk')
     }
 
-    // A pinned hash wins; otherwise the server's own hash, or at least its size
-    const expected = model.sha256 ? { sha256: model.sha256 } : await huggingFaceFileInfo(model.url)
-    for (let attempt = 1; ; attempt++) {
-      try {
-        await fetchToFile(model.url, part, signal, report)
-        break
-      } catch (err) {
-        const retryable = !signal.aborted && (!(err instanceof DownloadError) || err.retryable)
-        if (!retryable || attempt >= MAX_ATTEMPTS) throw err
-        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt))
+    let completed = 0
+    for (const file of remote) {
+      const target = targets[file.role]!
+      if ((await fileSize(target)) === null) {
+        await downloadFile(file, target, signal, (received) =>
+          report.bytes(completed + received, total)
+        )
       }
+      completed += (await fileSize(target)) ?? 0
     }
-
-    report.state('verifying')
-    if (!(await matches(part, expected))) {
-      await rm(part, { force: true })
-      throw new DownloadError('checksum-mismatch')
-    }
-    await rename(part, target)
     report.state('done')
     return { ok: true, data: undefined }
   } catch (err) {
@@ -156,30 +175,93 @@ async function runDownload(
       report.state('cancelled')
       return { ok: false, code: 'download-failed', detail: 'cancelled' }
     }
-    const code = err instanceof DownloadError ? err.code : 'download-failed'
+    const code = err instanceof LocalAiError ? err.code : 'download-failed'
     report.state('error', code)
     return { ok: false, code, detail: (err as Error).message }
+  }
+}
+
+/** Download one file to `<target>.part`, verify it and move it into place */
+async function downloadFile(
+  file: RemoteFile,
+  target: string,
+  signal: AbortSignal,
+  onBytes: (received: number) => void
+): Promise<void> {
+  const part = `${target}.part`
+  // Hashed while it streams in, so a multi-GB file isn't read a second time
+  const digest = new StreamingDigest(Boolean(file.sha256))
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await digest.catchUp(part)
+      await fetchToFile(file, part, signal, digest, onBytes)
+      break
+    } catch (err) {
+      const retryable = !signal.aborted && (!(err instanceof DownloadError) || err.retryable)
+      if (!retryable || attempt >= MAX_ATTEMPTS) throw err
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt))
+    }
+  }
+
+  const verified = file.sha256
+    ? digest.hex() === file.sha256
+    : file.size === undefined || (await fileSize(part)) === file.size
+  if (!verified) {
+    await rm(part, { force: true })
+    throw new DownloadError('checksum-mismatch')
+  }
+  await rename(part, target)
+}
+
+/** SHA-256 of a partial file as it grows, picking up after interruptions */
+class StreamingDigest {
+  private hash: Hash | null = null
+  private hashed = 0
+
+  constructor(private readonly enabled: boolean) {
+    this.reset()
+  }
+
+  /** Bring the hash up to the file's current length (on resume or after a failed attempt) */
+  async catchUp(file: string): Promise<void> {
+    if (!this.enabled) return
+    const size = (await fileSize(file)) ?? 0
+    if (size === this.hashed) return
+    this.reset()
+    if (size > 0) for await (const chunk of createReadStream(file)) this.update(chunk as Buffer)
+  }
+
+  reset(): void {
+    this.hash = this.enabled ? createHash('sha256') : null
+    this.hashed = 0
+  }
+
+  update(chunk: Uint8Array): void {
+    this.hash?.update(chunk)
+    this.hashed += chunk.byteLength
+  }
+
+  hex(): string {
+    return this.hash?.digest('hex') ?? ''
   }
 }
 
 /** Throttled progress events with a running download speed */
 class ProgressReporter {
   private received = 0
-  private total: number
+  private total = 0
   private lastSent = 0
   private lastBytes = 0
   private bytesPerSec = 0
 
   constructor(
-    private readonly model: LocalModelEntry,
+    private readonly id: string,
     private readonly onProgress: (progress: DownloadProgress) => void
-  ) {
-    this.total = model.sizeBytes
-  }
+  ) {}
 
   bytes(received: number, total: number): void {
     this.received = received
-    this.total = total || this.total
+    this.total = total
     const now = Date.now()
     if (now - this.lastSent < PROGRESS_INTERVAL_MS) return
     if (this.lastSent) {
@@ -192,30 +274,36 @@ class ProgressReporter {
 
   state(state: DownloadProgress['state'], error?: LocalAiErrorCode): void {
     const { received, total, bytesPerSec } = this
-    this.onProgress({ id: this.model.id, received, total, bytesPerSec, state, error })
+    this.onProgress({ id: this.id, received, total, bytesPerSec, state, error })
   }
 }
 
-/** Append the remainder of `url` to `part`, resuming from its current size */
+/** Append the remainder of `file` to `part`, resuming from its current size */
 async function fetchToFile(
-  url: string,
+  file: RemoteFile,
   part: string,
   signal: AbortSignal,
-  report: ProgressReporter
+  digest: StreamingDigest,
+  onBytes: (received: number) => void
 ): Promise<void> {
   let offset = (await fileSize(part)) ?? 0
-  const res = await net.fetch(url, {
+  if (offset > 0 && offset === file.size) return
+  const res = await net.fetch(file.url, {
     headers: offset ? { Range: `bytes=${offset}-` } : {},
     signal
   })
-  if (res.status === 416) return // Already complete
   if (!res.ok || !res.body) {
-    throw new DownloadError('download-failed', res.status === 429 || res.status >= 500)
+    // 416: the part file doesn't fit the remote file — drop it and start over
+    if (res.status === 416) await rm(part, { force: true })
+    const retryable = res.status === 416 || res.status === 429 || res.status >= 500
+    throw new DownloadError('download-failed', retryable)
   }
-  if (res.status !== 206) offset = 0 // Server ignored the range: start over
+  if (offset && res.status !== 206) {
+    // The server ignored the range: start over
+    offset = 0
+    digest.reset()
+  }
 
-  const length = Number(res.headers.get('content-length')) || 0
-  const total = length ? offset + length : 0
   const out = createWriteStream(part, { flags: offset ? 'a' : 'w' })
   let received = offset
   try {
@@ -223,9 +311,10 @@ async function fetchToFile(
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
-      received += value.byteLength
       await write(out, value)
-      report.bytes(received, total)
+      digest.update(value)
+      received += value.byteLength
+      onBytes(received)
     }
   } catch (err) {
     if (signal.aborted) throw err
@@ -234,55 +323,13 @@ async function fetchToFile(
     out.end()
     await once(out, 'close')
   }
-  if (total && received < total) throw new DownloadError('download-failed', true)
+  if (file.size !== undefined && received < file.size) {
+    throw new DownloadError('download-failed', true)
+  }
 }
 
 async function write(out: WriteStream, chunk: Uint8Array): Promise<void> {
   if (!out.write(chunk)) await once(out, 'drain')
-}
-
-async function matches(file: string, expected: RemoteFileInfo): Promise<boolean> {
-  if (expected.sha256) return (await sha256File(file)) === expected.sha256
-  if (expected.size) return (await fileSize(file)) === expected.size
-  return true
-}
-
-export async function sha256File(file: string): Promise<string> {
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer)
-  return hash.digest('hex')
-}
-
-/** Hugging Face sends the SHA-256 of LFS files in X-Linked-Etag on its redirect */
-export function parseLinkedEtag(value: string | string[] | undefined): string | undefined {
-  const raw = (Array.isArray(value) ? value[0] : value)?.replace(/^W\//, '').replace(/"/g, '')
-  return raw && /^[a-f0-9]{64}$/i.test(raw) ? raw.toLowerCase() : undefined
-}
-
-interface RemoteFileInfo {
-  sha256?: string
-  size?: number
-}
-
-/** Hash and size Hugging Face publishes for a file (both empty when it doesn't say) */
-function huggingFaceFileInfo(url: string): Promise<RemoteFileInfo> {
-  return new Promise((resolve) => {
-    const request = net.request({ method: 'HEAD', url, redirect: 'manual' })
-    const timer = setTimeout(() => finish({}), 10_000)
-    function finish(info: RemoteFileInfo): void {
-      clearTimeout(timer)
-      request.abort()
-      resolve(info)
-    }
-    const read = (headers: Record<string, string | string[]>): RemoteFileInfo => ({
-      sha256: parseLinkedEtag(headers['x-linked-etag']),
-      size: Number([headers['x-linked-size']].flat()[0]) || undefined
-    })
-    request.on('redirect', (_status, _method, _url, headers) => finish(read(headers)))
-    request.on('response', (res) => finish(read(res.headers)))
-    request.on('error', () => finish({}))
-    request.end()
-  })
 }
 
 // ── Deleting ──────────────────────────────────────────────────────
@@ -291,7 +338,11 @@ export async function deleteModel(id: string): Promise<LocalAiResult<void>> {
   const model = getModel(id)
   if (!model) return { ok: false, code: 'model-not-downloaded' }
   cancelDownload(id)
-  await rm(modelPath(model), { force: true })
-  await rm(`${modelPath(model)}.part`, { force: true })
+  await Promise.all(
+    localPaths(model).flatMap((file) => [
+      rm(file, { force: true }),
+      rm(`${file}.part`, { force: true })
+    ])
+  )
   return { ok: true, data: undefined }
 }

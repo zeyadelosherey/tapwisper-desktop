@@ -2,8 +2,8 @@
  * Open-source models the local engine can download, and the pure helpers that
  * match them to the user's device. Shared by the main process and the renderer.
  *
- * The data lives in models.json so CI can check every URL without a
- * TypeScript toolchain (scripts/check-model-urls.mjs).
+ * The data lives in models.json; CI resolves every entry on Hugging Face
+ * (src/main/local-ai/__tests__/catalog.online.test.ts).
  */
 import catalogData from './models.json'
 import type {
@@ -16,24 +16,44 @@ import type {
   SelfHostedSettings
 } from './types'
 
-type CatalogEntry = Omit<LocalModelEntry, 'kind' | 'license' | 'licenseUrl' | 'learnMoreUrl'> &
-  Partial<Pick<LocalModelEntry, 'license' | 'licenseUrl' | 'learnMoreUrl'>>
+/** Catalog entries may leave out what their family (or kind) already says */
+type CatalogEntry = Omit<LocalModelEntry, 'kind' | 'runtime' | 'languages'> &
+  Partial<Pick<LocalModelEntry, 'runtime' | 'languages'>>
 
-/** Every whisper.cpp model shares these */
-const WHISPER_INFO = {
-  license: 'MIT',
-  licenseUrl: 'https://github.com/openai/whisper/blob/main/LICENSE',
-  learnMoreUrl: 'https://huggingface.co/ggerganov/whisper.cpp'
+const familyDefaults = catalogData.familyDefaults as Record<string, Partial<LocalModelEntry>>
+
+function withDefaults(entries: unknown[], kind: LocalModelKind): LocalModelEntry[] {
+  return (entries as CatalogEntry[]).map((entry) => ({
+    runtime: 'llama',
+    languages: 'multilingual',
+    ...familyDefaults[entry.family],
+    ...entry,
+    kind
+  }))
 }
 
 export const MODEL_CATALOG: LocalModelEntry[] = [
-  ...(catalogData.stt as CatalogEntry[]).map((e) => ({
-    ...WHISPER_INFO,
-    ...e,
-    kind: 'stt' as const
-  })),
-  ...(catalogData.llm as CatalogEntry[]).map((e) => ({ ...e, kind: 'llm' as const }))
-] as LocalModelEntry[]
+  ...withDefaults(catalogData.stt, 'stt'),
+  ...withDefaults(catalogData.llm, 'llm')
+]
+
+/** Display names of the model families (brand names, not translated) */
+export const FAMILY_LABELS: Record<string, string> = {
+  whisper: 'Whisper',
+  parakeet: 'NVIDIA Parakeet',
+  'qwen-asr': 'Qwen3-ASR',
+  voxtral: 'Voxtral',
+  qwen: 'Qwen',
+  gemma: 'Gemma',
+  llama: 'Llama',
+  phi: 'Phi',
+  mistral: 'Mistral',
+  liquid: 'Liquid AI',
+  smollm: 'SmolLM',
+  granite: 'Granite',
+  nvidia: 'NVIDIA',
+  openai: 'OpenAI'
+}
 
 export const DEFAULT_LOCAL_AI_SETTINGS: LocalAiSettings = {
   modelsDir: null,
@@ -82,11 +102,15 @@ function baseLanguage(language: string): string {
   return language.toLowerCase().split(/[-_]/)[0]
 }
 
-/** Whether a model understands every language the user dictates in ([] = any) */
+/**
+ * Whether a model understands every language the user dictates in. With
+ * auto-detect ([]) a model needs to know more than one language.
+ */
 export function supportsLanguages(model: LocalModelEntry, languages: string[]): boolean {
   if (model.languages === 'multilingual') return true
   const supported = model.languages
-  return languages.length > 0 && languages.every((l) => supported.includes(baseLanguage(l)))
+  if (languages.length === 0) return supported.length > 1
+  return languages.every((l) => supported.includes(baseLanguage(l)))
 }
 
 function hasFastAccel(profile: DeviceProfile): boolean {
@@ -101,12 +125,13 @@ export function recommendedModelId(kind: LocalModelKind, profile: DeviceProfile)
   const ram = profile.totalRamGB
   if (kind === 'stt') {
     if (hasFastAccel(profile) && ram >= 8) return 'whisper-large-v3-turbo-q5'
-    if (ram >= 8 && !profile.emulated) return 'whisper-small'
-    return 'whisper-base'
+    // Quantized models: nearly the same accuracy, faster on a CPU
+    if (ram >= 8 && !profile.emulated) return 'whisper-small-q5'
+    return 'whisper-base-q5'
   }
-  if (hasFastAccel(profile) && ram >= 16) return 'qwen3-4b'
-  if (ram >= 8) return 'qwen3-1.7b'
-  if (ram >= 4) return 'qwen3-0.6b'
+  if (hasFastAccel(profile) && ram >= 16) return 'qwen3.5-4b'
+  if (ram >= 8) return 'qwen3.5-2b'
+  if (ram >= 4) return 'qwen3.5-0.8b'
   return null
 }
 

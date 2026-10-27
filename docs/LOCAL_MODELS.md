@@ -20,7 +20,9 @@ Main      src/main/local-ai/
             index.ts        IPC handlers, picks the model, CPU fallback
             sidecar.ts      runs one inference server on 127.0.0.1:<random port>
             whisper.ts      whisper-server arguments + /inference
-            llama.ts        llama-server arguments + /v1/chat/completions
+            parakeet.ts     runs parakeet-cli once per recording
+            llama.ts        llama-server arguments, chat and audio transcription
+            hf.ts           resolves a catalog entry to files on Hugging Face
             model-store.ts  downloads (resume, SHA-256 check), delete
             hardware.ts     RAM, disk, GPU, emulation, runtime probe
             self-hosted.ts  client for the user's own server
@@ -29,12 +31,17 @@ Binaries  resources/bin/{whisper,llama}/  built by scripts/build-runtimes.mjs
 Models    <userData>/models/{stt,llm}/     or a folder the user picks
 ```
 
-- **The servers.** whisper.cpp's `whisper-server` and llama.cpp's `llama-server` run as child processes.
+- **The runtimes.** Each speech model names the program that runs it:
+  - Whisper models run on whisper.cpp's `whisper-server`.
+  - NVIDIA Parakeet runs on whisper.cpp's `parakeet-cli`, started once per recording.
+  - Audio language models (Qwen3-ASR, Voxtral) run on llama.cpp's `llama-server` with their audio projector, through its `/v1/audio/transcriptions` endpoint.
+  - All language models run on `llama-server`.
+- **The servers.** `whisper-server` and `llama-server` run as child processes.
   - A server starts on the first request, or when recording starts, so the model loads while you talk.
   - It handles one request at a time.
   - It stops after a period without use (10 minutes by default). "Keep models loaded" turns that off.
   - It restarts whenever the model or a runtime option changes.
-- **Networking.** The servers only listen on `127.0.0.1`. Nothing is reachable from the network, and there's no firewall prompt.
+- **Networking.** The servers only listen on `127.0.0.1`. Nothing is reachable from the network, and there's no firewall prompt. `llama-server` also requires an API key that is generated for each session, so other programs on the computer can't use it.
 - **Audio.** Recordings are WebM/Opus. The renderer converts them to 16 kHz mono WAV (`utils/audio-convert.ts`) before sending them to whisper.cpp or a self-hosted server.
 - **Self-hosted requests** go through the main process (Electron's network stack). That way the system proxy and certificate store apply, and the renderer's Content-Security-Policy stays limited to the cloud APIs.
 - **Context size.** Local models get an 8K-token context. `getMaxInputChars()` in the router tells meeting summaries and Q&A how much text fits, and long meetings are condensed in several rounds.
@@ -43,7 +50,7 @@ Models    <userData>/models/{stt,llm}/     or a folder the user picks
 
 | Computer | Local engine | Notes |
 |---|---|---|
-| Mac with Apple Silicon | ✅ Metal GPU | Best experience. Recommended: Whisper Large v3 Turbo (Q5) and Qwen3 4B with 16 GB RAM or more. |
+| Mac with Apple Silicon | ✅ Metal GPU | Best experience. Recommended: Whisper Large v3 Turbo (Q5) and Qwen3.5 4B with 16 GB RAM or more. |
 | Intel Mac | ✅ CPU | Prefer Whisper Base/Small and a 1–2B language model. |
 | Intel build on Apple Silicon (Rosetta) | ⚠️ slow | The settings page asks you to install the Apple Silicon build. |
 | Windows x64 | ✅ CPU, Vulkan GPU for the language model | Uses the GPU on NVIDIA, AMD and Intel Arc. If the GPU fails to load a model, it falls back to the CPU for the rest of the session. |
@@ -64,39 +71,59 @@ Models    <userData>/models/{stt,llm}/     or a folder the user picks
 
 ## Models
 
-The catalog lives in [`src/shared/local-ai/models.json`](../src/shared/local-ai/models.json). Every file downloads from Hugging Face without an account.
+The catalog lives in [`src/shared/local-ai/models.json`](../src/shared/local-ai/models.json). Every model downloads from an ungated Hugging Face repository, without an account. Each model's license is linked in the app before you download it.
 
-- **Speech-to-text:** whisper.cpp GGML models, all MIT-licensed: Tiny, Base, Small, Medium, Large v3 Turbo, Large v3, plus English-only variants.
-- **Language models:** GGUF files, quantized to Q4_K_M:
+**Speech-to-text**
 
-  | Model | License |
-  |---|---|
-  | Qwen3 0.6B / 1.7B / 4B / 8B | Apache-2.0 |
-  | Llama 3.2 1B / 3B | Llama 3.2 Community License |
-  | Gemma 3 1B / 4B | Gemma Terms of Use |
-  | Phi-4 Mini | MIT |
-  | Mistral 7B v0.3 | Apache-2.0 |
+| Model | Runtime | Languages | License |
+|---|---|---|---|
+| Whisper Tiny, Base, Small, Medium, Large v3 Turbo, Large v3 (full and quantized; Tiny/Base/Small also English-only) | whisper-server | 99 | MIT |
+| NVIDIA Parakeet TDT 0.6B v3 | parakeet-cli | 25 European | CC-BY-4.0 |
+| Qwen3-ASR 0.6B / 1.7B | llama-server | Multilingual | Apache-2.0 |
+| Voxtral Mini 3B | llama-server | 8 | Apache-2.0 |
 
-  Each model's license is linked in the app before you download it.
+**Language models** (GGUF, Q4_K_M unless noted)
+
+| Family | Models | License |
+|---|---|---|
+| Qwen | Qwen3.5 0.8B / 2B / 4B / 9B, Qwen3 0.6B / 1.7B / 8B, Qwen3 4B Instruct 2507 | Apache-2.0 |
+| Gemma | Gemma 4 E2B / E4B | Apache-2.0 |
+| | Gemma 3 1B / 4B | Gemma Terms of Use |
+| Llama | Llama 3.2 1B / 3B, Llama 3.1 8B | Llama Community License |
+| Phi | Phi-4 Mini | MIT |
+| Mistral | Mistral 7B v0.3 | Apache-2.0 |
+| Liquid AI | LFM2 350M, LFM2.5 1.2B | LFM Open License |
+| SmolLM | SmolLM2 1.7B, SmolLM3 3B | Apache-2.0 |
+| Granite | Granite 3.3 2B | Apache-2.0 |
+| NVIDIA | Nemotron 3 Nano 4B | NVIDIA Open Model License |
+| OpenAI | gpt-oss 20B (MXFP4) | Apache-2.0 |
+
+Reasoning models are asked not to think, through `chat_template_kwargs`, and any leftover `<think>` block is stripped from the reply.
 
 **Download handling:**
-- Downloads resume after an interruption.
-- Each file is checked against the SHA-256 Hugging Face publishes for it. A damaged file is deleted and can be downloaded again.
+- The app asks the Hugging Face API for the repository's files and their SHA-256 hashes, then downloads from that exact commit. A model can't change between the size check and the download.
+- Downloads resume after an interruption. The hash is computed while the file streams in, so checking a multi-gigabyte file doesn't read it twice.
+- A file whose hash doesn't match is deleted and can be downloaded again.
+- Audio language models download two files, the model and its audio projector. They only count as installed when both are present.
 - Partial files left for more than 7 days are cleaned up.
 
 ### Adding a model
 
-1. Add an entry to `models.json` with a direct `resolve/main/…` URL from an ungated repository, plus its size, minimum and recommended RAM, license and speed/quality scores (1–5, relative within its kind).
-2. Add `"thinking": true` for models that emit `<think>` blocks. The app then turns reasoning off with `chat_template_kwargs` and strips any leftover blocks.
-3. Run `node scripts/check-model-urls.mjs` to check the URL and size.
-4. Run `npm test`. The catalog test checks for unique ids and complete license links.
+1. Add an entry to `models.json` under `stt` or `llm`, with a `source` from an ungated repository:
+   - `{ "repo": "owner/name", "file": "exact-file.gguf" }` for a fixed file, or
+   - `{ "repo": "owner/name", "quant": ["Q4_K_M", "Q8_0"] }` to pick the first quantization the repository has.
+   - Add `"mmproj": true` for audio models that need a projector file.
+2. Fill in its approximate size, minimum and recommended RAM, license, links and speed/quality scores (1–5, relative within its kind). Speech models also need `runtime` (`whisper`, `parakeet` or `llama`) and `languages`.
+3. For models that think before answering, add `chatTemplateKwargs`, for example `{ "enable_thinking": false }`.
+4. Run `npm test`. The catalog test checks for unique ids, complete licenses and sources.
+5. Run `LOCAL_AI_CHECK_CATALOG=1 npx vitest run src/main/local-ai/__tests__/catalog.online.test.ts`. It resolves every model on Hugging Face with the app's own code, and checks that each file has a SHA-256 and that the catalog size is about right. CI runs it on every change to the catalog.
 
 ## Building the runtimes
 
 The bundled servers are built from source at the tags pinned in [`scripts/runtimes.json`](../scripts/runtimes.json):
 
 ```bash
-npm run build:runtimes            # whisper-server + llama-server for this OS/arch
+npm run build:runtimes            # whisper-server, parakeet-cli, llama-server for this OS/arch
 npm run build:runtimes -- --vulkan   # add the Vulkan backend (Windows/Linux, needs the Vulkan SDK)
 ```
 
@@ -104,11 +131,23 @@ You need git, CMake 3.21 or newer, and a C++17 compiler (Xcode Command Line Tool
 
 **Development without runtimes.** You can develop without building them. The Local card then says the runtime isn't included in this build.
 
-**Release builds.** The release workflow builds the runtimes for each platform and caches them. `.github/workflows/local-runtimes.yml` builds them on Linux, macOS and Windows, then runs real Whisper Tiny and Qwen3 0.6B models through the app's own code (`src/main/local-ai/__tests__/runtimes.smoke.test.ts`). To run that test locally:
+**Release builds.** The release workflow builds the runtimes for each platform and caches them.
+
+**CI checks.** `.github/workflows/local-runtimes.yml` builds the runtimes on Linux, macOS and Windows. It then downloads Whisper Tiny, Parakeet, Qwen3-ASR 0.6B and Qwen3.5 0.8B with the app's own download code and runs them through the app's own launch and request code (`src/main/local-ai/__tests__/runtimes.smoke.test.ts`). To run that test locally, either let it download the models:
+
+```bash
+LOCAL_AI_SMOKE_DOWNLOAD=1 LOCAL_AI_SMOKE_EXPECT_TEXT=1 \
+npx vitest run src/main/local-ai/__tests__/runtimes.smoke.test.ts
+```
+
+or point it at model files you already have. Each check runs only when its model is given:
 
 ```bash
 LOCAL_AI_SMOKE_WHISPER_MODEL=/path/ggml-tiny.bin \
-LOCAL_AI_SMOKE_LLM_MODEL=/path/Qwen3-0.6B-Q4_K_M.gguf \
+LOCAL_AI_SMOKE_PARAKEET_MODEL=/path/ggml-parakeet-tdt-0.6b-v3-f16.bin \
+LOCAL_AI_SMOKE_ASR_MODEL=/path/Qwen3-ASR-0.6B-Q8_0.gguf \
+LOCAL_AI_SMOKE_ASR_MMPROJ=/path/mmproj-Qwen3-ASR-0.6B-f16.gguf \
+LOCAL_AI_SMOKE_LLM_MODEL=/path/Qwen3.5-0.8B-Q4_K_M.gguf \
 LOCAL_AI_SMOKE_EXPECT_TEXT=1 \
 npx vitest run src/main/local-ai/__tests__/runtimes.smoke.test.ts
 ```

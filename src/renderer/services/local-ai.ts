@@ -26,6 +26,8 @@ const FALLBACK_MESSAGES: Record<LocalAiErrorCode, string> = {
   timeout: 'The model took too long to respond.',
   'insufficient-disk': 'Not enough free disk space for this model.',
   'download-failed': 'The download failed. Check your connection and try again.',
+  'model-unavailable':
+    'This model is no longer available for download. Choose another one or update TapWisper.',
   'checksum-mismatch': 'The downloaded file was damaged and has been removed. Try again.',
   'model-in-use': 'This model is busy. Try again in a moment.',
   'input-too-long':

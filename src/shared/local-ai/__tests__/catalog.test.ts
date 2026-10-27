@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  FAMILY_LABELS,
   MODEL_CATALOG,
   getModel,
   isInsecureKeyUse,
@@ -41,16 +42,24 @@ function model(id: string): LocalModelEntry {
 }
 
 describe('MODEL_CATALOG', () => {
-  it('has unique ids and file names, https URLs and licenses for every entry', () => {
+  it('has unique ids, a complete source, a known family and licenses for every entry', () => {
     const ids = new Set(MODEL_CATALOG.map((m) => m.id))
-    const files = new Set(MODEL_CATALOG.map((m) => m.fileName))
     expect(ids.size).toBe(MODEL_CATALOG.length)
-    expect(files.size).toBe(MODEL_CATALOG.length)
     for (const m of MODEL_CATALOG) {
-      expect(m.url.startsWith('https://huggingface.co/')).toBe(true)
-      expect(m.url.endsWith(m.fileName)).toBe(true)
+      expect(m.source.repo).toMatch(/^[\w.-]+\/[\w.-]+$/)
+      expect(Boolean(m.source.file) !== Boolean(m.source.quant?.length)).toBe(true)
+      expect(FAMILY_LABELS[m.family]).toBeTruthy()
       expect(m.license && m.licenseUrl && m.learnMoreUrl).toBeTruthy()
       expect(m.minRamGB).toBeLessThanOrEqual(m.recommendedRamGB)
+    }
+  })
+
+  it('runs speech models on a speech runtime and language models on llama.cpp', () => {
+    for (const m of MODEL_CATALOG) {
+      if (m.kind === 'llm') expect(m.runtime).toBe('llama')
+      if (m.runtime === 'whisper' || m.runtime === 'parakeet') expect(m.kind).toBe('stt')
+      // Audio models served by llama-server need their projector
+      if (m.kind === 'stt' && m.runtime === 'llama') expect(m.source.mmproj).toBe(true)
     }
   })
 
@@ -67,30 +76,35 @@ describe('MODEL_CATALOG', () => {
 describe('recommendedModelId', () => {
   it('scales with the hardware', () => {
     expect(recommendedModelId('stt', profile())).toBe('whisper-large-v3-turbo-q5')
-    expect(recommendedModelId('llm', profile())).toBe('qwen3-4b')
-    expect(recommendedModelId('stt', intelMac)).toBe('whisper-small')
-    expect(recommendedModelId('llm', intelMac)).toBe('qwen3-1.7b')
-    expect(recommendedModelId('stt', lowEndPc)).toBe('whisper-base')
-    expect(recommendedModelId('llm', lowEndPc)).toBe('qwen3-0.6b')
+    expect(recommendedModelId('llm', profile())).toBe('qwen3.5-4b')
+    expect(recommendedModelId('stt', intelMac)).toBe('whisper-small-q5')
+    expect(recommendedModelId('llm', intelMac)).toBe('qwen3.5-2b')
+    expect(recommendedModelId('stt', lowEndPc)).toBe('whisper-base-q5')
+    expect(recommendedModelId('llm', lowEndPc)).toBe('qwen3.5-0.8b')
     expect(recommendedModelId('llm', profile({ totalRamGB: 2, accel: 'cpu' }))).toBeNull()
   })
 
   it('treats an emulated build as slow even on fast hardware', () => {
-    expect(recommendedModelId('stt', rosetta)).toBe('whisper-base')
+    expect(recommendedModelId('stt', rosetta)).toBe('whisper-base-q5')
   })
 })
 
 describe('rateModel', () => {
   it('marks the recommended model', () => {
-    expect(rateModel(model('qwen3-4b'), profile(), [], false)).toBe('recommended')
+    expect(rateModel(model('qwen3.5-4b'), profile(), [], false)).toBe('recommended')
   })
 
   it('blocks models that do not fit in memory or on disk', () => {
     expect(rateModel(model('qwen3-8b'), lowEndPc, [], false)).toBe('insufficient-ram')
+    expect(rateModel(model('gpt-oss-20b'), profile(), [], false)).toBe('slow')
     const fullDisk = profile({ freeDiskGB: 1 })
-    expect(rateModel(model('whisper-medium'), fullDisk, [], false)).toBe('insufficient-disk')
+    expect(rateModel(model('whisper-large-v3-turbo'), fullDisk, [], false)).toBe(
+      'insufficient-disk'
+    )
     // Already on disk: free space no longer matters
-    expect(rateModel(model('whisper-medium'), fullDisk, [], true)).not.toBe('insufficient-disk')
+    expect(rateModel(model('whisper-large-v3-turbo'), fullDisk, [], true)).not.toBe(
+      'insufficient-disk'
+    )
   })
 
   it('warns about heavy models without a GPU', () => {
@@ -108,6 +122,15 @@ describe('rateModel', () => {
 })
 
 describe('supportsLanguages', () => {
+  it('handles models with a fixed list of languages', () => {
+    const parakeet = model('parakeet-tdt-0.6b-v3')
+    expect(supportsLanguages(parakeet, ['de', 'en'])).toBe(true)
+    expect(supportsLanguages(parakeet, ['ar'])).toBe(false)
+    // Auto-detect works when the model knows several languages
+    expect(supportsLanguages(parakeet, [])).toBe(true)
+    expect(supportsLanguages(model('whisper-base-en'), [])).toBe(false)
+  })
+
   it('accepts regional codes', () => {
     expect(supportsLanguages(model('whisper-tiny-en'), ['en-US'])).toBe(true)
     expect(supportsLanguages(model('whisper-tiny'), ['ar', 'en'])).toBe(true)

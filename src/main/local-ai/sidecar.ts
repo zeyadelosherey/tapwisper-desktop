@@ -28,6 +28,8 @@ export interface SidecarLaunch {
 export interface RuntimeOptions {
   binary: string
   modelFile: string
+  /** Multimodal projector (audio models on llama-server) */
+  mmprojFile?: string | null
   modelId: string
   modelBytes: number
   useGpu: boolean
@@ -60,7 +62,11 @@ export class SidecarServer {
   constructor(
     readonly kind: LocalModelKind,
     private readonly onStatus: (status: SidecarStatus) => void,
-    private readonly onPid: (kind: LocalModelKind, pid: number | null) => void = () => {}
+    private readonly onPid: (
+      kind: LocalModelKind,
+      pid: number | null,
+      binary?: string
+    ) => void = () => {}
   ) {
     this.status = { kind, state: 'stopped', modelId: null }
   }
@@ -155,7 +161,7 @@ export class SidecarServer {
     this.child = child
     this.launchKey = key
     this.baseUrl = `http://127.0.0.1:${port}`
-    if (child.pid) this.onPid(this.kind, child.pid)
+    if (child.pid) this.onPid(this.kind, child.pid, launch.binary)
 
     child.stderr?.on('data', (chunk: Buffer) => {
       this.stderrTail = (this.stderrTail + chunk.toString()).slice(-4000)
@@ -256,13 +262,10 @@ type PidRecord = Partial<Record<LocalModelKind, { pid: number; binary: string }>
 export class PidFile {
   private record: PidRecord = {}
 
-  constructor(
-    private readonly file: string,
-    private readonly binaries: Record<LocalModelKind, string>
-  ) {}
+  constructor(private readonly file: string) {}
 
-  set(kind: LocalModelKind, pid: number | null): void {
-    if (pid) this.record[kind] = { pid, binary: path.basename(this.binaries[kind]) }
+  set(kind: LocalModelKind, pid: number | null, binary?: string): void {
+    if (pid && binary) this.record[kind] = { pid, binary: path.basename(binary) }
     else delete this.record[kind]
     this.write()
   }

@@ -119,7 +119,7 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 | 🤖 | **AI Text Transformations** | Rewrite, summarize, translate, fix grammar, and more |
 | 🔌 | **Multiple AI Providers** | Google Gemini, Together AI, OpenAI, Claude |
 | 🗣️ | **Multiple Voice Providers** | Together Whisper, OpenAI Whisper / GPT-4o Transcribe, Soniox — any spoken language, auto-detected |
-| 💻 | **Local & Self-hosted Models** | Run Whisper and open LLMs (Qwen, Llama, Gemma, Phi, Mistral) offline on your computer, or use your own Ollama / LM Studio / vLLM server — see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md) |
+| 💻 | **Local & Self-hosted Models** | Run Whisper, Parakeet, Qwen3-ASR and open LLMs (Qwen, Gemma, Llama, Phi, Mistral, SmolLM, Granite, gpt-oss and more) offline on your computer, or use your own Ollama / LM Studio / vLLM server — see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md) |
 | ⚡ | **Custom Actions** | Create your own AI action categories and prompts |
 | 🎯 | **Voice Triggers** | Hands-free automation with voice commands (tolerant of small transcription errors) |
 | 📋 | **Text Snippets** | Quick text expansion via trigger phrases |
@@ -217,7 +217,7 @@ npm run dist:linux   # Linux (AppImage)
 | <img src="src/renderer/assets/openai.png" width="20" /> **OpenAI** | LLM | GPT models for text processing |
 | <img src="src/renderer/assets/claude.png" width="20" /> **Claude** | LLM | Anthropic's Claude models |
 | <img src="src/renderer/assets/soniox.png" width="20" /> **Soniox** | Voice | High-accuracy speech-to-text |
-| 💻 **Local** | LLM + Voice | whisper.cpp and llama.cpp with open-source models, on your computer |
+| 💻 **Local** | LLM + Voice | whisper.cpp and llama.cpp with Whisper, Parakeet, Qwen3-ASR and 25+ open-source language models, on your computer |
 | 🖧 **Self-hosted** | LLM + Voice | Any OpenAI-compatible server on your network |
 
 ---

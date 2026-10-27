@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Build the local inference servers bundled with TapWisper — whisper.cpp's
- * whisper-server and llama.cpp's llama-server — for the current OS and CPU
- * architecture, into resources/bin/{whisper,llama}/.
+ * Build the local inference programs bundled with TapWisper — whisper.cpp's
+ * whisper-server and parakeet-cli, and llama.cpp's llama-server — for the
+ * current OS and CPU architecture, into resources/bin/{whisper,llama}/.
  *
  * Upstream releases don't cover every platform we ship (no macOS/Linux
  * whisper-server, macOS llama builds that need a recent macOS), so both are
@@ -127,7 +127,7 @@ function isRuntimeLibrary(path) {
 
 function build(name, spec) {
   const options = [...spec.options, ...platformOptions(name)]
-  const stamp = JSON.stringify({ tag: spec.tag, target, options })
+  const stamp = JSON.stringify({ tag: spec.tag, target, targets: spec.targets, options })
   const outDir = join(OUT, name)
   const stampFile = join(outDir, 'build.json')
   if (!force && existsSync(stampFile) && readFileSync(stampFile, 'utf8') === stamp) {
@@ -154,19 +154,22 @@ function build(name, spec) {
     '--config',
     'Release',
     '--target',
-    spec.target,
+    ...spec.targets,
     '--parallel',
     String(cpus().length)
   ])
 
-  const exe = platform === 'win32' ? `${spec.target}.exe` : spec.target
-  const [binary] = findFiles(buildDir, (f) => f === exe)
-  if (!binary) throw new Error(`${exe} was not produced`)
+  const binaries = spec.targets.map((name) => {
+    const exe = platform === 'win32' ? `${name}.exe` : name
+    const [binary] = findFiles(buildDir, (f) => f === exe)
+    if (!binary) throw new Error(`${exe} was not produced`)
+    return binary
+  })
 
   rmSync(outDir, { recursive: true, force: true })
   mkdirSync(outDir, { recursive: true })
   const libraries = findFiles(buildDir, (f) => SHARED_LIB.test(f)).filter(isRuntimeLibrary)
-  for (const file of [binary, ...libraries]) {
+  for (const file of [...binaries, ...libraries]) {
     copyFileSync(file, join(outDir, basename(file)))
   }
   writeFileSync(stampFile, stamp)

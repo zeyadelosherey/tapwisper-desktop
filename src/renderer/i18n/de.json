@@ -522,6 +522,7 @@
       "timeout": "Das Modell hat zu lange gebraucht.",
       "insufficient-disk": "Nicht genug freier Speicherplatz für dieses Modell.",
       "download-failed": "Der Download ist fehlgeschlagen. Prüfe deine Verbindung und versuche es erneut.",
+      "model-unavailable": "Dieses Modell kann nicht mehr heruntergeladen werden. Wähle ein anderes oder aktualisiere TapWisper.",
       "checksum-mismatch": "Die heruntergeladene Datei war beschädigt und wurde entfernt. Versuche es erneut.",
       "model-in-use": "Dieses Modell ist gerade beschäftigt. Versuche es gleich noch einmal.",
       "input-too-long": "Dieser Text ist zu lang für das Modell. Markiere weniger Text oder nutze für lange Texte einen Cloud-Anbieter.",

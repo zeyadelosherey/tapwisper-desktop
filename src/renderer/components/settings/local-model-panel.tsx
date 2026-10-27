@@ -2,22 +2,14 @@ import { type JSX, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Download, ExternalLink, FolderOpen, RotateCcw, Trash2, X } from 'lucide-react'
-import {
-  Callout,
-  Disclosure,
-  Row,
-  RowGroup,
-  Section,
-  Segmented,
-  Spinner,
-  Switch
-} from '../ui/primitives'
+import { Callout, Disclosure, Row, RowGroup, Section, Spinner, Switch } from '../ui/primitives'
 import { useConfirmDialog } from '../confirm-dialog'
 import type { LocalAiState } from '../../hooks/use-local-ai'
 import { localAiErrorMessage } from '../../services/local-ai'
 import { formatBytes } from '../../utils/formatting'
 import {
   DEFAULT_LOCAL_AI_SETTINGS,
+  FAMILY_LABELS,
   MODEL_CATALOG,
   rateModel,
   recommendedModelId
@@ -31,15 +23,6 @@ import type {
   ModelRating,
   SidecarStatus
 } from '../../../shared/local-ai/types'
-
-const FAMILY_LABELS: Record<string, string> = {
-  whisper: 'Whisper',
-  qwen: 'Qwen',
-  llama: 'Llama',
-  gemma: 'Gemma',
-  phi: 'Phi',
-  mistral: 'Mistral'
-}
 
 /** On-device model picker for one feature, with downloads and runtime options */
 export function LocalModelPanel({
@@ -150,12 +133,7 @@ export function LocalModelPanel({
         )}
         {families.length > 1 && (
           <div className="mb-2.5">
-            <Segmented
-              label={t('settings.localModels.family', 'Model family')}
-              value={family}
-              onChange={setFamily}
-              options={families.map((f) => ({ value: f, label: FAMILY_LABELS[f] ?? f }))}
-            />
+            <FamilyFilter families={families} value={family} onChange={setFamily} />
           </div>
         )}
         <div className="divide-y divide-hairline/70 border-y border-hairline/70">
@@ -179,6 +157,46 @@ export function LocalModelPanel({
       <AdvancedLocalSettings profile={profile} onModelsDirChange={() => void local.refresh()} />
       {dialog}
     </>
+  )
+}
+
+/** Model family chips; wraps onto more lines when there are many families */
+function FamilyFilter({
+  families,
+  value,
+  onChange
+}: {
+  families: string[]
+  value: string
+  onChange: (family: string) => void
+}): JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="radiogroup"
+      aria-label={t('settings.localModels.family', 'Model family')}
+      className="flex flex-wrap gap-1.5"
+    >
+      {families.map((family) => {
+        const active = family === value
+        return (
+          <button
+            key={family}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(family)}
+            className={`h-7 rounded-lg border px-2.5 text-[12.5px] font-medium transition-colors duration-200 ${
+              active
+                ? 'border-signal bg-signal-tint/40 text-ink'
+                : 'border-hairline bg-raised text-ink-muted hover:text-ink'
+            }`}
+          >
+            {FAMILY_LABELS[family] ?? family}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

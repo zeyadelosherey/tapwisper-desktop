@@ -5,108 +5,108 @@ import { tmpdir } from 'os'
 import path from 'path'
 import type { DownloadProgress } from '../../../shared/local-ai/types'
 
-const FILE = Buffer.from('fake model weights '.repeat(1000))
-const SHA = createHash('sha256').update(FILE).digest('hex')
+const MODEL = Buffer.from('fake model weights '.repeat(1000))
+const PROJECTOR = Buffer.from('fake projector '.repeat(300))
+const sha = (b: Buffer): string => createHash('sha256').update(b).digest('hex')
 
 let dir: string
-let linkedEtag: string | undefined
-let linkedSize: number
-let requests: Array<Record<string, string>>
+let modelSha256: string
+let requests: Array<{ url: string; range?: string }>
 
-// Hugging Face stand-in: honours Range requests and sends the LFS hash on HEAD
+// Hugging Face stand-in: the model API, plus file downloads that honour Range
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
   net: {
-    fetch: async (_url: string, init: { headers?: Record<string, string> }) => {
-      const headers = init.headers ?? {}
-      requests.push(headers)
-      const start = Number(headers.Range?.match(/bytes=(\d+)-/)?.[1] ?? 0)
-      const body = FILE.subarray(start)
-      return new Response(body, {
-        status: start ? 206 : 200,
-        headers: { 'content-length': String(body.length) }
-      })
-    },
-    request: () => {
-      const handlers: Record<string, (...args: unknown[]) => void> = {}
-      return {
-        on: (event: string, fn: (...args: unknown[]) => void) => (handlers[event] = fn),
-        end: () =>
-          setTimeout(() =>
-            handlers.redirect?.(302, 'HEAD', 'https://cdn', {
-              'x-linked-etag': [`"${linkedEtag}"`],
-              'x-linked-size': [String(linkedSize)]
-            })
-          ),
-        abort: () => {}
+    fetch: async (url: string, init: { headers?: Record<string, string> } = {}) => {
+      const range = init.headers?.Range
+      requests.push({ url, range })
+      if (url.includes('/api/models/')) {
+        if (url.includes('Qwen3.5')) return new Response('', { status: 404 })
+        const file = (name: string, body: Buffer, hash = sha(body)) => ({
+          rfilename: name,
+          size: body.length,
+          lfs: { sha256: hash, size: body.length }
+        })
+        return Response.json({
+          sha: 'abc123',
+          siblings: [
+            { rfilename: 'README.md', size: 10 },
+            file('ggml-tiny.bin', MODEL, modelSha256),
+            file('model-Q8_0.gguf', MODEL),
+            file('mmproj-model-f16.gguf', PROJECTOR)
+          ]
+        })
       }
+      const body = url.includes('mmproj') ? PROJECTOR : MODEL
+      const start = Number(range?.match(/bytes=(\d+)-/)?.[1] ?? 0)
+      return new Response(body.subarray(start), { status: start ? 206 : 200 })
     }
   }
 }))
 vi.mock('../../store', () => ({ getConfigValue: () => undefined }))
 
 const store = await import('../model-store')
+const { getModel } = await import('../../../shared/local-ai/catalog')
 
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'models-test-'))
-  linkedEtag = SHA
-  linkedSize = FILE.length
+  modelSha256 = sha(MODEL)
   requests = []
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-const target = (): string => path.join(dir, 'models', 'stt', 'ggml-tiny.bin')
+const tinyPath = (): string => path.join(dir, 'models', 'stt', 'whisper-tiny.bin')
 
 describe('downloadModel', () => {
-  it('downloads, verifies the Hugging Face hash and installs the file', async () => {
+  it('downloads from the pinned commit, verifies the hash and installs the file', async () => {
     const progress: DownloadProgress[] = []
     const result = await store.downloadModel('whisper-tiny', (p) => progress.push(p))
     expect(result).toEqual({ ok: true, data: undefined })
-    expect(readFileSync(target())).toEqual(FILE)
-    expect(progress.map((p) => p.state).slice(-2)).toEqual(['verifying', 'done'])
-    expect(progress.at(-1)).toMatchObject({ received: FILE.length, total: FILE.length })
+    expect(readFileSync(tinyPath())).toEqual(MODEL)
+    expect(requests[1].url).toBe(
+      'https://huggingface.co/ggerganov/whisper.cpp/resolve/abc123/ggml-tiny.bin'
+    )
+    expect(progress.at(-1)).toMatchObject({ state: 'done', received: MODEL.length })
     expect(await store.listInstalled()).toEqual(['whisper-tiny'])
   })
 
   it('resumes a partial download with a Range request', async () => {
-    mkdirSync(path.dirname(target()), { recursive: true })
-    writeFileSync(`${target()}.part`, FILE.subarray(0, 5000))
+    mkdirSync(path.dirname(tinyPath()), { recursive: true })
+    writeFileSync(`${tinyPath()}.part`, MODEL.subarray(0, 5000))
     const result = await store.downloadModel('whisper-tiny', () => {})
     expect(result.ok).toBe(true)
-    expect(requests[0].Range).toBe('bytes=5000-')
-    expect(readFileSync(target())).toEqual(FILE)
+    expect(requests[1].range).toBe('bytes=5000-')
+    expect(readFileSync(tinyPath())).toEqual(MODEL)
   })
 
   it('rejects a file whose hash does not match and removes it', async () => {
-    linkedEtag = 'a'.repeat(64)
+    modelSha256 = 'a'.repeat(64)
     const result = await store.downloadModel('whisper-tiny', () => {})
     expect(result).toMatchObject({ ok: false, code: 'checksum-mismatch' })
-    expect(existsSync(target())).toBe(false)
-    expect(existsSync(`${target()}.part`)).toBe(false)
+    expect(existsSync(tinyPath())).toBe(false)
+    expect(existsSync(`${tinyPath()}.part`)).toBe(false)
   })
 
-  it('checks the size when the server gives no hash', async () => {
-    linkedEtag = undefined
-    linkedSize = FILE.length + 1
-    const result = await store.downloadModel('whisper-tiny', () => {})
-    expect(result).toMatchObject({ ok: false, code: 'checksum-mismatch' })
-    linkedSize = FILE.length
-    expect((await store.downloadModel('whisper-tiny', () => {})).ok).toBe(true)
+  it('fetches the projector of audio models and needs both files to count as installed', async () => {
+    const model = getModel('qwen3-asr-0.6b')!
+    expect((await store.downloadModel(model.id, () => {})).ok).toBe(true)
+    const files = store.modelFiles(model)
+    expect(readFileSync(files.model!)).toEqual(MODEL)
+    expect(readFileSync(files.mmproj!)).toEqual(PROJECTOR)
+    expect(await store.isInstalled(model)).toBe(true)
+    rmSync(files.mmproj!)
+    expect(await store.isInstalled(model)).toBe(false)
+  })
+
+  it('reports a model that is no longer available upstream', async () => {
+    const result = await store.downloadModel('qwen3.5-4b', () => {})
+    expect(result).toMatchObject({ ok: false, code: 'model-unavailable' })
   })
 
   it('deletes installed models', async () => {
     await store.downloadModel('whisper-tiny', () => {})
     await store.deleteModel('whisper-tiny')
-    expect(existsSync(target())).toBe(false)
-  })
-})
-
-describe('parseLinkedEtag', () => {
-  it('accepts quoted SHA-256 values only', () => {
-    expect(store.parseLinkedEtag(`"${SHA}"`)).toBe(SHA)
-    expect(store.parseLinkedEtag([`W/"${SHA.toUpperCase()}"`])).toBe(SHA)
-    expect(store.parseLinkedEtag('"abc123"')).toBeUndefined()
-    expect(store.parseLinkedEtag(undefined)).toBeUndefined()
+    expect(existsSync(tinyPath())).toBe(false)
   })
 })

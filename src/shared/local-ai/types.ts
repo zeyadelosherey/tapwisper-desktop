@@ -8,18 +8,40 @@ export type AIEngine = 'cloud' | 'local' | 'self-hosted'
 
 export type LocalModelKind = 'stt' | 'llm'
 
+/**
+ * Program that runs a model:
+ * - whisper: whisper.cpp's whisper-server (Whisper models)
+ * - parakeet: whisper.cpp's parakeet-cli, once per request (NVIDIA Parakeet)
+ * - llama: llama.cpp's llama-server (language models, and audio models such as
+ *   Qwen3-ASR or Voxtral through its /v1/audio/transcriptions endpoint)
+ */
+export type LocalRuntime = 'whisper' | 'parakeet' | 'llama'
+
+/**
+ * Where a model is downloaded from. Files are resolved through the Hugging Face
+ * API at download time, which also gives the commit to pin and each file's SHA-256.
+ */
+export interface ModelSource {
+  /** Hugging Face repository, e.g. "ggml-org/gemma-4-E2B-it-GGUF" */
+  repo: string
+  /** Exact file name in the repository… */
+  file?: string
+  /** …or quantizations in order of preference; the first one present wins */
+  quant?: string[]
+  /** Also fetch the repository's multimodal projector (audio models) */
+  mmproj?: boolean
+}
+
 export interface LocalModelEntry {
   id: string
   kind: LocalModelKind
-  /** Grouping chip in the UI: whisper, qwen, llama, gemma, phi, mistral */
+  runtime: LocalRuntime
+  /** Grouping in the UI (see FAMILY_LABELS) */
   family: string
   label: string
-  fileName: string
-  url: string
-  /** Approximate; the server's Content-Length wins at download time */
+  source: ModelSource
+  /** Approximate total download; the real sizes come from Hugging Face */
   sizeBytes: number
-  /** Pinned SHA-256. Without it the Hugging Face LFS hash is used */
-  sha256?: string
   /** Below this the model is likely to swap or fail to load */
   minRamGB: number
   /** Comfortable amount of RAM next to normal apps */
@@ -33,8 +55,11 @@ export interface LocalModelEntry {
   speed: number
   /** 1 (lowest) – 5 (best), relative within its kind */
   quality: number
-  /** Emits <think> blocks unless told not to (Qwen3) */
-  thinking?: boolean
+  /**
+   * Passed to the model's chat template on every request, e.g.
+   * { enable_thinking: false } (Qwen) or { reasoning_effort: "low" } (gpt-oss)
+   */
+  chatTemplateKwargs?: Record<string, unknown>
   /** Painful without a GPU */
   heavy?: boolean
 }
@@ -150,6 +175,7 @@ export interface TranscribeInput {
 export type LocalAiErrorCode =
   | 'no-model-selected'
   | 'model-not-downloaded'
+  | 'model-unavailable'
   | 'runtime-unavailable'
   | 'server-failed'
   | 'timeout'

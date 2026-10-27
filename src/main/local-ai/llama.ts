@@ -1,9 +1,20 @@
-/** llama.cpp's llama-server: launch arguments and the chat request */
+/**
+ * llama.cpp's llama-server: launch arguments, chat requests for language
+ * models and transcription for audio models (Qwen3-ASR, Voxtral)
+ */
 import { randomUUID } from 'crypto'
-import { CHAT_TIMEOUT_MS, outputTokens, readChatReply } from './http'
+import { LocalAiError } from './errors'
+import {
+  assertOk,
+  CHAT_TIMEOUT_MS,
+  outputTokens,
+  readChatReply,
+  transcriptionForm,
+  transcriptionTimeout
+} from './http'
 import { loadTimeoutMs, type RuntimeOptions, type SidecarLaunch } from './sidecar'
 import { LOCAL_LLM_CONTEXT_TOKENS, toChatMessages } from '../../shared/local-ai/catalog'
-import type { ChatInput, LocalModelEntry } from '../../shared/local-ai/types'
+import type { ChatInput, LocalModelEntry, TranscribeInput } from '../../shared/local-ai/types'
 
 /**
  * The server only listens on 127.0.0.1, but web pages in a browser can still
@@ -21,6 +32,7 @@ export function llamaLaunch(o: RuntimeOptions): SidecarLaunch {
     args: (port) => [
       '-m',
       o.modelFile,
+      ...(o.mmprojFile ? ['--mmproj', o.mmprojFile] : []),
       '--host',
       '127.0.0.1',
       '--port',
@@ -34,7 +46,7 @@ export function llamaLaunch(o: RuntimeOptions): SidecarLaunch {
       o.useGpu ? '99' : '0',
       '-t',
       String(o.threads),
-      // Use the model's own chat template, needed for enable_thinking below
+      // Use the model's own chat template, needed for chat_template_kwargs below
       '--jinja',
       '--api-key',
       API_KEY
@@ -54,9 +66,27 @@ export async function llamaChat(
       messages: toChatMessages(input),
       temperature: input.temperature ?? 0.7,
       max_tokens: outputTokens(input),
-      ...(model.thinking ? { chat_template_kwargs: { enable_thinking: false } } : {})
+      // e.g. thinking off for Qwen, low reasoning effort for gpt-oss
+      ...(model.chatTemplateKwargs && { chat_template_kwargs: model.chatTemplateKwargs })
     }),
     signal: AbortSignal.timeout(CHAT_TIMEOUT_MS)
   })
   return readChatReply(res)
+}
+
+/** Speech to text with an audio model, through the OpenAI-style endpoint */
+export async function llamaTranscribe(baseUrl: string, input: TranscribeInput): Promise<string> {
+  // The server uses `prompt` as the instruction to the model, not as vocabulary
+  // context as Whisper does, so it's left out
+  const form = transcriptionForm({ ...input, prompt: undefined }, {})
+  const res = await fetch(`${baseUrl}/v1/audio/transcriptions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${API_KEY}` },
+    body: form,
+    signal: transcriptionTimeout(input.seconds, 60_000)
+  })
+  await assertOk(res)
+  const data = (await res.json()) as { text?: unknown }
+  if (typeof data.text !== 'string') throw new LocalAiError('bad-response', 'no transcript')
+  return data.text.trim()
 }

@@ -13,7 +13,7 @@ import { freeDiskBytes, modelsDir } from './model-store'
 import type {
   DeviceProfile,
   GpuAcceleration,
-  LocalModelKind,
+  LocalRuntime,
   ModelsDirWarning,
   RuntimeCheck
 } from '../../shared/local-ai/types'
@@ -21,39 +21,41 @@ import type {
 /** Platforms the runtimes are built for (see scripts/build-runtimes.mjs) */
 const SUPPORTED_TARGETS = new Set(['darwin-arm64', 'darwin-x64', 'win32-x64', 'linux-x64'])
 
-const SERVER_NAMES: Record<LocalModelKind, string> = {
-  stt: 'whisper-server',
-  llm: 'llama-server'
+/** Folder in resources/bin and executable of each runtime */
+const RUNTIME_BINARIES: Record<LocalRuntime, [string, string]> = {
+  whisper: ['whisper', 'whisper-server'],
+  parakeet: ['whisper', 'parakeet-cli'],
+  llama: ['llama', 'llama-server']
 }
 
-export function runtimeBinary(kind: LocalModelKind): string {
-  const exe = process.platform === 'win32' ? '.exe' : ''
-  return bundledBinaryPath(kind === 'stt' ? 'whisper' : 'llama', SERVER_NAMES[kind] + exe)
+export function runtimeBinary(runtime: LocalRuntime): string {
+  const [dir, name] = RUNTIME_BINARIES[runtime]
+  return bundledBinaryPath(dir, process.platform === 'win32' ? `${name}.exe` : name)
 }
 
 /** Windows NTSTATUS exit codes worth telling apart */
 const STATUS_DLL_NOT_FOUND = 0xc0000135
 const STATUS_ILLEGAL_INSTRUCTION = 0xc000001d
 
-const runtimeChecks = new Map<LocalModelKind, Promise<RuntimeCheck>>()
+const runtimeChecks = new Map<LocalRuntime, Promise<RuntimeCheck>>()
 
-/** Whether a bundled server can start here. Cached for the session */
-export function checkRuntime(kind: LocalModelKind): Promise<RuntimeCheck> {
-  let check = runtimeChecks.get(kind)
+/** Whether a bundled runtime can start here. Cached for the session */
+export function checkRuntime(runtime: LocalRuntime): Promise<RuntimeCheck> {
+  let check = runtimeChecks.get(runtime)
   if (!check) {
-    check = probeRuntime(kind)
-    runtimeChecks.set(kind, check)
+    check = probeRuntime(runtime)
+    runtimeChecks.set(runtime, check)
   }
   return check
 }
 
-function probeRuntime(kind: LocalModelKind): Promise<RuntimeCheck> {
+function probeRuntime(runtime: LocalRuntime): Promise<RuntimeCheck> {
   const target = `${process.platform}-${process.arch}`
   // x64 builds under Windows-on-ARM emulation lack the instructions ggml needs
   if (!SUPPORTED_TARGETS.has(target) || (process.platform === 'win32' && emulated())) {
     return Promise.resolve({ available: false, issue: 'unsupported-platform' })
   }
-  const binary = runtimeBinary(kind)
+  const binary = runtimeBinary(runtime)
   if (!existsSync(binary)) return Promise.resolve({ available: false, issue: 'not-bundled' })
 
   return new Promise((resolve) => {
@@ -160,8 +162,8 @@ export async function getDeviceProfile(): Promise<DeviceProfile> {
     detectGpu(),
     freeDiskBytes(dir),
     modelsDirWarning(dir),
-    checkRuntime('stt'),
-    checkRuntime('llm')
+    checkRuntime('whisper'),
+    checkRuntime('llama')
   ])
   return {
     platform: process.platform,

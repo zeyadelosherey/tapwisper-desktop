@@ -529,6 +529,7 @@
       "timeout": "El modelo tardó demasiado en responder.",
       "insufficient-disk": "No hay espacio libre suficiente para este modelo.",
       "download-failed": "La descarga falló. Comprueba tu conexión e inténtalo de nuevo.",
+      "model-unavailable": "Este modelo ya no está disponible para descargar. Elige otro o actualiza TapWisper.",
       "checksum-mismatch": "El archivo descargado estaba dañado y se ha eliminado. Inténtalo de nuevo.",
       "model-in-use": "Este modelo está ocupado. Inténtalo en un momento.",
       "input-too-long": "Este texto es demasiado largo para el modelo. Selecciona menos texto o usa un proveedor en la nube para textos largos.",
