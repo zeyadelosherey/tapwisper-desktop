@@ -53,8 +53,8 @@ Models    <userData>/models/{stt,llm}/     or a folder the user picks
 | Mac with Apple Silicon | ✅ Metal GPU | Best experience. Recommended: Whisper Large v3 Turbo (Q5) and Qwen3.5 4B with 16 GB RAM or more. |
 | Intel Mac | ✅ CPU | Prefer Whisper Base/Small and a 1–2B language model. |
 | Intel build on Apple Silicon (Rosetta) | ⚠️ slow | The settings page asks you to install the Apple Silicon build. |
-| Windows x64 | ✅ CPU, Vulkan GPU for the language model | Uses the GPU on NVIDIA, AMD and Intel Arc. If the GPU fails to load a model, it falls back to the CPU for the rest of the session. |
-| Linux x64 | ✅ CPU | |
+| Windows x64 | ✅ Vulkan GPU | Every model uses the GPU on NVIDIA, AMD and Intel Arc. If the GPU fails to load a model, that runtime falls back to the CPU for the rest of the session. |
+| Linux x64 | ✅ CPU, Vulkan GPU when built with `--vulkan` | Same GPU rules as Windows; needs a Vulkan driver (Mesa or NVIDIA's). |
 | Windows on ARM, Linux ARM, 32-bit | ❌ | Not built yet. Use Cloud or Self-hosted. |
 
 **Older CPUs.** On everything except Apple Silicon, the runtime contains one CPU backend per instruction-set level (SSE4.2 up to AVX-512) and loads the best one at startup. CPUs without AVX2 still work, just more slowly.
@@ -124,16 +124,16 @@ The bundled servers are built from source at the tags pinned in [`scripts/runtim
 
 ```bash
 npm run build:runtimes            # whisper-server, parakeet-cli, llama-server for this OS/arch
-npm run build:runtimes -- --vulkan   # add the Vulkan backend (Windows/Linux, needs the Vulkan SDK)
+npm run build:runtimes -- --vulkan   # add the Vulkan GPU backend to every runtime (Windows/Linux)
 ```
 
-You need git, CMake 3.21 or newer, and a C++17 compiler (Xcode Command Line Tools, Visual Studio 2022, or GCC/Clang). The first build takes about 10 minutes. After that, builds are incremental, and the script skips a runtime whose version and options haven't changed.
+You need git, CMake 3.21 or newer, and a C++17 compiler (Xcode Command Line Tools, Visual Studio 2022, or GCC/Clang). For `--vulkan`, install the [Vulkan SDK](https://vulkan.lunarg.com) on Windows, or `glslc libvulkan-dev spirv-headers` on Ubuntu/Debian. The first build takes about 10 minutes. After that, builds are incremental, and the script skips a runtime whose version and options haven't changed.
 
 **Development without runtimes.** You can develop without building them. The Local card then says the runtime isn't included in this build.
 
 **Release builds.** The release workflow builds the runtimes for each platform and caches them.
 
-**CI checks.** `.github/workflows/local-runtimes.yml` builds the runtimes on Linux, macOS and Windows. It then downloads Whisper Tiny, Parakeet, Qwen3-ASR 0.6B and Qwen3.5 0.8B with the app's own download code and runs them through the app's own launch and request code (`src/main/local-ai/__tests__/runtimes.smoke.test.ts`). To run that test locally, either let it download the models:
+**CI checks.** `.github/workflows/local-runtimes.yml` builds the runtimes on Linux, macOS and Windows, plus a Linux Vulkan build that runs on Mesa's software Vulkan device, so the GPU code path is tested without a GPU. It then downloads Whisper Tiny, Parakeet, Qwen3-ASR 0.6B and Qwen3.5 0.8B with the app's own download code and runs them through the app's own launch and request code (`src/main/local-ai/__tests__/runtimes.smoke.test.ts`). To run that test locally, either let it download the models:
 
 ```bash
 LOCAL_AI_SMOKE_DOWNLOAD=1 LOCAL_AI_SMOKE_EXPECT_TEXT=1 \

@@ -9,7 +9,8 @@
  * built from source at the tags pinned in scripts/runtimes.json.
  *
  * Usage: node scripts/build-runtimes.mjs [--only whisper|llama] [--vulkan] [--force]
- *   --vulkan  add the Vulkan GPU backend to llama-server (Windows/Linux; needs the Vulkan SDK)
+ *   --vulkan  add the Vulkan GPU backend to every runtime (Windows/Linux; needs the Vulkan SDK,
+ *             or glslc, libvulkan-dev and spirv-headers on Linux)
  *   --force   rebuild even if resources/bin already has this version
  *
  * Needs git, CMake ≥ 3.21 and a C++17 compiler (Xcode CLT, MSVC or GCC/Clang).
@@ -90,7 +91,8 @@ function platformOptions(name) {
       '-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15'
     ]
   }
-  const gpu = vulkan && name === 'llama' ? ['-DGGML_VULKAN=ON'] : []
+  // A backend library ggml loads at runtime; without a Vulkan driver or GPU the CPU is used
+  const gpu = vulkan ? ['-DGGML_VULKAN=ON'] : []
   if (platform === 'win32') {
     return [...common, ...dynamicCpu, ...gpu, '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL']
   }

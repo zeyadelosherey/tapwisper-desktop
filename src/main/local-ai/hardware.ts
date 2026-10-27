@@ -8,6 +8,7 @@ import { spawn } from 'child_process'
 import { existsSync } from 'fs'
 import { access, constants, mkdir } from 'fs/promises'
 import os from 'os'
+import path from 'path'
 import { bundledBinaryPath } from '../bundled-binary'
 import { freeDiskBytes, modelsDir } from './model-store'
 import type {
@@ -97,7 +98,7 @@ function emulated(): boolean {
   return app.runningUnderARM64Translation === true
 }
 
-interface GpuInfo {
+export interface GpuInfo {
   name: string | null
   vendor: 'nvidia' | 'amd' | 'intel' | 'apple' | 'other' | null
 }
@@ -128,24 +129,45 @@ function detectGpu(): Promise<GpuInfo> {
   return gpuInfo
 }
 
-function accelerationFor(gpu: GpuInfo, appleSilicon: boolean): GpuAcceleration {
-  if (process.platform === 'darwin') return appleSilicon && !emulated() ? 'metal' : 'cpu'
-  // The Windows runtime ships a Vulkan backend. Integrated Intel graphics (except
-  // Arc) are usually slower than the CPU for these models.
-  if (process.platform === 'win32') {
-    if (gpu.vendor === 'nvidia' || gpu.vendor === 'amd') return 'vulkan'
-    if (gpu.vendor === 'intel' && /\bArc\b/i.test(gpu.name ?? '')) return 'vulkan'
-  }
-  return 'cpu'
+/**
+ * GPU backend a runtime should use: Metal on Apple Silicon, Vulkan on Windows and
+ * Linux when the build includes it (`--vulkan`) and the GPU is worth it, else the CPU
+ */
+export function accelerationFor(
+  platform: NodeJS.Platform,
+  gpu: GpuInfo,
+  { metal, vulkan }: { metal: boolean; vulkan: boolean }
+): GpuAcceleration {
+  if (platform === 'darwin') return metal ? 'metal' : 'cpu'
+  // Integrated Intel graphics (except Arc) are usually slower than the CPU for these models
+  const capable =
+    gpu.vendor === 'nvidia' ||
+    gpu.vendor === 'amd' ||
+    (gpu.vendor === 'intel' && /\bArc\b/i.test(gpu.name ?? ''))
+  return vulkan && capable ? 'vulkan' : 'cpu'
 }
 
 function isAppleSilicon(cpuModel: string): boolean {
   return process.platform === 'darwin' && (process.arch === 'arm64' || /apple/i.test(cpuModel))
 }
 
-/** GPU backend the runtimes should use on this computer */
-export async function gpuAcceleration(): Promise<GpuAcceleration> {
-  return accelerationFor(await detectGpu(), isAppleSilicon(os.cpus()[0]?.model ?? ''))
+/** Metal works on Apple Silicon, but not for the Intel build running under Rosetta */
+function metalUsable(): boolean {
+  return isAppleSilicon(os.cpus()[0]?.model ?? '') && !emulated()
+}
+
+/** ggml's Vulkan backend, loaded at runtime; only builds made with --vulkan have it */
+function hasVulkanBackend(runtime: LocalRuntime): boolean {
+  const library = process.platform === 'win32' ? 'ggml-vulkan.dll' : 'libggml-vulkan.so'
+  return existsSync(path.join(path.dirname(runtimeBinary(runtime)), library))
+}
+
+/** GPU backend `runtime` should use on this computer */
+export async function gpuAcceleration(runtime: LocalRuntime): Promise<GpuAcceleration> {
+  return accelerationFor(process.platform, await detectGpu(), {
+    metal: metalUsable(),
+    vulkan: hasVulkanBackend(runtime)
+  })
 }
 
 async function modelsDirWarning(dir: string): Promise<ModelsDirWarning | undefined> {
@@ -183,7 +205,10 @@ export async function getDeviceProfile(): Promise<DeviceProfile> {
     appleSilicon,
     emulated: emulated(),
     gpuName: gpu.name,
-    accel: accelerationFor(gpu, appleSilicon),
+    accel: accelerationFor(process.platform, gpu, {
+      metal: metalUsable(),
+      vulkan: hasVulkanBackend('whisper') || hasVulkanBackend('llama')
+    }),
     runtimes: { whisper, parakeet, llama },
     modelsDir: dir,
     modelsDirWarning: warning

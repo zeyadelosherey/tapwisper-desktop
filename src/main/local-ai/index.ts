@@ -98,7 +98,7 @@ async function prepare(kind: LocalModelKind): Promise<LocalAiResult<Prepared>> {
     idleUnloadMs: s.keepWarm ? 0 : s.idleUnloadMinutes * 60_000
   })
   // Integrated graphics are usually slower than the CPU, so only a capable GPU is used
-  const gpuWanted = s.useGpu && (await gpuAcceleration()) !== 'cpu'
+  const gpuWanted = s.useGpu && (await gpuAcceleration(model.runtime)) !== 'cpu'
   return ok({ model, options, gpuWanted })
 }
 
