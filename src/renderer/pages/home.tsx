@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useStatsStore } from '../store/stats'
 import { useActivityStore, type TranscriptionRecord } from '../store/activity'
-import { getRecordingUrl, hasRecording, retranscribeRecord } from '../services/history'
+import { getRecordingUrl, hasRecordings, retranscribeRecord } from '../services/history'
 import { formatCompactNumber, formatDate, formatDuration, formatTime } from '../utils/formatting'
 import { displayActionName } from '../utils/action-labels'
 import { computeStreak, type StreakInfo } from '../utils/streak'
@@ -317,12 +317,10 @@ function HistoryList({ totalCount, refreshToken, shortcut }: HistoryListProps): 
     unchecked.forEach((id) => checkedRef.current.add(id))
     let cancelled = false
     let done = false
-    Promise.all(unchecked.map(async (id) => [id, await hasRecording(id)] as const)).then(
-      (pairs) => {
-        done = true
-        if (!cancelled) setAudio((prev) => ({ ...prev, ...Object.fromEntries(pairs) }))
-      }
-    )
+    hasRecordings(unchecked).then((found) => {
+      done = true
+      if (!cancelled) setAudio((prev) => ({ ...prev, ...found }))
+    })
     return () => {
       cancelled = true
       // Unfinished checks are retried by the next run

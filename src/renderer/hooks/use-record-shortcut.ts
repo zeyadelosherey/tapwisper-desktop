@@ -37,9 +37,15 @@ export function useRecordShortcut(): RecordShortcutState {
       if (typeof detail === 'string' && detail) setShortcut(detail)
     }
     window.addEventListener(CHANGED_EVENT, onChanged)
+    // Changes saved in another window (main broadcasts after every update/reset)
+    const unsubMain = window.tapwisper.on('shortcuts:changed', (value: unknown) => {
+      const record = (value as { record?: unknown } | undefined)?.record
+      if (typeof record === 'string' && record) setShortcut(record)
+    })
     return () => {
       cancelled = true
       window.removeEventListener(CHANGED_EVENT, onChanged)
+      unsubMain()
     }
   }, [])
 

@@ -20,6 +20,7 @@ import {
   saveRecording,
   loadRecording,
   hasRecording,
+  hasRecordings,
   deleteRecording,
   clearRecordings
 } from './recordings'
@@ -127,6 +128,14 @@ function setAutoLaunch(enabled: boolean): AutoLaunchResult {
   } catch (err) {
     // e.g. "Operation not permitted" in dev mode or when the app isn't signed
     return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Tell every window the record shortcut changed (views showing keycaps update) */
+function broadcastShortcuts(): void {
+  const shortcuts = getStore().get('shortcuts')
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('shortcuts:changed', shortcuts)
   }
 }
 
@@ -316,6 +325,7 @@ export function registerIpcHandlers(
     const store = getStore()
     store.set('shortcuts', { ...store.get('shortcuts'), ...shortcuts })
     reloadShortcuts()
+    broadcastShortcuts()
     return { success: true }
   })
 
@@ -330,6 +340,7 @@ export function registerIpcHandlers(
       record: 'Option+Space'
     })
     reloadShortcuts()
+    broadcastShortcuts()
     return store.get('shortcuts')
   })
 
@@ -419,6 +430,9 @@ export function registerIpcHandlers(
   )
   ipcMain.handle('recordings:load', (_e: IpcMainInvokeEvent, id: string) => loadRecording(id))
   ipcMain.handle('recordings:has', (_e: IpcMainInvokeEvent, id: string) => hasRecording(id))
+  ipcMain.handle('recordings:has-many', (_e: IpcMainInvokeEvent, ids: string[]) =>
+    hasRecordings(Array.isArray(ids) ? ids : [])
+  )
   ipcMain.handle('recordings:delete', (_e: IpcMainInvokeEvent, id: string) => deleteRecording(id))
   ipcMain.handle('recordings:clear', () => clearRecordings())
 

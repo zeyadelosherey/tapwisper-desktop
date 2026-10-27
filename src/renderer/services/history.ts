@@ -8,6 +8,12 @@ export async function hasRecording(recordId: string): Promise<boolean> {
   return window.tapwisper.recordings.has(recordId).catch(() => false)
 }
 
+/** Batch check: which records still have saved audio */
+export async function hasRecordings(recordIds: string[]): Promise<Record<string, boolean>> {
+  if (recordIds.length === 0) return {}
+  return window.tapwisper.recordings.hasMany(recordIds).catch(() => ({}))
+}
+
 /**
  * Object URL for the record's audio, or null if it wasn't kept.
  * Call URL.revokeObjectURL() when done playing.

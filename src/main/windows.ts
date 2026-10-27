@@ -35,9 +35,11 @@ const AI_PANEL_SIZE: Size = { width: 660, height: 540 }
 // drag strip rendered by the main window on Windows (h-10 = 40px).
 const TITLE_BAR_OVERLAY_HEIGHT = 40
 
+// Match the renderer's paper canvas so the first paint and the Windows
+// caption-button strip blend in (see --tw-bg in globals.css)
 const THEME_COLORS = {
-  dark: { background: '#000000', symbol: '#FFFFFF' },
-  light: { background: '#FFFFFF', symbol: '#1A1A1A' }
+  dark: { background: '#121110', symbol: '#F3F0EA' },
+  light: { background: '#F5F3EE', symbol: '#1B1A17' }
 }
 
 // Mouse-move forwarding for click-through windows only exists on macOS and

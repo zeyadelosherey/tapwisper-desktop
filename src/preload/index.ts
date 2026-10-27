@@ -196,6 +196,9 @@ const api = {
     load: (id: string): Promise<{ data: ArrayBuffer; mimeType: string } | null> =>
       ipcRenderer.invoke('recordings:load', id),
     has: (id: string): Promise<boolean> => ipcRenderer.invoke('recordings:has', id),
+    /** Batch version of `has` — one call per history page */
+    hasMany: (ids: string[]): Promise<Record<string, boolean>> =>
+      ipcRenderer.invoke('recordings:has-many', ids),
     delete: (id: string): Promise<void> => ipcRenderer.invoke('recordings:delete', id),
     clear: (): Promise<void> => ipcRenderer.invoke('recordings:clear')
   },

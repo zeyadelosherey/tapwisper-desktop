@@ -61,6 +61,18 @@ export async function hasRecording(id: string): Promise<boolean> {
   return (await findFile(id)) !== null
 }
 
+/** Which of `ids` still have saved audio — one directory read for a whole page */
+export async function hasRecordings(ids: string[]): Promise<Record<string, boolean>> {
+  let files: string[] = []
+  try {
+    files = await fsp.readdir(recordingsDir())
+  } catch {
+    // No recordings directory yet
+  }
+  const present = new Set(files.map((f) => f.slice(0, f.lastIndexOf('.'))))
+  return Object.fromEntries(ids.map((id) => [id, SAFE_ID.test(id) && present.has(id)]))
+}
+
 export async function deleteRecording(id: string): Promise<void> {
   const file = await findFile(id)
   if (file) await fsp.unlink(file).catch(() => {})
