@@ -74,7 +74,7 @@
 1. **📥 Download** the installer for your platform from the table above
 2. **⚙️ Open** the app and go to **Settings → AI Provider**
 3. **🔑 Paste** your API key (Gemini, OpenAI, Claude, or Together AI)
-4. **🎤 Start using it** — press <kbd>Option</kbd>+<kbd>Space</kbd> (Mac) or <kbd>Alt</kbd>+<kbd>Space</kbd> (Win/Linux) to record
+4. **🎤 Start using it** — hold <kbd>fn</kbd> (Mac), <kbd>Ctrl</kbd>+<kbd>Win</kbd> (Windows) or <kbd>Right Ctrl</kbd> (Linux) and speak
 
 > 💡 No account needed. No sign-up. Just your API key and you're ready to go.
 
@@ -94,7 +94,7 @@ TapWisper runs system-wide — just speak and your text appears in **any app** o
 
 ...and literally **every other app** on macOS, Windows, and Linux. If you can type in it, TapWisper works in it.
 
-> ⌨️ Press **Option+Space** (Mac) or **Alt+Space** (Windows/Linux), speak, and your words appear wherever your cursor is. It's that simple.
+> ⌨️ Hold **fn** (Mac), **Ctrl+Win** (Windows) or **Right Ctrl** (Linux), speak, let go — your words appear wherever your cursor is. It's that simple.
 
 ---
 
@@ -134,9 +134,12 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 
 | Shortcut | Action |
 |:--------:|--------|
-| <kbd>Option</kbd>+<kbd>Space</kbd> (Mac) / <kbd>Alt</kbd>+<kbd>Space</kbd> (Win/Linux) | Hold to record (push-to-talk), tap to toggle |
-| <kbd>Option</kbd>+<kbd>Space</kbd>+<kbd>Space</kbd> | Open pinned recording panel |
-| <kbd>Esc</kbd> | Dismiss any panel |
+| Hold <kbd>fn</kbd> (Mac) · <kbd>Ctrl</kbd>+<kbd>Win</kbd> (Windows) · <kbd>Right Ctrl</kbd> (Linux) | Push-to-talk: speak while holding, release to paste |
+| Add <kbd>Space</kbd> while holding | Hands-free: keeps listening after you let go; press the shortcut again to stop |
+| Quick tap of the shortcut | Also hands-free (tap again to stop) |
+| <kbd>Esc</kbd> | Cancel / dismiss any panel |
+
+Change it in Settings → Shortcuts. On macOS, set *System Settings → Keyboard → “Press 🌐 key to”* to **Do Nothing** so fn doesn't also open the emoji picker. Macs without an fn key can use <kbd>Ctrl</kbd>+<kbd>Option</kbd>.
 
 ---
 
