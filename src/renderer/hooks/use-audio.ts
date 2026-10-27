@@ -1,19 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { microphoneConstraints } from './use-microphone'
 import i18n from '../i18n'
 
 // Module-level constants to avoid repeated allocations
 const EMPTY_WAVEFORM: number[] = [0, 0, 0, 0, 0, 0, 0]
 const IPC_THROTTLE_MS = 66 // ~15fps for IPC sends (visually sufficient for waveform)
 
-const MIC_CONSTRAINTS: MediaStreamConstraints = {
-  audio: {
-    sampleRate: 16000,
-    channelCount: 1,
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true
-  }
-}
 
 // Voice activity detection. RMS of the raw waveform (−1..1). With noise
 // suppression on, room noise sits well below 0.005 while normal speech is 0.03+.
@@ -60,6 +52,7 @@ export function useAudio(): UseAudioReturn {
   // eliminate the 200-500ms getUserMedia hardware spin-up on each start.
   const warmStreamRef = useRef<MediaStream | null>(null)
   const warmingUpRef = useRef<boolean>(false)
+  const warmDeviceRef = useRef<string>('')
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -157,10 +150,22 @@ export function useAudio(): UseAudioReturn {
    * hardware "hot" so subsequent startRecording calls are near-instant.
    */
   const ensureWarmStream = useCallback(async (): Promise<MediaStream> => {
-    // If we already have a live stream, reuse it
+    const wantedDevice = ((await window.tapwisper.store.get('microphoneDeviceId').catch(() => '')) ||
+      '') as string
+
+    // If we already have a live stream on the right device, reuse it
     const existing = warmStreamRef.current
-    if (existing && existing.active && existing.getAudioTracks().every((t) => t.readyState === 'live')) {
+    if (
+      existing &&
+      existing.active &&
+      existing.getAudioTracks().every((t) => t.readyState === 'live') &&
+      warmDeviceRef.current === wantedDevice
+    ) {
       return existing
+    }
+    if (existing) {
+      existing.getTracks().forEach((t) => t.stop())
+      warmStreamRef.current = null
     }
 
     // Prevent concurrent warm-up calls from racing
@@ -178,8 +183,20 @@ export function useAudio(): UseAudioReturn {
 
     warmingUpRef.current = true
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS)
+      let stream: MediaStream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: microphoneConstraints(wantedDevice)
+        })
+      } catch (err) {
+        // The chosen mic was unplugged — fall back to the system default
+        if (!wantedDevice || !(err instanceof DOMException) || err.name !== 'OverconstrainedError') {
+          throw err
+        }
+        stream = await navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints('') })
+      }
       warmStreamRef.current = stream
+      warmDeviceRef.current = wantedDevice
 
       // If the track ends unexpectedly (e.g. user revokes permission), clear the ref
       stream.getAudioTracks()[0]?.addEventListener('ended', () => {

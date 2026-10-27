@@ -12,6 +12,19 @@ export interface TranscriptionRecord {
   llmAction?: string
   llmInput?: string
   llmResult?: string
+  /** Transcript before dictionary / Smart Formatting, when it differs */
+  rawTranscription?: string | null
+  /** App the text was dictated into */
+  appName?: string | null
+  /** Spoken language (ISO-639-1), when known */
+  language?: string | null
+}
+
+/** Optional context stored with a dictation */
+export interface DictationMeta {
+  rawTranscription?: string
+  appName?: string
+  language?: string
 }
 
 export interface ActivityQuery {
@@ -35,19 +48,26 @@ interface ActivityState {
   loadRecords: () => Promise<void>
   /** Paged + searchable query against the whole history (database-side) */
   queryRecords: (query: ActivityQuery) => Promise<ActivityPage>
-  addTranscription: (data: {
-    transcription: string
-    durationSeconds: number
-    wordCount: number
-  }) => void
-  addTranscriptionWithLLM: (data: {
-    transcription: string
-    durationSeconds: number
-    wordCount: number
-    llmAction: string
-    llmInput: string
-    llmResult: string
-  }) => void
+  /** Returns the new record id (also used as the saved-audio id) */
+  addTranscription: (
+    data: {
+      transcription: string
+      durationSeconds: number
+      wordCount: number
+    } & DictationMeta
+  ) => string
+  addTranscriptionWithLLM: (
+    data: {
+      transcription: string
+      durationSeconds: number
+      wordCount: number
+      llmAction: string
+      llmInput: string
+      llmResult: string
+    } & DictationMeta
+  ) => string
+  /** Patch a record in memory after it was updated in the DB (e.g. re-transcribed) */
+  patchRecord: (id: string, patch: Partial<TranscriptionRecord>) => void
   addLLMAction: (data: {
     llmAction: string
     llmInput: string
@@ -101,13 +121,17 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
       type: 'voice',
       transcription: data.transcription,
       durationSeconds: data.durationSeconds,
-      wordCount: data.wordCount
+      wordCount: data.wordCount,
+      rawTranscription: data.rawTranscription,
+      appName: data.appName,
+      language: data.language
     }
 
     window.tapwisper.db.activity.add(record)
     const state = get()
     const records = [record, ...state.records].slice(0, RECENT_LIMIT)
     set({ records, totalCount: state.totalCount + 1 })
+    return record.id
   },
 
   addTranscriptionWithLLM: (data) => {
@@ -120,13 +144,21 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
       wordCount: data.wordCount,
       llmAction: data.llmAction,
       llmInput: data.llmInput,
-      llmResult: data.llmResult
+      llmResult: data.llmResult,
+      rawTranscription: data.rawTranscription,
+      appName: data.appName,
+      language: data.language
     }
 
     window.tapwisper.db.activity.add(record)
     const state = get()
     const records = [record, ...state.records].slice(0, RECENT_LIMIT)
     set({ records, totalCount: state.totalCount + 1 })
+    return record.id
+  },
+
+  patchRecord: (id, patch) => {
+    set({ records: get().records.map((r) => (r.id === id ? { ...r, ...patch } : r)) })
   },
 
   addLLMAction: (data) => {

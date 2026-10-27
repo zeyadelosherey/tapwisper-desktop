@@ -106,6 +106,36 @@ function migrateSonioxModel(): void {
 }
 
 /**
+ * v1.2: single speechLanguage → speechLanguages[], free-text vocabulary →
+ * dictionary entries.
+ */
+function migrateSpeechSettings(): void {
+  const legacy = legacyStore()
+  const store = getStore()
+
+  const oldLanguage = legacy.get('speechLanguage')
+  if (typeof oldLanguage === 'string') {
+    if (oldLanguage && oldLanguage !== 'auto' && store.get('speechLanguages').length === 0) {
+      store.set('speechLanguages', [oldLanguage])
+    }
+    legacy.delete('speechLanguage')
+  }
+
+  const oldVocabulary = legacy.get('speechVocabulary')
+  if (typeof oldVocabulary === 'string') {
+    const existing = store.get('dictionary')
+    const known = new Set(existing.map((e) => e.term.toLowerCase()))
+    const added = oldVocabulary
+      .split(/[\n,]+/)
+      .map((t) => t.trim())
+      .filter((t) => t && !known.has(t.toLowerCase()))
+      .map((term, i) => ({ id: `migrated-${Date.now()}-${i}`, term, aliases: [], createdAt: Date.now() }))
+    if (added.length) store.set('dictionary', [...existing, ...added])
+    legacy.delete('speechVocabulary')
+  }
+}
+
+/**
  * Run all migrations
  */
 export function runMigrations(): void {
@@ -114,6 +144,7 @@ export function runMigrations(): void {
     migrateStats,
     migrateActivityRecords,
     migrateSonioxModel,
+    migrateSpeechSettings,
     migrateApiKeysToSafeStorage
   ]) {
     try {

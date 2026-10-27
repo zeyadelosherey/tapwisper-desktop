@@ -35,7 +35,18 @@ export interface ActivityRecord {
   llmAction?: string
   llmInput?: string
   llmResult?: string
+  /** Transcript before dictionary/Smart Formatting, when it differs */
+  rawTranscription?: string
+  /** App the text was dictated into */
+  appName?: string
+  /** Detected/selected spoken language (ISO-639-1), when known */
+  language?: string
 }
+
+/** Fields that may be changed after a record is created (e.g. re-transcription) */
+export type ActivityRecordUpdate = Partial<
+  Pick<ActivityRecord, 'transcription' | 'rawTranscription' | 'wordCount' | 'language' | 'llmResult'>
+>
 
 // ── Database Instance ─────────────────────────────────────────────
 let db: Database.Database | null = null
@@ -74,8 +85,25 @@ export function initDatabase(): Database.Database {
 
   // Create schema
   createSchema(db)
+  migrateSchema(db)
 
   return db
+}
+
+/**
+ * Additive column migrations for databases created by older versions
+ */
+function migrateSchema(database: Database.Database): void {
+  const columns = new Set(
+    (database.prepare('PRAGMA table_info(activity_records)').all() as { name: string }[]).map(
+      (c) => c.name
+    )
+  )
+  for (const column of ['rawTranscription', 'appName', 'language']) {
+    if (!columns.has(column)) {
+      database.exec(`ALTER TABLE activity_records ADD COLUMN ${column} TEXT`)
+    }
+  }
 }
 
 /**
@@ -317,8 +345,8 @@ export function addActivityRecord(record: ActivityRecord): void {
   const stmt = database.prepare(`
     INSERT INTO activity_records (
       id, timestamp, type, transcription, durationSeconds, wordCount,
-      llmAction, llmInput, llmResult
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      llmAction, llmInput, llmResult, rawTranscription, appName, language
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   
   stmt.run(
@@ -330,8 +358,30 @@ export function addActivityRecord(record: ActivityRecord): void {
     record.wordCount,
     record.llmAction || null,
     record.llmInput || null,
-    record.llmResult || null
+    record.llmResult || null,
+    record.rawTranscription || null,
+    record.appName || null,
+    record.language || null
   )
+}
+
+/**
+ * Update mutable fields of an activity record
+ */
+export function updateActivityRecord(id: string, update: ActivityRecordUpdate): void {
+  const allowed: (keyof ActivityRecordUpdate)[] = [
+    'transcription',
+    'rawTranscription',
+    'wordCount',
+    'language',
+    'llmResult'
+  ]
+  const entries = allowed.filter((k) => update[k] !== undefined).map((k) => [k, update[k]] as const)
+  if (entries.length === 0) return
+  const sets = entries.map(([k]) => `${k} = ?`).join(', ')
+  getDatabase()
+    .prepare(`UPDATE activity_records SET ${sets} WHERE id = ?`)
+    .run(...entries.map(([, v]) => v ?? null), id)
 }
 
 /**

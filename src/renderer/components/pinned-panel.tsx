@@ -3,7 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { WaveformBars } from './waveform-bars'
 import { useAudio } from '../hooks/use-audio'
 import { transcribeAudio, processText } from '../services/ai-router'
-import { expandSnippets, Snippet } from '../models/snippet'
+import type { Snippet } from '../models/snippet'
+import type { DictionaryEntry } from '../models/dictionary'
+import type { WritingStyles } from '../models/style'
+import { applyLocalCorrections, postProcessTranscript } from '../services/dictation-pipeline'
 import { useStatsStore } from '../store/stats'
 import { useActivityStore } from '../store/activity'
 import type { Trigger } from '../models/trigger'
@@ -84,6 +87,23 @@ function friendlyError(err: unknown): string {
   return raw.length > 160 ? `${raw.slice(0, 157)}...` : raw
 }
 
+interface PipelineConfigWithTriggers {
+  dictionary?: DictionaryEntry[]
+  snippets?: Snippet[]
+  smartFormatting?: boolean
+  writingStyles?: Partial<WritingStyles>
+  triggers?: Trigger[]
+}
+
+/** Keep the dictation audio for replay / re-transcription from History */
+async function saveAudio(recordId: string, blob: Blob): Promise<void> {
+  try {
+    await window.tapwisper.recordings.save(recordId, await blob.arrayBuffer(), blob.type)
+  } catch {
+    // Saving is best-effort — never disturb the dictation
+  }
+}
+
 /** Track whether the panel is visible so we can replay the entrance animation */
 let showCounter = 0
 
@@ -140,12 +160,33 @@ export function PinnedPanel(): JSX.Element {
         return
       }
 
-      // Fire all async work in parallel: transcription, text grab, config reads.
-      // Previously these were sequential, adding 100-300ms of avoidable latency.
+      // Fire all async work in parallel: transcription, text grab, config and
+      // the app being dictated into (for the writing style).
       const grabPromise = window.tapwisper.clipboard.grabSelectedText().catch(() => '')
-      const snippetsPromise = window.tapwisper.store.get('snippets') as Promise<Snippet[] | undefined>
+      const configPromise = window.tapwisper.store
+        .getAll()
+        .catch(() => ({})) as Promise<PipelineConfigWithTriggers>
+      const appPromise = window.tapwisper.context.activeApp().catch(() => null)
+      const recordingSeconds = (Date.now() - recordingStartRef.current) / 1000
 
-      const [result, storedSnippets] = await Promise.all([transcribeAudio(blob), snippetsPromise])
+      let result: Awaited<ReturnType<typeof transcribeAudio>>
+      try {
+        result = await transcribeAudio(blob)
+      } catch (err) {
+        // Keep the audio so the dictation can be retried from History
+        // (a failed entry has an empty transcription)
+        const appInfo = await appPromise
+        const failedId = addTranscription({
+          transcription: '',
+          durationSeconds: recordingSeconds,
+          wordCount: 0,
+          appName: appInfo?.name
+        })
+        void saveAudio(failedId, blob)
+        throw err
+      }
+      const [config, appInfo] = await Promise.all([configPromise, appPromise])
+
       let rawTranscription = result.text?.trim() || ''
       if (rawTranscription && isLikelyHallucination(rawTranscription, stats.voicedMs)) {
         rawTranscription = ''
@@ -162,16 +203,18 @@ export function PinnedPanel(): JSX.Element {
         // Grab failed, continue with empty selection
       }
 
-      // Expand snippets in transcription (e.g. "/email" → actual email)
-      const transcription = storedSnippets?.length
-        ? expandSnippets(rawTranscription, storedSnippets)
-        : rawTranscription
+      // Dictionary corrections + snippet expansion (local, instant)
+      const transcription = applyLocalCorrections(rawTranscription, config)
+      const meta = {
+        rawTranscription: rawTranscription !== transcription ? rawTranscription : undefined,
+        appName: appInfo?.name,
+        language: result.language
+      }
 
       // ── Track voice recording analytics ──
-      const recordingSeconds = transcription ? (Date.now() - recordingStartRef.current) / 1000 : 0
       const chars = transcription?.length || 0
       const words = transcription ? transcription.split(/\s+/).filter(Boolean).length : 0
-      
+
       if (transcription) {
         addVoiceRecording(recordingSeconds, chars, words)
       }
@@ -179,7 +222,7 @@ export function PinnedPanel(): JSX.Element {
       // ── Check voice triggers before default behavior ──
       if (transcription) {
         try {
-          const storedTriggers = await window.tapwisper.store.get('triggers') as Trigger[] | undefined
+          const storedTriggers = config.triggers
           if (storedTriggers?.length) {
             const triggerMatch = matchTrigger(transcription, storedTriggers)
             if (triggerMatch) {
@@ -197,8 +240,8 @@ export function PinnedPanel(): JSX.Element {
 
               // If there was text spoken before the trigger phrase (mid-sentence trigger),
               // inject it as normal dictation first so it's not lost.
-              // e.g. "So this is my movie so Google about the movie"
-              //       → inject "So this is my movie so" then run the Google trigger
+              // e.g. "So this is my movie. Google about the movie"
+              //       → inject "So this is my movie." then run the Google trigger
               if (triggerMatch.prefixText) {
                 await new Promise((r) => setTimeout(r, 50))
                 await window.tapwisper.clipboard.insertText(triggerMatch.prefixText)
@@ -243,7 +286,7 @@ export function PinnedPanel(): JSX.Element {
           const aiResult = await processText({
             prompt: transcription,
             text: selectedText,
-            systemInstruction: 'You are a helpful writing assistant. The user has selected some text and given you a voice instruction about what to do with it. Follow their instruction precisely. Only return the result text, nothing else — no explanations, no quotes, no markdown formatting.'
+            systemInstruction: 'You are a helpful writing assistant. The user has selected some text and given you a voice instruction about what to do with it. Follow their instruction precisely. Keep the language of the selected text unless the instruction asks to translate. Only return the result text, nothing else — no explanations, no quotes, no markdown formatting.'
           })
 
           window.tapwisper.window.send('recordingPill', 'result-panel:result', aiResult.result)
@@ -251,36 +294,52 @@ export function PinnedPanel(): JSX.Element {
 
           addAIAction('voice-command', aiResult.result?.length || 0)
 
-          addTranscriptionWithLLM({
+          const id = addTranscriptionWithLLM({
             transcription,
             durationSeconds: recordingSeconds,
             wordCount: words,
             llmAction: 'Voice Command',
             llmInput: selectedText,
-            llmResult: aiResult.result || ''
+            llmResult: aiResult.result || '',
+            ...meta
           })
+          void saveAudio(id, blob)
         } catch (err: unknown) {
           const errorMsg =
             err instanceof Error ? err.message : i18n.t('errors.aiFailed', 'AI processing failed')
           window.tapwisper.window.send('recordingPill', 'result-panel:error', errorMsg)
         }
       } else if (transcription) {
-        addTranscription({
-          transcription,
-          durationSeconds: recordingSeconds,
-          wordCount: words
-        })
-
         window.tapwisper.window.hide('pinnedPanel')
 
+        // Optional Smart Formatting (LLM clean-up in the app's writing style).
+        // Never throws — falls back to the corrected transcript.
+        const finalText = config.smartFormatting
+          ? await postProcessTranscript(
+              transcription,
+              { appName: appInfo?.name, windowTitle: appInfo?.title },
+              // Dictionary/snippets were already applied above
+              { ...config, dictionary: [], snippets: [] }
+            )
+          : transcription
+
+        const id = addTranscription({
+          transcription: finalText,
+          durationSeconds: recordingSeconds,
+          wordCount: finalText.split(/\s+/).filter(Boolean).length,
+          ...meta,
+          rawTranscription: rawTranscription !== finalText ? rawTranscription : undefined
+        })
+        void saveAudio(id, blob)
+
         await new Promise((r) => setTimeout(r, 50))
-        await window.tapwisper.clipboard.insertText(transcription)
+        await window.tapwisper.clipboard.insertText(finalText)
 
         // Activate post-recording state so the shortcut can open the action panel
-        window.tapwisper.recording.transcriptionDone(transcription)
+        window.tapwisper.recording.transcriptionDone(finalText)
 
         setState('idle')
-        window.tapwisper.window.send('recordingPill', 'post-recording:show', transcription)
+        window.tapwisper.window.send('recordingPill', 'post-recording:show', finalText)
       } else {
         // No transcription at all
         window.tapwisper.recordingPill.hide()

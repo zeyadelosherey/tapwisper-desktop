@@ -35,6 +35,8 @@ export interface TranscriptionResponse {
   text: string
   provider: string
   duration?: number
+  /** Spoken language (ISO-639-1) when known */
+  language?: string
 }
 
 /**
@@ -78,6 +80,8 @@ export async function processText(request: AIRequest): Promise<AIResponse> {
 export interface TranscriptionOptions {
   /** ISO-639-1 code; undefined lets the model auto-detect the spoken language */
   language?: string
+  /** All languages the user speaks (code-switching); providers that accept hints use these */
+  languageHints?: string[]
   /** Vocabulary / context that biases recognition toward the user's terms */
   prompt?: string
 }
@@ -85,15 +89,31 @@ export interface TranscriptionOptions {
 /** Whisper only reads the last ~224 tokens of the prompt — keep it bounded */
 const MAX_PROMPT_CHARS = 600
 
-function buildVocabularyPrompt(vocabulary: unknown, triggers: unknown): string | undefined {
+/**
+ * Example sentences that show Whisper the user mixes a language with English.
+ * Without them it tends to translate or transliterate the English words.
+ */
+const CODE_SWITCH_SAMPLES: Record<string, string> = {
+  ar: 'تمام، هبعتلك الـ report على الـ Drive بعد الـ meeting.',
+  hi: 'Theek hai, main report ko Drive pe upload kar dunga after the meeting.',
+  ur: 'ٹھیک ہے، میں meeting کے بعد report بھیج دوں گا۔',
+  fa: 'باشه، بعد از meeting فایل report رو می‌فرستم.',
+  es: 'Vale, te mando el report por Drive después del meeting.',
+  fr: "D'accord, je t'envoie le report sur le Drive après le meeting.",
+  de: 'Okay, ich schicke dir den Report nach dem Meeting über Drive.',
+  tr: 'Tamam, meeting sonrası report dosyasını Drive üzerinden atarım.'
+}
+
+function buildVocabularyPrompt(
+  dictionary: unknown,
+  triggers: unknown,
+  languages: string[]
+): string | undefined {
   const terms: string[] = []
-  if (typeof vocabulary === 'string') {
-    terms.push(
-      ...vocabulary
-        .split(/[\n,]+/)
-        .map((t) => t.trim())
-        .filter(Boolean)
-    )
+  if (Array.isArray(dictionary)) {
+    for (const e of dictionary as Array<{ term?: string }>) {
+      if (e.term?.trim()) terms.push(e.term.trim())
+    }
   }
   // Trigger phrases are exactly the words that must be recognised reliably
   if (Array.isArray(triggers)) {
@@ -101,17 +121,29 @@ function buildVocabularyPrompt(vocabulary: unknown, triggers: unknown): string |
       if (t.enabled && t.triggerPhrase?.trim()) terms.push(t.triggerPhrase.trim())
     }
   }
+  const parts: string[] = []
   const unique = [...new Set(terms)]
-  if (unique.length === 0) return undefined
-  return unique.join(', ').slice(0, MAX_PROMPT_CHARS)
+  if (unique.length) parts.push(unique.join(', '))
+
+  // Code-switching with English: prime with a mixed sentence in the other language
+  if (languages.length > 1 && languages.includes('en')) {
+    const other = languages.find((l) => l !== 'en' && CODE_SWITCH_SAMPLES[l])
+    if (other) parts.push(CODE_SWITCH_SAMPLES[other])
+  }
+  if (parts.length === 0) return undefined
+  // Whisper weights the END of the prompt most — keep the sample sentence last
+  const prompt = parts.join('. ')
+  return prompt.length > MAX_PROMPT_CHARS ? prompt.slice(-MAX_PROMPT_CHARS) : prompt
 }
 
 /**
  * Route transcription to the configured voice provider.
  *
- * The spoken language comes from the `speechLanguage` setting (default 'auto'),
+ * Spoken languages come from the `speechLanguages` setting (empty = auto-detect),
  * NOT the UI language — forcing the UI language made Whisper mistranscribe or
  * translate anyone who speaks a different language than their interface.
+ * With several languages (code-switching) the model auto-detects, primed by
+ * an example sentence and, for Soniox, explicit language hints.
  */
 export async function transcribeAudio(
   audioBlob: Blob,
@@ -121,8 +153,8 @@ export async function transcribeAudio(
     voiceProvider?: VoiceProvider
     apiKeys?: Record<string, string>
     voiceModels?: Partial<Record<VoiceProvider, string>>
-    speechLanguage?: string
-    speechVocabulary?: string
+    speechLanguages?: string[]
+    dictionary?: unknown
     triggers?: unknown
   }
   const provider: VoiceProvider = config.voiceProvider || 'whisper'
@@ -145,10 +177,13 @@ export async function transcribeAudio(
     )
   }
 
-  const speechLanguage = languageOverride || config.speechLanguage || 'auto'
+  const languages = languageOverride
+    ? [languageOverride]
+    : (config.speechLanguages ?? []).filter((l) => typeof l === 'string' && l)
   const options: TranscriptionOptions = {
-    language: speechLanguage === 'auto' ? undefined : speechLanguage,
-    prompt: buildVocabularyPrompt(config.speechVocabulary, config.triggers)
+    language: languages.length === 1 ? languages[0] : undefined,
+    languageHints: languages.length ? languages : undefined,
+    prompt: buildVocabularyPrompt(config.dictionary, config.triggers, languages)
   }
 
   let response: TranscriptionResponse
@@ -170,7 +205,7 @@ export async function transcribeAudio(
   if (options.prompt && isPromptEcho(response.text, options.prompt)) {
     return { ...response, text: '' }
   }
-  return response
+  return { ...response, language: response.language ?? options.language }
 }
 
 function normalizeForCompare(text: string): string {
@@ -187,7 +222,12 @@ function normalizeForCompare(text: string): string {
 export function isPromptEcho(text: string, prompt: string): boolean {
   const t = normalizeForCompare(text)
   if (!t) return false
-  const terms = prompt.split(',').map(normalizeForCompare).filter(Boolean)
+  // The code-switch sample is one long sentence — echoing it alone is also an echo
+  for (const sentence of prompt.split('. ')) {
+    const n = normalizeForCompare(sentence)
+    if (n.split(' ').length >= 4 && n === t) return true
+  }
+  const terms = prompt.split(/[,.]\s/).map(normalizeForCompare).filter(Boolean)
   for (let start = 0; start < terms.length; start++) {
     for (let end = start + 2; end <= terms.length; end++) {
       if (terms.slice(start, end).join(' ') === t) return true

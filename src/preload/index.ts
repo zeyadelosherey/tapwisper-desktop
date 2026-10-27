@@ -20,6 +20,22 @@ export interface ActivityRecordDTO {
   llmAction?: string
   llmInput?: string
   llmResult?: string
+  /** Transcript before dictionary / Smart Formatting, when it differs */
+  rawTranscription?: string | null
+  /** App the text was dictated into */
+  appName?: string | null
+  /** Spoken language (ISO-639-1), when known */
+  language?: string | null
+}
+
+export type ActivityRecordUpdate = Partial<
+  Pick<ActivityRecordDTO, 'transcription' | 'rawTranscription' | 'wordCount' | 'language' | 'llmResult'>
+>
+
+export interface ActiveAppInfo {
+  name: string
+  bundleId?: string
+  title?: string
 }
 
 export interface ActivityQueryParams {
@@ -117,7 +133,8 @@ const api = {
   // ── Shortcuts ────────────────────────────────────────────────────
   shortcuts: {
     get: () => ipcRenderer.invoke('shortcuts:get'),
-    update: (shortcuts: { record?: string }) =>
+    /** Rejects shortcuts main can't listen for (`error: 'unsupported-shortcut'`) */
+    update: (shortcuts: { record?: string }): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('shortcuts:update', shortcuts),
     reset: () => ipcRenderer.invoke('shortcuts:reset')
   },
@@ -157,6 +174,8 @@ const api = {
       query: (params: ActivityQueryParams): Promise<ActivityQueryResult> =>
         ipcRenderer.invoke('db:activity:query', params),
       add: (record: ActivityRecordDTO) => ipcRenderer.invoke('db:activity:add', record),
+      update: (id: string, update: ActivityRecordUpdate): Promise<void> =>
+        ipcRenderer.invoke('db:activity:update', id, update),
       delete: (id: string) => ipcRenderer.invoke('db:activity:delete', id),
       clearAll: () => ipcRenderer.invoke('db:activity:clear-all'),
       getByDateRange: (startDate: number, endDate: number) =>
@@ -167,6 +186,24 @@ const api = {
     cleanupOldRecords: (keepCount?: number) => ipcRenderer.invoke('db:cleanup-old-records', keepCount),
     exportJSON: () => ipcRenderer.invoke('db:export-json'),
     importJSON: (data: unknown) => ipcRenderer.invoke('db:import-json', data)
+  },
+
+  // ── Saved dictation audio (keyed by activity record id) ─────────
+  recordings: {
+    /** No-op when the user disabled keepRecordings */
+    save: (id: string, data: ArrayBuffer, mimeType: string): Promise<void> =>
+      ipcRenderer.invoke('recordings:save', id, data, mimeType),
+    load: (id: string): Promise<{ data: ArrayBuffer; mimeType: string } | null> =>
+      ipcRenderer.invoke('recordings:load', id),
+    has: (id: string): Promise<boolean> => ipcRenderer.invoke('recordings:has', id),
+    delete: (id: string): Promise<void> => ipcRenderer.invoke('recordings:delete', id),
+    clear: (): Promise<void> => ipcRenderer.invoke('recordings:clear')
+  },
+
+  // ── Context ─────────────────────────────────────────────────────
+  context: {
+    /** Frontmost app (null if unavailable, e.g. missing permission) */
+    activeApp: (): Promise<ActiveAppInfo | null> => ipcRenderer.invoke('context:active-app')
   },
 
   // ── Trigger Actions ──────────────────────────────────────────────

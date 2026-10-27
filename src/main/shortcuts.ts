@@ -22,6 +22,14 @@ let primaryKeyDownTime = 0
 // that key is released. Windows delivers repeated hotkey events while a key is
 // held, which would otherwise stop a push-to-talk recording mid-hold.
 let pressConsumed = false
+// A modifier-only shortcut was used as part of a key combo (e.g. Right Option+E
+// to type "é"), so that press must not start or toggle a recording
+let comboInterrupted = false
+
+/** Tell the main window (onboarding shortcut test) whether the record key is held */
+function broadcastShortcutState(pressed: boolean): void {
+  windowManagerRef?.sendToWindow('main', 'shortcut:state', pressed)
+}
 
 let windowManagerRef: WindowManager | null = null
 
@@ -43,6 +51,21 @@ interface ParsedShortcut {
   shift: boolean
   alt: boolean
   meta: boolean
+  /** A single modifier key held on its own (e.g. Right Option) */
+  modifierOnly: boolean
+}
+
+/**
+ * Single-key push-to-talk shortcuts. Right-hand modifiers are rarely used for
+ * typing, so holding one alone is a comfortable, conflict-free trigger.
+ */
+const MODIFIER_ONLY_KEYS: Record<string, number> = {
+  RIGHTOPTION: UiohookKey.AltRight,
+  RIGHTALT: UiohookKey.AltRight,
+  RIGHTCOMMAND: UiohookKey.MetaRight,
+  RIGHTCONTROL: UiohookKey.CtrlRight,
+  RIGHTCTRL: UiohookKey.CtrlRight,
+  RIGHTSHIFT: UiohookKey.ShiftRight
 }
 
 // Current active shortcuts (parsed from store strings)
@@ -93,6 +116,11 @@ const KEY_MAP: Record<string, number> = {
  * Supports: CommandOrControl, Ctrl, Cmd, Shift, Alt, Option, and key names.
  */
 function parseShortcut(accelerator: string): ParsedShortcut | null {
+  const single = MODIFIER_ONLY_KEYS[accelerator.replace(/[\s_-]/g, '').toUpperCase()]
+  if (single !== undefined) {
+    return { keycode: single, ctrl: false, shift: false, alt: false, meta: false, modifierOnly: true }
+  }
+
   const parts = accelerator.split('+').map((p) => p.trim())
   let ctrl = false
   let shift = false
@@ -130,7 +158,7 @@ function parseShortcut(accelerator: string): ParsedShortcut | null {
   const keycode = KEY_MAP[keyName.toUpperCase()] ?? KEY_MAP[keyName]
   if (keycode === undefined) return null
 
-  return { keycode, ctrl, shift, alt, meta }
+  return { keycode, ctrl, shift, alt, meta, modifierOnly: false }
 }
 
 /**
@@ -141,6 +169,8 @@ function eventMatchesShortcut(
   shortcut: ParsedShortcut
 ): boolean {
   if (e.keycode !== shortcut.keycode) return false
+  // The modifier's own flag is set on its keydown; other modifiers mean a combo
+  if (shortcut.modifierOnly) return true
 
   if (shortcut.ctrl && !e.ctrlKey) return false
   if (shortcut.meta && !e.metaKey) return false
@@ -157,6 +187,11 @@ function eventMatchesShortcut(
 }
 
 const DEFAULT_RECORD_SHORTCUT = 'Option+Space'
+
+/** Whether a shortcut string can be used as the record shortcut */
+export function isValidShortcut(accelerator: string): boolean {
+  return parseShortcut(accelerator) !== null
+}
 
 function loadShortcutsFromStore(): void {
   const store = getStore()
@@ -252,6 +287,9 @@ function registerElectronShortcut(): void {
   const accelerator = toElectronAccelerator(shortcuts.record)
 
   unregisterElectronShortcut()
+
+  // A lone modifier can't be an Electron accelerator — uiohook handles it
+  if (recordShortcut?.modifierOnly) return
 
   try {
     const registered = globalShortcut.register(accelerator, handleRecordShortcutPress)
@@ -354,11 +392,24 @@ function attachHookListeners(_windowManager: WindowManager): void {
   keydownHandler = (e): void => {
     trackKeyDown(e.keycode)
 
+    // ── Modifier-only shortcut used in a combo → not a dictation press ──
+    if (
+      recordShortcut?.modifierOnly &&
+      primaryKeyDown &&
+      e.keycode !== recordShortcut.keycode &&
+      !comboInterrupted
+    ) {
+      comboInterrupted = true
+      if (isRecording && recordingMode === 'push-to-talk') cancelRecording()
+    }
+
     // ── Record shortcut (e.g. Ctrl + Space) ──
     if (recordShortcut && eventMatchesShortcut(e, recordShortcut)) {
       if (!primaryKeyDown) {
         // First press (not a key repeat)
         primaryKeyDown = true
+        comboInterrupted = false
+        broadcastShortcutState(true)
         // Note: Electron's globalShortcut handles the keydown action (startRecording/stopRecording).
         // uiohook only tracks the key state for push-to-talk keyup detection.
         // If globalShortcut didn't register (fallback), handle it here.
@@ -399,7 +450,15 @@ function attachHookListeners(_windowManager: WindowManager): void {
   keyupHandler = (e): void => {
     trackKeyUp(e.keycode)
 
-    if (recordShortcut && e.keycode === recordShortcut.keycode) pressConsumed = false
+    if (recordShortcut && e.keycode === recordShortcut.keycode) {
+      pressConsumed = false
+      broadcastShortcutState(false)
+      if (comboInterrupted) {
+        comboInterrupted = false
+        primaryKeyDown = false
+        return
+      }
+    }
 
     // ── Record key released — Handle push-to-talk stop ──
     if (recordShortcut && e.keycode === recordShortcut.keycode && primaryKeyDown) {

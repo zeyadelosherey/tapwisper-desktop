@@ -641,7 +641,6 @@ export function Settings(): JSX.Element {
   const [theme, setTheme] = useState<Theme>('system')
   const [autoLaunch, setAutoLaunch] = useState(false)
   const [speechLanguage, setSpeechLanguage] = useState('auto')
-  const [speechVocabulary, setSpeechVocabulary] = useState('')
   const [keepMicWarm, setKeepMicWarm] = useState(false)
   const [appVersion, setAppVersion] = useState('')
 
@@ -710,12 +709,11 @@ export function Settings(): JSX.Element {
       window.tapwisper.store.get('apiKeys'),
       window.tapwisper.store.get('models'),
       window.tapwisper.store.get('voiceModels'),
-      window.tapwisper.store.get('speechLanguage'),
-      window.tapwisper.store.get('speechVocabulary'),
+      window.tapwisper.store.get('speechLanguages'),
       window.tapwisper.store.get('keepMicWarm')
-    ]).then(([lang, th, auto, platform, sc, llm, voice, keys, mdls, vMdls, sLang, vocab, warm]) => {
-      if (typeof sLang === 'string') setSpeechLanguage(sLang)
-      if (typeof vocab === 'string') setSpeechVocabulary(vocab)
+    ]).then(([lang, th, auto, platform, sc, llm, voice, keys, mdls, vMdls, sLangs, warm]) => {
+      // Single-select UI for now: one language, or auto-detect
+      if (Array.isArray(sLangs)) setSpeechLanguage(sLangs.length === 1 ? String(sLangs[0]) : 'auto')
       if (typeof warm === 'boolean') setKeepMicWarm(warm)
       if (lang) {
         setLanguage(lang as string)
@@ -777,7 +775,7 @@ export function Settings(): JSX.Element {
 
   const handleSpeechLanguageChange = useCallback((code: string) => {
     setSpeechLanguage(code)
-    window.tapwisper.store.set('speechLanguage', code)
+    window.tapwisper.store.set('speechLanguages', code === 'auto' ? [] : [code])
   }, [])
 
   const handleKeepMicWarmChange = useCallback((value: boolean) => {
@@ -930,27 +928,6 @@ export function Settings(): JSX.Element {
                 </option>
               ))}
             </select>
-          </div>
-          <div className="p-4">
-            <label htmlFor="speech-vocabulary" className="text-sm text-theme-text">
-              {t('settings.speechVocabulary', 'Custom vocabulary')}
-            </label>
-            <p className="text-xs text-theme-text-tertiary mt-0.5 mb-2">
-              {t(
-                'settings.speechVocabularyHint',
-                'Names, products and jargon you use, separated by commas. Your voice trigger phrases are included automatically.'
-              )}
-            </p>
-            <textarea
-              id="speech-vocabulary"
-              value={speechVocabulary}
-              onChange={(e) => setSpeechVocabulary(e.target.value)}
-              onBlur={() => window.tapwisper.store.set('speechVocabulary', speechVocabulary)}
-              rows={2}
-              maxLength={600}
-              placeholder="TapWisper, Kubernetes, Zeyad"
-              className="w-full bg-theme-surface text-theme-text text-sm rounded-lg px-3 py-2 border border-theme-border/50 focus:outline-none focus:border-sky-accent/50 resize-none placeholder:text-theme-text-tertiary"
-            />
           </div>
           <div className="p-4 flex items-center justify-between gap-4">
             <div>

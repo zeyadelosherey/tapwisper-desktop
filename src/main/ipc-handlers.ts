@@ -6,10 +6,24 @@ import { WindowManager, applyNativeTheme, type WindowType } from './windows'
 import { ClipboardManager } from './clipboard'
 import { getStore, getConfigValue, setConfigValue, getAllConfig } from './store'
 import { encodeWav, saveTempAudio, cleanupAudioFile } from './audio'
-import { reloadShortcuts, cancelRecording, startShortcutsAfterPermission, setPostRecordingState } from './shortcuts'
+import {
+  reloadShortcuts,
+  cancelRecording,
+  startShortcutsAfterPermission,
+  setPostRecordingState,
+  isValidShortcut
+} from './shortcuts'
 import { checkPermissions, requestPermission } from './permissions'
 import type { PermissionType } from './permissions'
 import * as db from './database'
+import {
+  saveRecording,
+  loadRecording,
+  hasRecording,
+  deleteRecording,
+  clearRecordings
+} from './recordings'
+import { getActiveApp } from './app-context'
 import {
   executeWebSearch,
   executeTerminal,
@@ -296,9 +310,13 @@ export function registerIpcHandlers(
 
   // ── Shortcuts ────────────────────────────────────────────────────
   ipcMain.handle('shortcuts:update', (_e: IpcMainInvokeEvent, shortcuts: { record?: string }) => {
+    if (shortcuts.record && !isValidShortcut(shortcuts.record)) {
+      return { success: false, error: 'unsupported-shortcut' }
+    }
     const store = getStore()
-    store.set('shortcuts', shortcuts)
+    store.set('shortcuts', { ...store.get('shortcuts'), ...shortcuts })
     reloadShortcuts()
+    return { success: true }
   })
 
   ipcMain.handle('shortcuts:get', () => {
@@ -374,13 +392,38 @@ export function registerIpcHandlers(
     db.addActivityRecord(record)
   })
 
-  ipcMain.handle('db:activity:delete', (_e: IpcMainInvokeEvent, id: string) => {
+  ipcMain.handle(
+    'db:activity:update',
+    (_e: IpcMainInvokeEvent, id: string, update: db.ActivityRecordUpdate) => {
+      db.updateActivityRecord(id, update)
+    }
+  )
+
+  ipcMain.handle('db:activity:delete', async (_e: IpcMainInvokeEvent, id: string) => {
     db.deleteActivityRecord(id)
+    await deleteRecording(id)
   })
 
-  ipcMain.handle('db:activity:clear-all', () => {
+  ipcMain.handle('db:activity:clear-all', async () => {
     db.clearAllActivityRecords()
+    await clearRecordings()
   })
+
+  // ── Saved dictation audio (replay / re-transcribe) ─────────────
+  ipcMain.handle(
+    'recordings:save',
+    (_e: IpcMainInvokeEvent, id: string, data: ArrayBuffer, mimeType: string) => {
+      if (getStore().get('keepRecordings') === false) return
+      return saveRecording(id, data, mimeType)
+    }
+  )
+  ipcMain.handle('recordings:load', (_e: IpcMainInvokeEvent, id: string) => loadRecording(id))
+  ipcMain.handle('recordings:has', (_e: IpcMainInvokeEvent, id: string) => hasRecording(id))
+  ipcMain.handle('recordings:delete', (_e: IpcMainInvokeEvent, id: string) => deleteRecording(id))
+  ipcMain.handle('recordings:clear', () => clearRecordings())
+
+  // ── Context: the app being dictated into ───────────────────────
+  ipcMain.handle('context:active-app', () => getActiveApp())
 
   ipcMain.handle('db:activity:get-by-date-range', (_e: IpcMainInvokeEvent, startDate: number, endDate: number) => {
     return db.getActivityRecordsByDateRange(startDate, endDate)

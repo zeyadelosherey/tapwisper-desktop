@@ -54,7 +54,8 @@ export async function transcribeWithSoniox(
       model: model && model.startsWith('stt-') ? model : DEFAULT_MODEL,
       file_id: file.id
     }
-    if (options.language) body.language_hints = [options.language]
+    const hints = options.languageHints ?? (options.language ? [options.language] : [])
+    if (hints.length) body.language_hints = hints
     if (options.prompt) body.context = options.prompt
 
     const created = await sonioxFetch<SonioxTranscription>(apiKey, '/transcriptions', {

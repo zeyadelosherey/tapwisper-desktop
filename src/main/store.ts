@@ -51,12 +51,29 @@ export interface AppConfig {
   autoLaunch: boolean
 
   // Speech recognition
-  /** ISO-639-1 code of the language the user speaks, or 'auto' to let the model detect it */
-  speechLanguage: string
-  /** Names, jargon and spellings to bias transcription toward (free text) */
-  speechVocabulary: string
+  /**
+   * ISO-639-1 codes of the languages the user dictates in. Empty = auto-detect.
+   * Several entries = code-switching (e.g. ['ar', 'en'] for Arabic mixed with English).
+   */
+  speechLanguages: string[]
+  /** Personal dictionary: terms to recognise + wrong spellings to correct */
+  dictionary: DictionaryEntryConfig[]
   /** Keep the microphone open between recordings for instant start (mic indicator stays on) */
   keepMicWarm: boolean
+  /** Input device id from navigator.mediaDevices ('' = system default) */
+  microphoneDeviceId: string
+  /** Keep recent dictation audio so history entries can be replayed / re-transcribed */
+  keepRecordings: boolean
+
+  // Smart Formatting (LLM clean-up pass after transcription)
+  smartFormatting: boolean
+  /** Tone per app category, used by Smart Formatting */
+  writingStyles: Record<'messages' | 'work' | 'email' | 'other', 'formal' | 'casual' | 'very-casual'>
+
+  /** @deprecated migrated to speechLanguages */
+  speechLanguage?: string
+  /** @deprecated migrated to dictionary */
+  speechVocabulary?: string
 
   // Shortcut customization
   shortcuts: {
@@ -78,6 +95,13 @@ export interface AppConfig {
    * getConfigValue / getAllConfig.
    */
   apiKeysEncrypted?: string
+}
+
+export interface DictionaryEntryConfig {
+  id: string
+  term: string
+  aliases: string[]
+  createdAt: number
 }
 
 export interface SnippetEntry {
@@ -302,9 +326,14 @@ const defaultConfig: AppConfig = {
   theme: 'system',
   autoLaunch: false,
 
-  speechLanguage: 'auto',
-  speechVocabulary: '',
+  speechLanguages: [],
+  dictionary: [],
   keepMicWarm: false,
+  microphoneDeviceId: '',
+  keepRecordings: true,
+
+  smartFormatting: false,
+  writingStyles: { messages: 'casual', work: 'casual', email: 'formal', other: 'formal' },
 
   shortcuts: {
     record: 'Option+Space'
