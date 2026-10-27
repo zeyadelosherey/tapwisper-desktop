@@ -107,6 +107,7 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 | 🔑 | **BYOAPI** | Bring Your Own API key — no subscriptions, no middleman |
 | 🔓 | **100% Open Source** | Inspect, modify, and contribute. MIT licensed |
 | 🛡️ | **Privacy First** | Audio & text go directly to your chosen provider — or never leave your computer with local models. Nothing passes through our servers |
+| ✈️ | **Works Offline** | Local models run with no internet connection and no API key |
 | 🖥️ | **Cross-Platform** | macOS, Windows, and Linux |
 
 ---
@@ -119,7 +120,8 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 | 🤖 | **AI Text Transformations** | Rewrite, summarize, translate, fix grammar, and more |
 | 🔌 | **Multiple AI Providers** | Google Gemini, Together AI, OpenAI, Claude |
 | 🗣️ | **Multiple Voice Providers** | Together Whisper, OpenAI Whisper / GPT-4o Transcribe, Soniox — any spoken language, auto-detected |
-| 💻 | **Local & Self-hosted Models** | Run Whisper, Parakeet, Qwen3-ASR and open LLMs (Qwen, Gemma, Llama, Phi, Mistral, SmolLM, Granite, gpt-oss and more) offline on your computer, or use your own Ollama / LM Studio / vLLM server — see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md) |
+| 💻 | **Local & Self-hosted Models** | Run 18 speech models (Whisper, NVIDIA Parakeet, Qwen3-ASR, Voxtral) and 24 open language models (Qwen, Gemma, Llama, Phi, Mistral, SmolLM, Granite, gpt-oss and more) offline on your computer, or use your own Ollama / LM Studio / vLLM server — see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md) |
+| 🚀 | **GPU Acceleration** | Local models use the GPU: Metal on Apple Silicon, Vulkan on Windows and Linux (NVIDIA, AMD, Intel Arc), with automatic CPU fallback. Each model is rated for your computer's memory and GPU |
 | ⚡ | **Custom Actions** | Create your own AI action categories and prompts |
 | 🎯 | **Voice Triggers** | Hands-free automation with voice commands (tolerant of small transcription errors) |
 | 📋 | **Text Snippets** | Quick text expansion via trigger phrases |
@@ -151,6 +153,7 @@ Change it in Settings → Shortcuts. On macOS, set *System Settings → Keyboard
 - [Node.js](https://nodejs.org/) v18 or later
 - npm v9 or later
 - macOS 12+, Windows 10+, or Linux (X11; on Wayland, install `wtype` so text can be pasted)
+- Optional, for local models in a development build: git, CMake 3.21+ and a C++17 compiler, then `npm run build:runtimes` (add `-- --vulkan` for the GPU backend on Windows/Linux; see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md#building-the-runtimes))
 
 ### 📦 Installation
 
@@ -187,6 +190,7 @@ npm run dist:linux   # Linux (AppImage)
 | `npm run dist` | 🚀 Build and package for distribution |
 | `npm run typecheck` | ✅ Run TypeScript type checking |
 | `npm run lint` | 🔍 Run ESLint |
+| `npm test` | 🧪 Run the Vitest unit tests |
 | `npm run format` | 💅 Format code with Prettier |
 | `npm run build:runtimes` | 🧠 Build the bundled whisper.cpp / llama.cpp servers for local models ([details](docs/LOCAL_MODELS.md#building-the-runtimes)) |
 
@@ -205,6 +209,7 @@ npm run dist:linux   # Linux (AppImage)
 | 🐻 **Zustand** | State management |
 | 🌍 **i18next** | 6-language localization |
 | 🎬 **Framer Motion** | Smooth animations |
+| 🧠 **whisper.cpp / llama.cpp** | On-device speech-to-text and language models (bundled, built from source) |
 
 ---
 
@@ -217,7 +222,7 @@ npm run dist:linux   # Linux (AppImage)
 | <img src="src/renderer/assets/openai.png" width="20" /> **OpenAI** | LLM | GPT models for text processing |
 | <img src="src/renderer/assets/claude.png" width="20" /> **Claude** | LLM | Anthropic's Claude models |
 | <img src="src/renderer/assets/soniox.png" width="20" /> **Soniox** | Voice | High-accuracy speech-to-text |
-| 💻 **Local** | LLM + Voice | whisper.cpp and llama.cpp with Whisper, Parakeet, Qwen3-ASR and 25+ open-source language models, on your computer |
+| 💻 **Local** | LLM + Voice | whisper.cpp and llama.cpp on your computer: 18 speech models and 24 open-source language models, downloaded once and verified, GPU-accelerated with Metal or Vulkan |
 | 🖧 **Self-hosted** | LLM + Voice | Any OpenAI-compatible server on your network |
 
 ---
@@ -307,3 +312,5 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 ## 🙌 Acknowledgements
 
 Built with ❤️ using [Electron](https://www.electronjs.org/), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/), [Vite](https://vite.dev/), and many other great open-source projects.
+
+Local models run on [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and [llama.cpp](https://github.com/ggml-org/llama.cpp) by the ggml team, and download from [Hugging Face](https://huggingface.co). Thanks to the authors of the open models in the catalog (OpenAI Whisper, NVIDIA Parakeet and Nemotron, Qwen, Mistral and Voxtral, Google Gemma, Meta Llama, Microsoft Phi, Liquid AI, Hugging Face SmolLM, IBM Granite, OpenAI gpt-oss); each model's license is shown in the app before you download it.
