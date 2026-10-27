@@ -118,15 +118,15 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 | 🎤 | **Voice Dictation** | Push-to-talk or toggle recording from anywhere on your system |
 | 🤖 | **AI Text Transformations** | Rewrite, summarize, translate, fix grammar, and more |
 | 🔌 | **Multiple AI Providers** | Google Gemini, Together AI, OpenAI, Claude |
-| 🗣️ | **Multiple Voice Providers** | Together Whisper, Soniox |
+| 🗣️ | **Multiple Voice Providers** | Together Whisper, OpenAI Whisper / GPT-4o Transcribe, Soniox — any spoken language, auto-detected |
 | ⚡ | **Custom Actions** | Create your own AI action categories and prompts |
-| 🎯 | **Voice Triggers** | Hands-free automation with fuzzy-matched voice commands |
+| 🎯 | **Voice Triggers** | Hands-free automation with voice commands (tolerant of small transcription errors) |
 | 📋 | **Text Snippets** | Quick text expansion via trigger phrases |
 | 📝 | **Voice Notes** | Record and transcribe notes |
-| 🛒 | **Prompt Marketplace** | Browse and install community prompt templates |
+| 🧩 | **Template Library** | 100 built-in prompt templates you can add to your actions |
 | 🌐 | **Multi-Language** | English, Arabic, German, Spanish, French, Italian |
 | 🌙 | **Dark Mode** | System, dark, and light theme support |
-| ↔️ | **RTL Support** | Full right-to-left layout for Arabic |
+| ↔️ | **RTL Support** | Right-to-left layout for Arabic |
 
 ---
 
@@ -146,7 +146,7 @@ TapWisper is a **free, open-source** alternative to tools like [WhisperFlow](htt
 
 - [Node.js](https://nodejs.org/) v18 or later
 - npm v9 or later
-- macOS 12+, Windows 10+, or Linux
+- macOS 12+, Windows 10+, or Linux (X11; on Wayland, install `wtype` so text can be pasted)
 
 ### 📦 Installation
 
@@ -195,7 +195,7 @@ npm run dist:linux   # Linux (AppImage)
 | ⚡ **Electron 33+** | Cross-platform desktop shell |
 | 🎨 **Tailwind CSS** | Utility-first styling |
 | 🏎️ **Vite** | Fast dev builds via electron-vite |
-| 🔐 **electron-store** | Encrypted config storage |
+| 🔐 **electron-store** | Config storage (API keys encrypted with the OS keychain via `safeStorage`) |
 | 🗄️ **better-sqlite3** | Activity database |
 | 🐻 **Zustand** | State management |
 | 🌍 **i18next** | 6-language localization |
