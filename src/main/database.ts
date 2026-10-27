@@ -256,6 +256,58 @@ export function getActivityRecords(limit = 100): ActivityRecord[] {
   return stmt.all(limit) as ActivityRecord[]
 }
 
+export interface ActivityQuery {
+  /** Number of records to skip (for paging). Default 0. */
+  offset?: number
+  /** Page size. Default 25, max 500. */
+  limit?: number
+  /** Case-insensitive substring matched against text fields. */
+  search?: string
+}
+
+export interface ActivityQueryResult {
+  records: ActivityRecord[]
+  /** Total number of records matching the search (ignores offset/limit). */
+  total: number
+}
+
+/**
+ * Paged + searchable activity query, newest first. Search matches the
+ * transcription, LLM action, LLM input and LLM result.
+ */
+export function queryActivityRecords(query: ActivityQuery = {}): ActivityQueryResult {
+  const database = getDatabase()
+
+  const offset = Math.max(0, Math.floor(Number(query.offset) || 0))
+  const limit = Math.min(500, Math.max(0, Math.floor(Number(query.limit ?? 25) || 0)))
+  const search = typeof query.search === 'string' ? query.search.trim() : ''
+
+  let where = ''
+  const params: string[] = []
+  if (search) {
+    // Escape LIKE wildcards so user input is matched literally
+    const pattern = `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+    const fields = ['transcription', 'llmAction', 'llmInput', 'llmResult']
+    where = `WHERE ${fields.map((f) => `IFNULL(${f}, '') LIKE ? ESCAPE '\\'`).join(' OR ')}`
+    params.push(...fields.map(() => pattern))
+  }
+
+  const { total } = database
+    .prepare(`SELECT COUNT(*) as total FROM activity_records ${where}`)
+    .get(...params) as { total: number }
+
+  const records =
+    limit > 0
+      ? (database
+          .prepare(
+            `SELECT * FROM activity_records ${where} ORDER BY timestamp DESC LIMIT ? OFFSET ?`
+          )
+          .all(...params, limit, offset) as ActivityRecord[])
+      : []
+
+  return { records, total }
+}
+
 /**
  * Add new activity record
  */

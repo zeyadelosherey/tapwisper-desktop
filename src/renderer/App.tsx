@@ -29,6 +29,10 @@ function getRouteFromHash(): Route {
   }
 }
 
+function toTheme(value: unknown): Theme {
+  return value === 'dark' || value === 'light' ? value : 'system'
+}
+
 function applyTheme(value: Theme): void {
   if (value === 'system') {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -52,7 +56,7 @@ function App(): JSX.Element {
   useEffect(() => {
     // Load and apply saved theme
     window.tapwisper.store.get('theme').then((th) => {
-      applyTheme((th as Theme) || 'system')
+      applyTheme(toTheme(th))
     })
 
     // Listen for OS theme changes
@@ -84,6 +88,19 @@ function App(): JSX.Element {
   useEffect(() => {
     updateDirection(i18n.language)
   }, [i18n.language])
+
+  // Theme / language changed in another window (e.g. Settings). Overlay
+  // windows are pre-warmed at startup, so they must follow live changes.
+  useEffect(() => {
+    return window.tapwisper.on('settings:changed', (key: unknown, value: unknown) => {
+      if (key === 'theme') {
+        applyTheme(toTheme(value))
+      } else if (key === 'language' && typeof value === 'string' && value) {
+        if (i18n.language !== value) i18n.changeLanguage(value)
+        updateDirection(value)
+      }
+    })
+  }, [i18n])
 
   useEffect(() => {
     const handleHashChange = (): void => {
