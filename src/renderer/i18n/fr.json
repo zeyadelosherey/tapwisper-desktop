@@ -793,8 +793,13 @@
     "right": "{{key}} droite",
     "rightCaption": "{{key}} droite",
     "holdHint": "Maintenez pour parler · ajoutez Espace pour le mode mains libres",
-    "fnTip": "Astuce : dans Réglages Système → Clavier, réglez « Appuyer sur la touche 🌐 pour » sur « Ne rien faire ».",
-    "fnUnavailable": "fn nécessite l’outil d’aide de TapWisper, qui n’est pas installé — Ctrl + Option fonctionne en attendant."
+    "fnUnavailable": "fn nécessite l’outil d’aide de TapWisper, qui n’est pas installé — Ctrl + Option fonctionne en attendant.",
+    "fnSystemAction": "macOS utilise aussi fn pour changer la langue du clavier ou afficher les emojis, ce qui s’affiche à chaque enregistrement. Désactivez-le pour que fn serve uniquement à enregistrer.",
+    "fnTurnOff": "Désactiver",
+    "keyboardSettings": "Réglages du clavier",
+    "fnFixFailed": "Impossible de le modifier. Dans les réglages du clavier, réglez « Appuyer sur la touche 🌐 pour » sur « Ne rien faire ».",
+    "fnFixed": "C’est fait : fn sert désormais uniquement à enregistrer. Si le sélecteur de langue apparaît encore, réglez « Appuyer sur la touche 🌐 pour » sur « Ne rien faire » dans les réglages du clavier.",
+    "openKeyboardSettings": "Ouvrir"
   },
   "mic": {
     "device": "Microphone",

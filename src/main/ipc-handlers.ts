@@ -15,6 +15,7 @@ import {
   defaultRecordShortcut,
   fnMonitorAvailable
 } from './shortcuts'
+import { getFnKeyAction, openKeyboardSettings, setFnKeyDoNothing } from './fn-key-setting'
 import { checkPermissions, requestPermission } from './permissions'
 import type { PermissionType } from './permissions'
 import * as db from './database'
@@ -340,6 +341,9 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle('shortcuts:fn-available', () => fnMonitorAvailable())
+  ipcMain.handle('shortcuts:fn-key-action', () => getFnKeyAction())
+  ipcMain.handle('shortcuts:fn-key-do-nothing', () => setFnKeyDoNothing())
+  ipcMain.handle('shortcuts:open-keyboard-settings', () => openKeyboardSettings())
 
   ipcMain.handle('shortcuts:get', () => {
     const store = getStore()

@@ -209,7 +209,14 @@ const api = {
       ipcRenderer.invoke('shortcuts:update', shortcuts),
     reset: () => ipcRenderer.invoke('shortcuts:reset'),
     /** macOS: whether the fn/Globe helper is installed (else fn acts as Ctrl+Option) */
-    fnAvailable: (): Promise<boolean> => ipcRenderer.invoke('shortcuts:fn-available')
+    fnAvailable: (): Promise<boolean> => ipcRenderer.invoke('shortcuts:fn-available'),
+    /** macOS: what the system itself does on fn/Globe ("Press 🌐 key to") */
+    fnKeyAction: (): Promise<'nothing' | 'input-source' | 'emoji' | 'dictation' | 'unknown'> =>
+      ipcRenderer.invoke('shortcuts:fn-key-action'),
+    /** macOS: set "Press 🌐 key to" Do Nothing; false if it couldn't be changed */
+    setFnKeyDoNothing: (): Promise<boolean> => ipcRenderer.invoke('shortcuts:fn-key-do-nothing'),
+    openKeyboardSettings: (): Promise<void> =>
+      ipcRenderer.invoke('shortcuts:open-keyboard-settings')
   },
 
   // ── App ────────────────────────────────────────────────────────

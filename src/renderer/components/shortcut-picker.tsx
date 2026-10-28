@@ -6,6 +6,8 @@ import type { ShortcutSaveError } from '../hooks/use-record-shortcut'
 import { ShortcutKeys } from './ui/keycap'
 import { ShortcutRecorder } from './shortcut-recorder'
 
+type FnKeyAction = Awaited<ReturnType<typeof window.tapwisper.shortcuts.fnKeyAction>>
+
 interface ShortcutPickerProps {
   value: string
   onSave: (accelerator: string) => Promise<ShortcutSaveError | null>
@@ -23,6 +25,8 @@ export function ShortcutPicker({ value, onSave }: ShortcutPickerProps): JSX.Elem
   const [saving, setSaving] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
   const [fnAvailable, setFnAvailable] = useState(true)
+  const [fnKeyAction, setFnKeyAction] = useState<FnKeyAction | null>(null)
+  const [fnFix, setFnFix] = useState<'idle' | 'working' | 'done' | 'failed'>('idle')
 
   useEffect(() => {
     if (!IS_MAC) return
@@ -30,7 +34,28 @@ export function ShortcutPicker({ value, onSave }: ShortcutPickerProps): JSX.Elem
       .fnAvailable()
       .then(setFnAvailable)
       .catch(() => {})
+    // Re-read when the user comes back from System Settings
+    const refresh = (): void => {
+      window.tapwisper.shortcuts
+        .fnKeyAction()
+        .then(setFnKeyAction)
+        .catch(() => {})
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
   }, [])
+
+  const turnOffFnKeyAction = useCallback(async () => {
+    setFnFix('working')
+    const ok = await window.tapwisper.shortcuts.setFnKeyDoNothing().catch(() => false)
+    setFnFix(ok ? 'done' : 'failed')
+    if (ok) setFnKeyAction('nothing')
+  }, [])
+
+  const openKeyboardSettings = (): void => {
+    window.tapwisper.shortcuts.openKeyboardSettings().catch(() => {})
+  }
 
   const choose = useCallback(
     async (accelerator: string) => {
@@ -96,17 +121,63 @@ export function ShortcutPicker({ value, onSave }: ShortcutPickerProps): JSX.Elem
         })}
       </div>
 
-      {fnSelected && (
+      {fnSelected && !fnAvailable && (
         <p className="mt-2 text-[12px] text-ink-muted">
-          {fnAvailable
-            ? t(
-                'shortcut.fnTip',
-                'Tip: in System Settings → Keyboard, set “Press 🌐 key to” Do Nothing.'
-              )
-            : t(
-                'shortcut.fnUnavailable',
-                'fn needs TapWisper’s helper, which isn’t installed — Ctrl + Option works meanwhile.'
+          {t(
+            'shortcut.fnUnavailable',
+            'fn needs TapWisper’s helper, which isn’t installed — Ctrl + Option works meanwhile.'
+          )}
+        </p>
+      )}
+
+      {fnSelected && fnAvailable && fnKeyAction && fnKeyAction !== 'nothing' && (
+        <div
+          role="alert"
+          className="mt-2 rounded-xl bg-signal-tint/60 px-3 py-2.5 text-[12.5px] text-ink"
+        >
+          <p>
+            {t(
+              'shortcut.fnSystemAction',
+              'macOS also uses fn to switch the keyboard language or show emoji, so that pops up every time you record. Turn it off so fn only records.'
+            )}
+          </p>
+          {fnFix === 'failed' && (
+            <p className="mt-1.5 text-danger">
+              {t(
+                'shortcut.fnFixFailed',
+                'Couldn’t change it. In Keyboard settings, set “Press 🌐 key to” Do Nothing.'
               )}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn-signal btn-sm"
+              disabled={fnFix === 'working'}
+              onClick={turnOffFnKeyAction}
+            >
+              {t('shortcut.fnTurnOff', 'Turn it off')}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={openKeyboardSettings}>
+              {t('shortcut.keyboardSettings', 'Keyboard settings')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {fnSelected && fnFix === 'done' && fnKeyAction === 'nothing' && (
+        <p className="mt-2 text-[12px] text-ink-muted">
+          {t(
+            'shortcut.fnFixed',
+            'Done — fn now only records. If the language switcher still appears, set “Press 🌐 key to” Do Nothing in Keyboard settings.'
+          )}{' '}
+          <button
+            type="button"
+            className="text-signal hover:underline"
+            onClick={openKeyboardSettings}
+          >
+            {t('shortcut.openKeyboardSettings', 'Open')}
+          </button>
         </p>
       )}
 

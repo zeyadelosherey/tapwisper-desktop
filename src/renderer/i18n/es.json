@@ -793,8 +793,13 @@
     "right": "{{key}} derecha",
     "rightCaption": "{{key}} der.",
     "holdHint": "Mantén para hablar · añade Espacio para manos libres",
-    "fnTip": "Consejo: en Ajustes del Sistema → Teclado, pon «Pulsar la tecla 🌐 para» en «No hacer nada».",
-    "fnUnavailable": "fn necesita el asistente de TapWisper, que no está instalado; mientras tanto funciona Ctrl + Option."
+    "fnUnavailable": "fn necesita el asistente de TapWisper, que no está instalado; mientras tanto funciona Ctrl + Option.",
+    "fnSystemAction": "macOS también usa fn para cambiar el idioma del teclado o mostrar emojis, así que aparece cada vez que grabas. Desactívalo para que fn solo grabe.",
+    "fnTurnOff": "Desactivar",
+    "keyboardSettings": "Ajustes de teclado",
+    "fnFixFailed": "No se pudo cambiar. En Ajustes de teclado, pon «Pulsar la tecla 🌐 para» en «No hacer nada».",
+    "fnFixed": "Listo: fn ahora solo graba. Si el selector de idioma sigue apareciendo, pon «Pulsar la tecla 🌐 para» en «No hacer nada» en Ajustes de teclado.",
+    "openKeyboardSettings": "Abrir"
   },
   "mic": {
     "device": "Micrófono",

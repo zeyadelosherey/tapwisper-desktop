@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **fn (Globe) record key on macOS:**
+  - A quick fn tap no longer starts a hands-free recording that later pastes junk. Hold fn to talk, or use fn + Space for hands-free.
+  - Holding fn right after a dictation records again instead of opening AI Actions. A quick tap still opens AI Actions.
+  - When macOS also uses fn to switch the keyboard language or show emoji, the shortcut settings say so, with a button to turn that off.
+- Transcripts that are only noise (one character or word repeated, or only punctuation) are no longer pasted.
+
 ## [1.2.0] - 2026-10-27
 
 ### Added

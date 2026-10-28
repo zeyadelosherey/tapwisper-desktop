@@ -313,10 +313,10 @@ function clearPostRecordingState(): void {
   }
 }
 
-function openCommandPopup(): void {
+function openCommandPopup(text: string | null = postRecordingText): void {
   if (!windowManagerRef) return
-  windowManagerRef.showCommandPopup(postRecordingText || undefined, {
-    grabText: !postRecordingText
+  windowManagerRef.showCommandPopup(text || undefined, {
+    grabText: !text
   })
   windowManagerRef.sendToWindow('recordingPill', 'post-recording:action-panel-opened')
   clearPostRecordingState()
@@ -352,8 +352,12 @@ function handleRecordShortcutPress(): void {
 
   if (!isRecording && !isStartingRecording) {
     if (postRecordingActive) {
-      openCommandPopup()
-      return
+      if (!isHoldTrigger()) {
+        openCommandPopup()
+        return
+      }
+      // Hold triggers: holding talks again; a quick tap opens the panel (onHoldEnd)
+      tapOpensActionsWith = postRecordingText ?? ''
     }
 
     const sinceLast = Date.now() - lastStopTime
@@ -462,6 +466,15 @@ const heldModifiers = new Set<number>()
 let typedWhileModifiersHeld = false
 let holdActive = false
 let holdInterrupted = false
+/**
+ * Set when a hold trigger was pressed just after a dictation: the text a quick
+ * tap opens the action panel with (a longer hold records as usual).
+ */
+let tapOpensActionsWith: string | null = null
+
+function isHoldTrigger(): boolean {
+  return !!(recordShortcut?.holdGroups || recordShortcut?.fn)
+}
 
 function holdSatisfied(groups: number[][]): boolean {
   if (typedWhileModifiersHeld) return false
@@ -486,6 +499,8 @@ function onHoldEnd(): void {
   holdActive = false
   pressConsumed = false
   broadcastShortcutState(false)
+  const actionText = tapOpensActionsWith
+  tapOpensActionsWith = null
   if (holdInterrupted) {
     holdInterrupted = false
     primaryKeyDown = false
@@ -498,10 +513,19 @@ function onHoldEnd(): void {
     return
   }
   const holdDuration = Date.now() - primaryKeyDownTime
-  if (isRecording && recordingMode === 'push-to-talk') {
-    // Held: push-to-talk ends. Tapped: keep listening hands-free.
-    if (holdDuration >= HOLD_THRESHOLD_MS) stopRecording()
-    else recordingMode = 'toggle'
+  if (!isRecording || recordingMode !== 'push-to-talk') return
+  if (holdDuration >= HOLD_THRESHOLD_MS) {
+    stopRecording() // held: push-to-talk ends
+  } else if (actionText !== null) {
+    // Tapped right after a dictation: the action panel, as with a combo shortcut
+    cancelRecording()
+    openCommandPopup(actionText)
+  } else if (recordShortcut?.fn) {
+    // People tap fn/Globe to switch keyboard language or open emoji: not dictation.
+    // Hands-free with fn is fn+Space.
+    cancelRecording()
+  } else {
+    recordingMode = 'toggle' // tapped: keep listening hands-free
   }
 }
 

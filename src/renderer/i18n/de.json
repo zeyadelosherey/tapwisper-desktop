@@ -786,8 +786,13 @@
     "right": "{{key}} rechts",
     "rightCaption": "{{key}} rechts",
     "holdHint": "Halten zum Sprechen · Leertaste dazu für freihändig",
-    "fnTip": "Tipp: Stelle unter Systemeinstellungen → Tastatur „🌐-Taste drücken, um“ auf „Keine Aktion“.",
-    "fnUnavailable": "fn braucht das TapWisper-Hilfsprogramm, das nicht installiert ist – bis dahin funktioniert Ctrl + Option."
+    "fnUnavailable": "fn braucht das TapWisper-Hilfsprogramm, das nicht installiert ist – bis dahin funktioniert Ctrl + Option.",
+    "fnSystemAction": "macOS nutzt fn auch, um die Tastatursprache zu wechseln oder Emojis anzuzeigen – das erscheint dann bei jeder Aufnahme. Schalte es aus, damit fn nur aufnimmt.",
+    "fnTurnOff": "Ausschalten",
+    "keyboardSettings": "Tastatureinstellungen",
+    "fnFixFailed": "Konnte nicht geändert werden. Stelle in den Tastatureinstellungen „🌐-Taste drücken, um“ auf „Keine Aktion“.",
+    "fnFixed": "Erledigt – fn nimmt jetzt nur noch auf. Wenn der Sprachumschalter weiter erscheint, stelle „🌐-Taste drücken, um“ in den Tastatureinstellungen auf „Keine Aktion“.",
+    "openKeyboardSettings": "Öffnen"
   },
   "mic": {
     "device": "Mikrofon",

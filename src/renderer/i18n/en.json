@@ -786,8 +786,13 @@
     "right": "Right {{key}}",
     "rightCaption": "right {{key}}",
     "holdHint": "Hold to talk · add Space for hands-free",
-    "fnTip": "Tip: in System Settings → Keyboard, set “Press 🌐 key to” Do Nothing.",
-    "fnUnavailable": "fn needs TapWisper’s helper, which isn’t installed — Ctrl + Option works meanwhile."
+    "fnUnavailable": "fn needs TapWisper’s helper, which isn’t installed — Ctrl + Option works meanwhile.",
+    "fnSystemAction": "macOS also uses fn to switch the keyboard language or show emoji, so that pops up every time you record. Turn it off so fn only records.",
+    "fnTurnOff": "Turn it off",
+    "keyboardSettings": "Keyboard settings",
+    "fnFixFailed": "Couldn’t change it. In Keyboard settings, set “Press 🌐 key to” Do Nothing.",
+    "fnFixed": "Done — fn now only records. If the language switcher still appears, set “Press 🌐 key to” Do Nothing in Keyboard settings.",
+    "openKeyboardSettings": "Open"
   },
   "mic": {
     "device": "Microphone",

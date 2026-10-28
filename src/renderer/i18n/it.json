@@ -793,8 +793,13 @@
     "right": "{{key}} destro",
     "rightCaption": "{{key}} destro",
     "holdHint": "Tieni premuto per parlare · aggiungi Spazio per il vivavoce",
-    "fnTip": "Suggerimento: in Impostazioni di Sistema → Tastiera, imposta «Premi il tasto 🌐 per» su «Non fare nulla».",
-    "fnUnavailable": "fn richiede l’helper di TapWisper, che non è installato: nel frattempo funziona Ctrl + Option."
+    "fnUnavailable": "fn richiede l’helper di TapWisper, che non è installato: nel frattempo funziona Ctrl + Option.",
+    "fnSystemAction": "macOS usa fn anche per cambiare la lingua della tastiera o mostrare le emoji, che compaiono così a ogni registrazione. Disattivalo perché fn serva solo a registrare.",
+    "fnTurnOff": "Disattiva",
+    "keyboardSettings": "Impostazioni tastiera",
+    "fnFixFailed": "Impossibile cambiarlo. Nelle impostazioni della tastiera, imposta «Premi il tasto 🌐 per» su «Non fare nulla».",
+    "fnFixed": "Fatto: ora fn serve solo a registrare. Se il selettore della lingua compare ancora, imposta «Premi il tasto 🌐 per» su «Non fare nulla» nelle impostazioni della tastiera.",
+    "openKeyboardSettings": "Apri"
   },
   "mic": {
     "device": "Microfono",
