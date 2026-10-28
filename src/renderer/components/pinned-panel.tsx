@@ -343,11 +343,9 @@ export function PinnedPanel(): JSX.Element {
         await new Promise((r) => setTimeout(r, 50))
         await window.tapwisper.clipboard.insertText(finalText)
 
-        // Activate post-recording state so the shortcut can open the action panel
+        // Remembered for "AI Actions on Last Dictation" in the tray menu
         window.tapwisper.recording.transcriptionDone(finalText)
-
         setState('idle')
-        window.tapwisper.window.send('recordingPill', 'post-recording:show', finalText)
       } else {
         // No transcription at all
         window.tapwisper.recordingPill.hide()

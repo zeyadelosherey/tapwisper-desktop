@@ -9,6 +9,7 @@ import type {
   SidecarStatus,
   TranscribeInput
 } from '../shared/local-ai/types'
+import type { FnKeyUsage } from '../shared/fn-key'
 
 export type IpcCallback = (...args: unknown[]) => void
 
@@ -209,7 +210,11 @@ const api = {
       ipcRenderer.invoke('shortcuts:update', shortcuts),
     reset: () => ipcRenderer.invoke('shortcuts:reset'),
     /** macOS: whether the fn/Globe helper is installed (else fn acts as Ctrl+Option) */
-    fnAvailable: (): Promise<boolean> => ipcRenderer.invoke('shortcuts:fn-available')
+    fnAvailable: (): Promise<boolean> => ipcRenderer.invoke('shortcuts:fn-available'),
+    /** macOS: what the fn/Globe key does on its own ("Press 🌐 key to") */
+    fnKeyUsage: (): Promise<FnKeyUsage> => ipcRenderer.invoke('shortcuts:fn-key-usage'),
+    /** macOS: set "Press 🌐 key to" Do Nothing and open Keyboard settings */
+    fnKeyDoNothing: (): Promise<FnKeyUsage> => ipcRenderer.invoke('shortcuts:fn-key-do-nothing')
   },
 
   // ── App ────────────────────────────────────────────────────────

@@ -5,19 +5,26 @@ import { IS_MAC, SHORTCUT_OPTIONS, isHoldShortcut, sameShortcut } from '../utils
 import type { ShortcutSaveError } from '../hooks/use-record-shortcut'
 import { ShortcutKeys } from './ui/keycap'
 import { ShortcutRecorder } from './shortcut-recorder'
+import { FnKeyNotice } from './fn-key-notice'
 
 interface ShortcutPickerProps {
   value: string
   onSave: (accelerator: string) => Promise<ShortcutSaveError | null>
   /** Kept for callers; the list layout works at any width */
   compact?: boolean
+  /** Warn when the fn/Globe key also switches the keyboard language (default true) */
+  showFnNotice?: boolean
 }
 
 /**
  * Choose the record shortcut from a short list of good defaults for this
  * platform (hold fn / Ctrl+Win…), or record a custom key combination.
  */
-export function ShortcutPicker({ value, onSave }: ShortcutPickerProps): JSX.Element {
+export function ShortcutPicker({
+  value,
+  onSave,
+  showFnNotice = true
+}: ShortcutPickerProps): JSX.Element {
   const { t } = useTranslation()
   const [error, setError] = useState<ShortcutSaveError | null>(null)
   const [saving, setSaving] = useState<string | null>(null)
@@ -96,18 +103,16 @@ export function ShortcutPicker({ value, onSave }: ShortcutPickerProps): JSX.Elem
         })}
       </div>
 
-      {fnSelected && (
+      {fnSelected && !fnAvailable && (
         <p className="mt-2 text-[12px] text-ink-muted">
-          {fnAvailable
-            ? t(
-                'shortcut.fnTip',
-                'Tip: in System Settings → Keyboard, set “Press 🌐 key to” Do Nothing.'
-              )
-            : t(
-                'shortcut.fnUnavailable',
-                'fn needs TapWisper’s helper, which isn’t installed — Ctrl + Option works meanwhile.'
-              )}
+          {t(
+            'shortcut.fnUnavailable',
+            'fn needs TapWisper’s helper, which isn’t installed — Ctrl + Option works meanwhile.'
+          )}
         </p>
+      )}
+      {fnSelected && fnAvailable && showFnNotice && (
+        <FnKeyNotice shortcut={value} className="mt-2" />
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-3">

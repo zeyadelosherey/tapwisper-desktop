@@ -10,12 +10,13 @@ import {
   reloadShortcuts,
   cancelRecording,
   startShortcutsAfterPermission,
-  setPostRecordingState,
+  setLastDictation,
   isValidShortcut,
   defaultRecordShortcut,
   fnMonitorAvailable
 } from './shortcuts'
 import { checkPermissions, requestPermission } from './permissions'
+import { getFnKeyUsage, setFnKeyDoNothing } from './fn-key'
 import type { PermissionType } from './permissions'
 import * as db from './database'
 import {
@@ -245,7 +246,7 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle('recording:transcription-done', (_e: IpcMainInvokeEvent, text: string) => {
-    setPostRecordingState(text)
+    setLastDictation(text)
   })
 
   // ── Clipboard ──────────────────────────────────────────────────
@@ -340,6 +341,8 @@ export function registerIpcHandlers(
   })
 
   ipcMain.handle('shortcuts:fn-available', () => fnMonitorAvailable())
+  ipcMain.handle('shortcuts:fn-key-usage', () => getFnKeyUsage())
+  ipcMain.handle('shortcuts:fn-key-do-nothing', () => setFnKeyDoNothing())
 
   ipcMain.handle('shortcuts:get', () => {
     const store = getStore()

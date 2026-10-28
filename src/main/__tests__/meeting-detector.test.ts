@@ -21,4 +21,10 @@ describe('matchMeeting', () => {
     expect(matchMeeting('Google Chrome', 'Inbox - Gmail')).toBeNull()
     expect(matchMeeting('Finder', 'Downloads')).toBeNull()
   })
+
+  it('ignores the call app when no call is in progress', () => {
+    expect(matchMeeting('FaceTime', 'FaceTime')).toBeNull()
+    expect(matchMeeting('FaceTime', '')).toBeNull()
+    expect(matchMeeting('Google Chrome', 'Google Meet')).toBeNull()
+  })
 })

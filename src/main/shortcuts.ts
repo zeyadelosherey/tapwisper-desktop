@@ -7,12 +7,7 @@ import { ClipboardManager } from './clipboard'
 import { getStore } from './store'
 import { bundledBinaryPath } from './bundled-binary'
 import { trackKeyDown, trackKeyUp } from './key-state'
-import {
-  HOLD_THRESHOLD_MS,
-  START_GRACE_PERIOD_MS,
-  STOP_COOLDOWN_MS,
-  POST_RECORDING_TIMEOUT_MS
-} from './constants'
+import { HOLD_THRESHOLD_MS, START_GRACE_PERIOD_MS, STOP_COOLDOWN_MS } from './constants'
 
 let isRecording = false
 let recordingMode: 'push-to-talk' | 'toggle' | null = null
@@ -33,13 +28,9 @@ function broadcastShortcutState(pressed: boolean): void {
 
 let windowManagerRef: WindowManager | null = null
 
-// ── Post-recording state ──────────────────────────────────────────
-// After transcription completes, pressing the record shortcut opens the
-// command popup instead of starting a new recording. This state auto-clears
-// after POST_RECORDING_TIMEOUT_MS or when the user dismisses overlays.
-let postRecordingActive = false
-let postRecordingText: string | null = null
-let postRecordingTimer: ReturnType<typeof setTimeout> | null = null
+// The last dictation, for "AI Actions on last dictation" in the tray menu.
+// The record shortcut itself always starts a new dictation.
+let lastDictationText: string | null = null
 
 // Current registered Electron accelerators (to unregister on reload)
 let registeredElectronAccelerator: string | null = null
@@ -304,41 +295,31 @@ function toElectronAccelerator(shortcutStr: string): string {
     .replace(/\bControl\b/gi, 'Ctrl')
 }
 
-function clearPostRecordingState(): void {
-  postRecordingActive = false
-  postRecordingText = null
-  if (postRecordingTimer) {
-    clearTimeout(postRecordingTimer)
-    postRecordingTimer = null
+/** Called from IPC when the renderer finishes a dictation */
+export function setLastDictation(text: string): void {
+  lastDictationText = text || null
+}
+
+/** Open the AI actions popup on the last dictation (or the selected text) */
+export function openActionsOnLastDictation(): void {
+  windowManagerRef?.showCommandPopup(lastDictationText ?? undefined, {
+    grabText: !lastDictationText
+  })
+}
+
+/** Start dictation hands-free, or stop it — for the tray menu */
+export function toggleDictation(): void {
+  if (isRecording) {
+    stopRecording()
+  } else if (!isStartingRecording) {
+    recordingMode = 'toggle'
+    void startRecording()
   }
 }
 
-function openCommandPopup(): void {
-  if (!windowManagerRef) return
-  windowManagerRef.showCommandPopup(postRecordingText || undefined, {
-    grabText: !postRecordingText
-  })
-  windowManagerRef.sendToWindow('recordingPill', 'post-recording:action-panel-opened')
-  clearPostRecordingState()
-}
-
 /**
- * Called from IPC when the renderer finishes transcription.
- * Activates the post-recording window where the record shortcut
- * opens the command popup instead of starting a new recording.
- */
-export function setPostRecordingState(text: string): void {
-  clearPostRecordingState()
-  // The next shortcut press may open the command popup — load it now
-  windowManagerRef?.warmCommandPopup()
-  postRecordingActive = true
-  postRecordingText = text
-  postRecordingTimer = setTimeout(clearPostRecordingState, POST_RECORDING_TIMEOUT_MS)
-}
-
-/**
- * Handle the record shortcut press. Routes to the correct action based on
- * current state: stop recording, open command popup, or start recording.
+ * Handle the record shortcut press: stop the recording, or start a new one.
+ * It never opens anything else — the key always means "dictate".
  */
 function handleRecordShortcutPress(): void {
   if (pressConsumed && primaryKeyDown) return // auto-repeat of the same press
@@ -351,11 +332,6 @@ function handleRecordShortcutPress(): void {
   }
 
   if (!isRecording && !isStartingRecording) {
-    if (postRecordingActive) {
-      openCommandPopup()
-      return
-    }
-
     const sinceLast = Date.now() - lastStopTime
     if (sinceLast >= STOP_COOLDOWN_MS) {
       primaryKeyDown = true
@@ -413,7 +389,6 @@ let lastStopTime = 0
 
 async function startRecording(): Promise<void> {
   if (!windowManagerRef || isRecording || isStartingRecording) return
-  clearPostRecordingState()
   isStartingRecording = true
   recordingStartTime = Date.now()
 
@@ -444,7 +419,6 @@ function stopRecording(): void {
 
 export function cancelRecording(): void {
   if (!windowManagerRef) return
-  clearPostRecordingState()
   if (isRecording) {
     isRecording = false
     recordingMode = null
@@ -668,13 +642,8 @@ function attachHookListeners(_windowManager: WindowManager): void {
       otherKeyPressedDuringModifier = true
     }
 
-    // ── Escape — Dismiss overlays and post-recording state ──
+    // ── Escape — Cancel the recording and dismiss overlays ──
     if (e.keycode === UiohookKey.Escape) {
-      if (postRecordingActive) {
-        clearPostRecordingState()
-        if (windowManagerRef) windowManagerRef.hideAllOverlays()
-        return
-      }
       cancelRecording()
       return
     }
