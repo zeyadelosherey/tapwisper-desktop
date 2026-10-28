@@ -48,6 +48,9 @@ jobs:
           # Metal build; the runner has no usable Metal, so models run on the CPU
           - label: macos-latest
             os: macos-latest
+          # Intel Mac build (CPU backends), as shipped in the x64 .dmg
+          - label: macos-15-intel
+            os: macos-15-intel
           # The release build (with Vulkan); the runner has no GPU, so this is the CPU fallback
           - label: windows-2022
             os: windows-2022
