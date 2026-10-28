@@ -1,5 +1,6 @@
 # Build and publish macOS + Windows release when a version tag is pushed (e.g. v1.0.0),
-# or a publish/v1.0.0 branch, for when tags can't be pushed: the release then creates the tag
+# or a publish/v1.0.0 branch, for when tags can't be pushed: the release then creates the tag.
+# A publish/v1.0.0+<anything> branch runs the same release again (e.g. after a failed run).
 name: Release
 
 on:
@@ -165,18 +166,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The Vulkan backend lets every runtime use NVIDIA, AMD and Intel Arc GPUs.
-      # The full LunarG SDK, as llama.cpp's CI installs it: ggml's Vulkan backend also
-      # needs the SDK's SPIRV-Headers CMake package
+      # The Vulkan backend lets every runtime use NVIDIA, AMD and Intel Arc GPUs
       - name: Install Vulkan SDK
-        shell: pwsh
-        env:
-          VULKAN_VERSION: 1.4.357.0
-        run: |
-          curl.exe -o "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" -L "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
-          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
-          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
-          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\bin"
+        timeout-minutes: 20
+        uses: ./.github/actions/install-vulkan-sdk
 
       # whisper.cpp / llama.cpp servers for the Local engine (scripts/build-runtimes.mjs)
       - name: Cache local AI runtimes
@@ -241,6 +234,7 @@ jobs:
         id: tag
         run: |
           TAG="${GITHUB_REF_NAME#publish/}"
+          TAG="${TAG%%+*}"
           VERSION=$(node -p "require('./package.json').version")
           if [ "$TAG" != "v$VERSION" ]; then
             echo "::error::$TAG does not match package.json version $VERSION"
