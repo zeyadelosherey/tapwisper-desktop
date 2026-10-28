@@ -56,6 +56,8 @@ jobs:
             os: windows-2022
             vulkan: true
     runs-on: ${{ matrix.os }}
+    env:
+      VULKAN_VERSION: 1.4.357.0
     steps:
       - uses: actions/checkout@v4
 
@@ -73,17 +75,43 @@ jobs:
           sudo apt-get install -y glslc libvulkan-dev spirv-headers
 
       # The full LunarG SDK, as llama.cpp's CI installs it: ggml's Vulkan backend also
-      # needs the SDK's SPIRV-Headers CMake package
+      # needs the SDK's SPIRV-Headers CMake package. The installer is cached: LunarG's server
+      # sometimes slows to a few KB/s (the first v1.2.0 release stalled on it for 95 minutes)
+      - name: Restore Vulkan SDK installer
+        id: vulkan-cache
+        if: matrix.vulkan && runner.os == 'Windows'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/vulkan-sdk
+          key: vulkan-sdk-windows-${{ env.VULKAN_VERSION }}
+
       - name: Install Vulkan SDK
         if: matrix.vulkan && runner.os == 'Windows'
         shell: pwsh
-        env:
-          VULKAN_VERSION: 1.4.357.0
+        timeout-minutes: 30
         run: |
-          curl.exe -o "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" -L "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
-          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          $installer = "$env:RUNNER_TEMP\vulkan-sdk\VulkanSDK-Installer.exe"
+          if (-not (Test-Path $installer)) {
+            New-Item -ItemType Directory -Force (Split-Path $installer) | Out-Null
+            # Give up on an attempt that stays under 1 MB/s for 30 s and retry, rather than
+            # crawl for hours and then run a truncated installer
+            curl.exe --fail --silent --show-error --location --retry 5 --retry-delay 15 --retry-all-errors `
+              --speed-limit 1048576 --speed-time 30 -o $installer `
+              "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+            if ($LASTEXITCODE -ne 0) { throw "Vulkan SDK download failed (curl exit code $LASTEXITCODE)" }
+          }
+          & $installer --accept-licenses --default-answer --confirm-command install
+          if (-not (Test-Path "C:\VulkanSDK\$env:VULKAN_VERSION")) { throw "Vulkan SDK $env:VULKAN_VERSION did not install" }
           Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
           Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\bin"
+
+      # Saved straight after a good install, so a later failure in the job still keeps it
+      - name: Save Vulkan SDK installer
+        if: matrix.vulkan && runner.os == 'Windows' && steps.vulkan-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/vulkan-sdk
+          key: ${{ steps.vulkan-cache.outputs.cache-primary-key }}
 
       - name: Build local AI runtimes
         run: npm run build:runtimes -- ${{ matrix.vulkan && '--vulkan' || '' }}
