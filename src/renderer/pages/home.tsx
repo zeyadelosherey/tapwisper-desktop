@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslation, Trans } from 'react-i18next'
+import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
   AlertTriangle,
@@ -16,11 +16,13 @@ import {
 import { useStatsStore } from '../store/stats'
 import { useActivityStore, type TranscriptionRecord } from '../store/activity'
 import { getRecordingUrl, hasRecordings, retranscribeRecord } from '../services/history'
-import { formatCompactNumber, formatDate, formatDuration, formatTime } from '../utils/formatting'
+import { formatDate, formatTime } from '../utils/formatting'
 import { displayActionName } from '../utils/action-labels'
 import { computeStreak, type StreakInfo } from '../utils/streak'
 import { useRecordShortcut } from '../hooks/use-record-shortcut'
 import { FnKeyNotice } from '../components/fn-key-notice'
+import { Dashboard } from '../components/home/dashboard'
+import type { Navigate } from './main-window'
 import { useConfirmDialog } from '../components/confirm-dialog'
 import { ShortcutKeys } from '../components/ui/keycap'
 import { Page, Spinner } from '../components/ui/primitives'
@@ -71,7 +73,15 @@ function retryErrorMessage(t: TFunction, err: unknown): string {
 
 // ── Page ─────────────────────────────────────────────────────────
 
-export function Home(): JSX.Element {
+/** "Good morning" / "Good afternoon" / "Good evening" by the local time */
+function greeting(t: TFunction): string {
+  const hour = new Date().getHours()
+  if (hour < 5 || hour >= 18) return t('home.greetingEvening', 'Good evening')
+  if (hour < 12) return t('home.greetingMorning', 'Good morning')
+  return t('home.greetingAfternoon', 'Good afternoon')
+}
+
+export function Home({ onNavigate }: { onNavigate?: Navigate }): JSX.Element {
   const { t } = useTranslation()
   const { shortcut } = useRecordShortcut()
   const { loadStats, voiceTimeSavedSeconds, aiTimeSavedSeconds } = useStatsStore()
@@ -128,84 +138,37 @@ export function Home(): JSX.Element {
     }
   }, [totalCount, latestId])
 
-  const wpm =
-    allTime && allTime.seconds > 0 ? Math.round(allTime.words / (allTime.seconds / 60)) : 0
   const savedSeconds = voiceTimeSavedSeconds + aiTimeSavedSeconds
 
   const hintParts = t('home.heroHint', 'Hold {{keys}} in any app and start talking.', {
     keys: SLOT
   }).split(SLOT)
 
-  // One quiet line of stats; each item explains itself on hover
-  const stats: { key: string; text: string; title: string }[] = []
-  if (allTime && allTime.words > 0) {
-    stats.push({
-      key: 'words',
-      text: t('home.statsWords', '{{value}} words', {
-        value: formatCompactNumber(allTime.words)
-      }),
-      title: `${t('home.statWords', 'Words dictated')} · ${t('home.statWordsHint', 'all time')}`
-    })
-  }
-  if (wpm > 0) {
-    stats.push({
-      key: 'pace',
-      text: t('home.statsPace', '{{value}} wpm', { value: wpm }),
-      title: t('home.statPace', 'Average pace')
-    })
-  }
-  if (streak.streak > 0) {
-    stats.push({
-      key: 'streak',
-      text: t('home.statsStreak', '{{count}}-day streak', { count: streak.streak }),
-      title: t('home.statStreakHint', '{{count}} days in a row', { count: streak.streak })
-    })
-  }
-  if (savedSeconds > 0) {
-    stats.push({
-      key: 'saved',
-      text: t('home.statsSaved', '{{value}} saved', { value: formatDuration(savedSeconds) }),
-      title: `${t('home.statSaved', 'Time saved')} · ${t('home.statSavedHint', 'this week, vs. typing')}`
-    })
-  }
-
   return (
     <>
       {/* ── Hero (full-bleed grainy band) ───────────────────── */}
       <section className="grain-hero">
-        <div className="mx-auto w-full max-w-[860px] px-6 pb-7 pt-8 animate-rise">
-          <h1 className="hero-title max-w-[620px] text-[26px] text-balance">
-            <Trans i18nKey="home.hero" components={{ em: <em /> }}>
-              Say it, and it&apos;s <em>on the page</em>.
-            </Trans>
-          </h1>
+        <div className="mx-auto w-full max-w-[1040px] px-6 pb-6 pt-8 animate-rise">
+          <h1 className="hero-title text-[26px] text-balance">{greeting(t)}</h1>
           <p className="mt-1 text-[13px] leading-[1.9] text-ink-muted">
             {hintParts[0]}
             <ShortcutKeys accelerator={shortcut} size="sm" className="-translate-y-px" />
             {hintParts[1]}
           </p>
-          {stats.length > 0 && (
-            <ul
-              aria-label={t('home.statsLabel', 'Your stats')}
-              className="mt-2 flex flex-wrap items-center gap-y-1 text-[12.5px] text-ink-soft tabular"
-            >
-              {stats.map((s, i) => (
-                <li key={s.key} title={s.title} className="flex items-center">
-                  {i > 0 && (
-                    <span aria-hidden="true" className="px-2 text-ink-faint">
-                      ·
-                    </span>
-                  )}
-                  {s.text}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       </section>
 
-      <Page className="!pt-0">
-        <FnKeyNotice shortcut={shortcut} className="mb-5" />
+      <Page width="wide" className="!pt-0">
+        <FnKeyNotice shortcut={shortcut} className="mb-4" />
+        <div className="mb-8">
+          <Dashboard
+            totals={allTime}
+            streak={streak}
+            savedSeconds={savedSeconds}
+            refreshToken={`${totalCount}-${latestId}`}
+            onNavigate={onNavigate}
+          />
+        </div>
         {/* ── History ──────────────────────────────────────── */}
         {!isLoaded ? (
           <div className="flex justify-center py-16 text-ink-faint">
