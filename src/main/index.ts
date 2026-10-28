@@ -2,7 +2,12 @@ import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import path from 'path'
 
-import { registerGlobalShortcuts, unregisterAllShortcuts } from './shortcuts'
+import {
+  registerGlobalShortcuts,
+  unregisterAllShortcuts,
+  toggleDictation,
+  openActionsOnLastDictation
+} from './shortcuts'
 import { WindowManager } from './windows'
 import { registerIpcHandlers } from './ipc-handlers'
 import { initStore } from './store'
@@ -105,10 +110,12 @@ function updateTrayMenu(meeting: MeetingState): void {
       }
     },
     {
-      label: 'Start Recording',
-      click: (): void => {
-        windowManager?.showPinnedPanel()
-      }
+      label: 'Start / Stop Dictation',
+      click: (): void => toggleDictation()
+    },
+    {
+      label: 'AI Actions on Last Dictation…',
+      click: (): void => openActionsOnLastDictation()
     },
     { type: 'separator' },
     recording

@@ -52,7 +52,6 @@ const windowManager = {
   },
   showPinnedPanel: vi.fn(),
   hideAllOverlays: vi.fn(),
-  warmCommandPopup: vi.fn(),
   showCommandPopup: vi.fn()
 }
 
@@ -164,6 +163,22 @@ describe('hold triggers', () => {
     down('CtrlRight')
     advance(100)
     up('CtrlRight')
+    expect(sent).toContain('recording:stop')
+  })
+
+  it('right after a dictation, the key starts a new dictation (no action popup)', () => {
+    useShortcut('RightControl')
+    down('CtrlRight')
+    advance(1200)
+    up('CtrlRight')
+    shortcuts.setLastDictation('Hello there')
+    sent.length = 0
+    advance(1000)
+    down('CtrlRight')
+    advance(1200)
+    up('CtrlRight')
+    expect(windowManager.showCommandPopup).not.toHaveBeenCalled()
+    expect(sent[0]).toBe('recording:start')
     expect(sent).toContain('recording:stop')
   })
 })

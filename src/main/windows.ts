@@ -162,15 +162,9 @@ export class WindowManager {
    */
   warmUpOverlays(): void {
     // Only what the first shortcut press needs. Every pre-created window is a
-    // renderer process (~45MB) — the command popup is warmed after the first
-    // dictation instead (warmCommandPopup), the AI panel on first use.
+    // renderer process (~45MB) — the command popup and AI panel load on first use.
     this.ensurePinnedPanel()
     this.ensureRecordingPill()
-  }
-
-  /** Load the command popup ahead of use (called when a dictation finishes) */
-  warmCommandPopup(): void {
-    this.ensureCommandPopup()
   }
 
   // ── Main Settings Window ──────────────────────────────────────
