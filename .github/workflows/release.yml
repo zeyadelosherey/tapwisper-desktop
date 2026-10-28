@@ -1,10 +1,13 @@
-# Build and publish macOS + Windows release when a version tag is pushed (e.g. v1.0.0)
+# Build and publish macOS + Windows release when a version tag is pushed (e.g. v1.0.0),
+# or a publish/v1.0.0 branch, for when tags can't be pushed: the release then creates the tag
 name: Release
 
 on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'publish/v*'
 
 permissions:
   contents: write
@@ -55,7 +58,7 @@ jobs:
         run: npm run build:runtimes
 
       - name: Build macOS arm64 app
-        run: npx electron-vite build && npx electron-builder --mac --arm64
+        run: npx electron-vite build && npx electron-builder --mac --arm64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -119,7 +122,7 @@ jobs:
         run: npm run build:runtimes
 
       - name: Build macOS x64 app
-        run: npx electron-vite build && npx electron-builder --mac --x64
+        run: npx electron-vite build && npx electron-builder --mac --x64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -188,7 +191,7 @@ jobs:
         run: npm run build:runtimes -- --vulkan
 
       - name: Build Windows app
-        run: npm run dist:win
+        run: npm run dist:win -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -234,10 +237,23 @@ jobs:
           echo "=== Windows artifacts ==="
           find windows-artifacts -type f
 
+      - name: Release tag
+        id: tag
+        run: |
+          TAG="${GITHUB_REF_NAME#publish/}"
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::$TAG does not match package.json version $VERSION"
+            exit 1
+          fi
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: TapWisper ${{ github.ref_name }}
+          name: TapWisper ${{ steps.tag.outputs.name }}
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
           files: |
             macos-artifacts/*
             windows-artifacts/*

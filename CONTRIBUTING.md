@@ -42,7 +42,9 @@ npm run dev
 
 Releases are built and published automatically via GitHub Actions:
 
-1. Push a version tag: `git tag v1.0.0 && git push origin v1.0.0`
+1. Push a version tag: `git tag v1.0.0 && git push origin v1.0.0`.
+   - Or push a `publish/v1.0.0` branch (from `main`, or from the GitHub UI) when tags can't be pushed. The release then creates the `v1.0.0` tag on that commit.
+   - The version must match `package.json`.
 2. The [Release workflow](.github/workflows/release.yml) builds macOS and Windows apps and creates a GitHub release with all artifacts.
 
 ## Project Structure
