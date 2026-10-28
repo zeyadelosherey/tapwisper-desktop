@@ -42,7 +42,11 @@ const RULES: Rule[] = [
 export function matchMeeting(appName: string, title: string): DetectedMeeting | null {
   for (const rule of RULES) {
     if (rule.owner && !rule.owner.test(appName)) continue
-    if (!rule.title.test(title || appName)) continue
+    const subject = (title || appName).trim()
+    // Just the product's own window (FaceTime's start screen, the Google Meet
+    // home page): the app is open, but no call is in progress
+    if (subject.toLowerCase() === rule.app.toLowerCase()) continue
+    if (!rule.title.test(subject)) continue
     return { app: rule.app, key: `${rule.app}:${(title || '').slice(0, 80)}` }
   }
   return null
