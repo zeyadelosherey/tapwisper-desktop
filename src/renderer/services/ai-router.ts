@@ -204,6 +204,7 @@ export async function transcribeAudio(
   if (options.prompt && isPromptEcho(response.text, options.prompt)) {
     return { ...response, text: '' }
   }
+  if (isNoiseTranscript(response.text)) return { ...response, text: '' }
   return { ...response, language: response.language ?? options.language }
 }
 
@@ -255,6 +256,23 @@ function normalizeForCompare(text: string): string {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
+}
+
+/**
+ * True for what speech models make of silence or noise: only punctuation, one
+ * character repeated ("ẙẙẙẙẙ") or one word over and over ("you you you…").
+ * Repeated digits are kept: they can be a number someone read out.
+ */
+export function isNoiseTranscript(text: string): boolean {
+  const compact = text.replace(/\s+/g, '')
+  if (!compact) return false
+  if (!/[\p{L}\p{N}]/u.test(compact)) return true
+  const graphemes = [...new Intl.Segmenter().segment(compact)].map((s) => s.segment)
+  if (graphemes.length >= 5 && new Set(graphemes).size === 1 && !/\p{N}/u.test(compact)) {
+    return true
+  }
+  const words = normalizeForCompare(text).split(' ')
+  return words.length >= 6 && new Set(words).size === 1
 }
 
 /**

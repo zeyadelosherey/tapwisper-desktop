@@ -472,10 +472,15 @@ function onHoldEnd(): void {
     return
   }
   const holdDuration = Date.now() - primaryKeyDownTime
-  if (isRecording && recordingMode === 'push-to-talk') {
-    // Held: push-to-talk ends. Tapped: keep listening hands-free.
-    if (holdDuration >= HOLD_THRESHOLD_MS) stopRecording()
-    else recordingMode = 'toggle'
+  if (!isRecording || recordingMode !== 'push-to-talk') return
+  if (holdDuration >= HOLD_THRESHOLD_MS) {
+    stopRecording() // held: push-to-talk ends
+  } else if (recordShortcut?.fn) {
+    // People tap fn/Globe to switch keyboard language or open emoji: not dictation.
+    // Hands-free with fn is fn+Space.
+    cancelRecording()
+  } else {
+    recordingMode = 'toggle' // tapped: keep listening hands-free
   }
 }
 
