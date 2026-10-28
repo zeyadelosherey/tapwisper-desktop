@@ -1,0 +1,44 @@
+# The full LunarG Vulkan SDK on Windows, as llama.cpp's CI installs it: ggml's Vulkan
+# backend also needs the SDK's SPIRV-Headers CMake package.
+# The installer has hung on CI (a release sat on it for over an hour), so each
+# attempt gets a time limit and a stuck or failed install is retried.
+name: Install Vulkan SDK
+description: Install the LunarG Vulkan SDK on a Windows runner and add it to the environment
+
+inputs:
+  version:
+    description: Vulkan SDK version
+    required: false
+    default: 1.4.357.0
+
+runs:
+  using: composite
+  steps:
+    - shell: pwsh
+      env:
+        VULKAN_VERSION: ${{ inputs.version }}
+      run: |
+        $installer = "$env:RUNNER_TEMP\VulkanSDK-Installer.exe"
+        $sdk = "C:\VulkanSDK\$env:VULKAN_VERSION"
+        curl.exe --fail --location --retry 5 --retry-all-errors --connect-timeout 30 --max-time 600 `
+          -o $installer "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+        if ($LASTEXITCODE -ne 0) { throw "Vulkan SDK download failed (curl exit $LASTEXITCODE)" }
+
+        for ($attempt = 1; ; $attempt++) {
+          $p = Start-Process $installer -PassThru -ArgumentList `
+            '--accept-licenses', '--default-answer', '--confirm-command', 'install'
+          $null = $p.Handle # keeps ExitCode readable after the process ends
+          if ($p.WaitForExit(300000)) {
+            if ($p.ExitCode -eq 0 -and (Test-Path "$sdk\Bin\glslc.exe")) { break }
+            Write-Host "Vulkan SDK installer exited with $($p.ExitCode)"
+          } else {
+            Write-Host "Vulkan SDK installer still running after 5 minutes; stopping it"
+            taskkill.exe /T /F /PID $p.Id | Out-Null
+          }
+          if ($attempt -ge 3) { throw "Vulkan SDK install failed after $attempt attempts" }
+          Remove-Item -Recurse -Force $sdk -ErrorAction SilentlyContinue
+        }
+
+        Add-Content $env:GITHUB_ENV "VULKAN_SDK=$sdk"
+        Add-Content $env:GITHUB_PATH "$sdk\Bin"
+        exit 0 # not taskkill's exit code from an earlier attempt
