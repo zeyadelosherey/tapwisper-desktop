@@ -1,22 +1,30 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import { Mic, Accessibility, Monitor, Check, ArrowLeft, ArrowRight, Globe } from 'lucide-react'
+import {
+  Mic,
+  Accessibility,
+  Monitor,
+  Check,
+  ArrowLeft,
+  ArrowRight,
+  Globe,
+  Keyboard,
+  TextCursorInput,
+  Users
+} from 'lucide-react'
 import appLogo from '../assets/logo.png'
 import { updateDirection } from '../i18n'
-import {
-  UI_LANGUAGES,
-  SPEECH_LANGUAGES,
-  languageName,
-  normalizeSpeechLanguages
-} from '../constants/speech-languages'
+import { UI_LANGUAGES, normalizeSpeechLanguages } from '../constants/speech-languages'
 import { useRecordShortcut, useShortcutPressed } from '../hooks/use-record-shortcut'
-import { useMicrophones } from '../hooks/use-microphone'
 import { ShortcutKeys } from '../components/ui/keycap'
 import { Spinner } from '../components/ui/primitives'
 import { MicrophonePicker } from '../components/microphone-picker'
 import { ShortcutPicker } from '../components/shortcut-picker'
 import { SpeechLanguagePicker } from '../components/speech-language-picker'
-import { IS_MAC, OS } from '../utils/shortcuts'
+import { FnKeyNotice } from '../components/fn-key-notice'
+import { SpeechSetup } from '../components/onboarding/speech-setup'
+import { WelcomeDemo } from '../components/onboarding/welcome-demo'
+import { IS_MAC, OS, sameShortcut } from '../utils/shortcuts'
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -34,16 +42,16 @@ interface OnboardingProps {
   onComplete: () => void
 }
 
-const STEPS = ['welcome', 'permissions', 'microphone', 'shortcut', 'languages', 'done'] as const
+const STEPS = ['welcome', 'permissions', 'microphone', 'languages', 'speech', 'try'] as const
 type Step = (typeof STEPS)[number]
 
-const STEP_LABEL_KEYS: Record<Step, string> = {
-  welcome: 'onboarding.stepWelcome',
-  permissions: 'onboarding.stepPermissions',
-  microphone: 'onboarding.stepMicrophone',
-  shortcut: 'onboarding.stepShortcut',
-  languages: 'onboarding.stepLanguages',
-  done: 'onboarding.stepDone'
+const STEP_LABELS: Record<Step, [key: string, fallback: string]> = {
+  welcome: ['onboarding.stepWelcome', 'Welcome'],
+  permissions: ['onboarding.stepPermissions', 'Permissions'],
+  microphone: ['onboarding.stepMicrophone', 'Microphone'],
+  languages: ['onboarding.stepLanguages', 'Languages'],
+  speech: ['onboarding.stepSpeech', 'Speech engine'],
+  try: ['onboarding.stepTry', 'Try it']
 }
 
 const PERMISSIONS: { id: PermissionId; labelKey: string; descKey: string; icon: ReactNode }[] = [
@@ -83,9 +91,11 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
   const [requesting, setRequesting] = useState<PermissionId | null>(null)
   const [deviceId, setDeviceId] = useState('')
   const [speechLanguages, setSpeechLanguages] = useState<string[]>([])
+  const [speechReady, setSpeechReady] = useState(true)
   const [finishing, setFinishing] = useState(false)
   const { shortcut, save: saveShortcut } = useRecordShortcut()
   const contentRef = useRef<HTMLDivElement>(null)
+  const [visited, setVisited] = useState(0)
 
   const stepIndex = STEPS.indexOf(step)
 
@@ -160,6 +170,7 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
     // the shortcut test can light up (main re-checks accessibility itself).
     if (step === 'permissions') void window.tapwisper.permissions.allGranted()
     setStep(next)
+    setVisited((v) => Math.max(v, STEPS.indexOf(next)))
     contentRef.current?.scrollTo({ top: 0 })
   }
   const back = (): void => {
@@ -198,29 +209,33 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
 
   // ── Render ─────────────────────────────────────────────────────
 
-  const brandBesideTrafficLights = IS_MAC && i18n.dir() === 'ltr'
   const uiLanguage = UI_LANGUAGES.some((l) => l.code === i18n.language) ? i18n.language : 'en'
 
-  const continueDisabled = step === 'permissions' && !allGranted
+  // A step that isn't done yet can still be skipped, and set up later in Settings
+  const blocked = (step === 'permissions' && !allGranted) || (step === 'speech' && !speechReady)
 
   return (
-    <div className="flex h-screen flex-col bg-canvas">
-      {/* Top bar: brand, language. Draggable on frameless windows. */}
-      <header
-        className={`drag-region flex h-11 shrink-0 items-center justify-between gap-3 ${
-          brandBesideTrafficLights ? 'ps-[84px]' : 'ps-5'
-        } ${OS === 'win32' ? 'pr-[150px] rtl:pl-5' : 'pe-4'}`}
+    <div className="flex h-screen bg-canvas">
+      {/* Step rail. Draggable; on macOS the traffic lights sit above the brand. */}
+      <aside
+        className={`drag-region flex w-[232px] shrink-0 flex-col px-5 pb-4 ${
+          IS_MAC ? 'pt-[52px]' : 'pt-5'
+        }`}
       >
-        <span className="font-display text-[15px] leading-none text-ink-muted">
-          {t('app.name')}
-        </span>
-        <label className="no-drag relative flex items-center">
+        <div className="flex items-center gap-2.5">
+          <img src={appLogo} alt="" className="h-7 w-7 rounded-lg object-contain" />
+          <span className="font-display text-[17px] leading-none text-ink">{t('app.name')}</span>
+        </div>
+
+        <StepRail current={stepIndex} visited={visited} onSelect={(i) => goTo(STEPS[i])} />
+
+        <label className="no-drag relative mt-auto flex items-center">
           <span className="sr-only">{t('settings.language', 'Language')}</span>
           <Globe className="pointer-events-none absolute start-3 h-3.5 w-3.5 text-ink-soft" />
           <select
             value={uiLanguage}
             onChange={(e) => handleUiLanguage(e.target.value)}
-            className="field h-8 w-auto rounded-lg ps-8 text-[12.5px]"
+            className="field h-8 rounded-lg ps-8 text-[12.5px]"
           >
             {UI_LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>
@@ -229,20 +244,21 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
             ))}
           </select>
         </label>
-      </header>
+      </aside>
 
-      <main className="sheet mx-3 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-sheet">
+      <main
+        className={`sheet mb-2 me-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-sheet ${
+          OS === 'win32' ? 'mt-10' : 'mt-2'
+        }`}
+      >
         <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div key={step} className="animate-rise">
-            {/* Hero band: logo + the step's title and one short line */}
-            <div className="grain-hero">
-              <div className="mx-auto w-full max-w-[600px] px-6 pb-6 pt-7">
-                <img src={appLogo} alt="" className="h-7 w-7 rounded-lg object-contain" />
-                <StepHeading step={step} />
-              </div>
-            </div>
+          <div
+            key={step}
+            className="mx-auto flex min-h-full w-full max-w-[580px] flex-col justify-center px-8 py-10 animate-rise"
+          >
+            <StepHeading step={step} index={stepIndex} />
 
-            <div className="mx-auto w-full max-w-[600px] px-6 pb-6">
+            <div className="mt-7">
               {step === 'welcome' && <WelcomeStep shortcut={shortcut} />}
 
               {step === 'permissions' &&
@@ -252,7 +268,7 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
                   </div>
                 ) : (
                   <div>
-                    <ul className="divide-y divide-hairline/70">
+                    <ul className="space-y-2">
                       {relevant.map((perm) => (
                         <PermissionRow
                           key={perm.id}
@@ -290,64 +306,51 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
                 />
               )}
 
-              {step === 'shortcut' && <ShortcutStep shortcut={shortcut} onSave={saveShortcut} />}
-
               {step === 'languages' && (
                 <SpeechLanguagePicker value={speechLanguages} onChange={handleLanguagesChange} />
               )}
 
-              {step === 'done' && (
-                <DoneStep
-                  deviceId={deviceId}
-                  shortcut={shortcut}
-                  speechLanguages={speechLanguages}
-                />
+              {step === 'speech' && (
+                <SpeechSetup languages={speechLanguages} onReadyChange={setSpeechReady} />
               )}
+
+              {step === 'try' && <TryStep shortcut={shortcut} onSave={saveShortcut} />}
             </div>
           </div>
         </div>
 
         {/* Footer: Back / Skip / Continue */}
-        <footer className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-hairline px-4 py-2.5">
-          <div>
-            {stepIndex > 0 && (
-              <button type="button" className="btn-ghost" onClick={back}>
-                <ArrowLeft className="h-4 w-4 rtl-flip" />
-                {t('common.back', 'Back')}
-              </button>
-            )}
-          </div>
-          <StepDots current={stepIndex} />
-          <div className="flex items-center justify-end gap-2">
-            {step === 'permissions' && !allGranted && (
-              <button type="button" className="btn-ghost" onClick={next}>
-                {t('onboarding.skipForNow', 'Skip for now')}
-              </button>
-            )}
-            {step === 'done' ? (
-              <button
-                type="button"
-                className="btn-signal btn-lg"
-                onClick={finish}
-                disabled={finishing}
-              >
-                {finishing && <Spinner className="h-3.5 w-3.5" />}
-                {t('onboarding.startDictating', 'Start dictating')}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn-signal btn-lg"
-                onClick={next}
-                disabled={continueDisabled}
-              >
-                {step === 'welcome'
-                  ? t('onboarding.getStarted', 'Get started')
-                  : t('onboarding.continue', 'Continue')}
-                <ArrowRight className="h-4 w-4 rtl-flip" />
-              </button>
-            )}
-          </div>
+        <footer className="flex shrink-0 items-center gap-3 border-t border-hairline px-4 py-3">
+          {stepIndex > 0 && (
+            <button type="button" className="btn-ghost" onClick={back}>
+              <ArrowLeft className="h-4 w-4 rtl-flip" />
+              {t('common.back', 'Back')}
+            </button>
+          )}
+          <span className="flex-1" />
+          {blocked && (
+            <button type="button" className="btn-ghost" onClick={next}>
+              {t('onboarding.skipForNow', 'Skip for now')}
+            </button>
+          )}
+          {step === 'try' ? (
+            <button
+              type="button"
+              className="btn-signal btn-lg"
+              onClick={finish}
+              disabled={finishing}
+            >
+              {finishing && <Spinner className="h-3.5 w-3.5" />}
+              {t('onboarding.finish', 'Finish setup')}
+            </button>
+          ) : (
+            <button type="button" className="btn-signal btn-lg" onClick={next} disabled={blocked}>
+              {step === 'welcome'
+                ? t('onboarding.getStarted', 'Get started')
+                : t('onboarding.continue', 'Continue')}
+              <ArrowRight className="h-4 w-4 rtl-flip" />
+            </button>
+          )}
         </footer>
       </main>
     </div>
@@ -356,32 +359,56 @@ export function Onboarding({ onComplete }: OnboardingProps): JSX.Element {
 
 // ── Progress ─────────────────────────────────────────────────────
 
-function StepDots({ current }: { current: number }): JSX.Element {
+/** Numbered step list; finished steps can be revisited */
+function StepRail({
+  current,
+  visited,
+  onSelect
+}: {
+  current: number
+  visited: number
+  onSelect: (index: number) => void
+}): JSX.Element {
   const { t } = useTranslation()
   return (
-    <nav aria-label={t('onboarding.progress', 'Setup progress')}>
-      <p className="sr-only" aria-live="polite">
-        {t('onboarding.stepOf', 'Step {{current}} of {{total}}', {
-          current: current + 1,
-          total: STEPS.length
+    <nav aria-label={t('onboarding.progress', 'Setup progress')} className="mt-9">
+      <ol className="space-y-0.5">
+        {STEPS.map((s, i) => {
+          const [key, fallback] = STEP_LABELS[s]
+          const active = i === current
+          const done = i < current
+          const reachable = i <= visited && !active
+          return (
+            <li key={s}>
+              <button
+                type="button"
+                onClick={() => onSelect(i)}
+                disabled={!reachable}
+                aria-current={active ? 'step' : undefined}
+                className={`no-drag flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-start text-[13px] transition-colors duration-150 ${
+                  active
+                    ? 'bg-raised font-medium text-ink shadow-sm'
+                    : reachable
+                      ? 'text-ink-muted hover:bg-hover'
+                      : 'cursor-default text-ink-faint'
+                }`}
+              >
+                <span
+                  className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[11px] tabular ${
+                    done
+                      ? 'bg-signal text-on-signal'
+                      : active
+                        ? 'border-[1.5px] border-signal text-signal'
+                        : 'border border-hairline-strong'
+                  }`}
+                >
+                  {done ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
+                </span>
+                <span className="truncate">{t(key, fallback)}</span>
+              </button>
+            </li>
+          )
         })}
-        {': '}
-        {t(STEP_LABEL_KEYS[STEPS[current]])}
-      </p>
-      <ol className="flex items-center gap-1.5" aria-hidden="true">
-        {STEPS.map((s, i) => (
-          <li
-            key={s}
-            title={t(STEP_LABEL_KEYS[s])}
-            className={`h-1.5 rounded-full transition-[width,background-color] duration-200 ${
-              i === current
-                ? 'w-4 bg-signal'
-                : i < current
-                  ? 'w-1.5 bg-signal/40'
-                  : 'w-1.5 bg-hairline-strong'
-            }`}
-          />
-        ))}
       </ol>
     </nav>
   )
@@ -389,14 +416,14 @@ function StepDots({ current }: { current: number }): JSX.Element {
 
 // ── Steps ────────────────────────────────────────────────────────
 
-/** Title + one short line for each step, shown in the hero band */
-function StepHeading({ step }: { step: Step }): JSX.Element {
+/** Title + one short line for each step */
+function StepHeading({ step, index }: { step: Step; index: number }): JSX.Element {
   const { t } = useTranslation()
   const heading: Record<Step, { title: ReactNode; line: string }> = {
     welcome: {
       title: (
         <Trans i18nKey="onboarding.welcomeTitle" components={{ em: <em /> }}>
-          Say it once. It&apos;s <em>written</em> everywhere.
+          Your voice, <em>written</em> anywhere.
         </Trans>
       ),
       line: t('onboarding.welcomeBody', 'Hold a key, talk, let go — your words appear in any app.')
@@ -409,53 +436,90 @@ function StepHeading({ step }: { step: Step }): JSX.Element {
       title: t('onboarding.micTitle', 'Check your microphone'),
       line: t('onboarding.micBody', 'Say a few words and watch the bars.')
     },
-    shortcut: {
-      title: t('onboarding.shortcutTitle', 'Your dictation key'),
-      line: t('onboarding.shortcutBody', 'Hold it while you talk, let go to insert the text.')
-    },
     languages: {
       title: t('onboarding.languagesTitle', 'Which languages do you speak?'),
       line: t('onboarding.languagesBody', 'Or leave it on auto-detect.')
     },
-    done: {
+    speech: {
+      title: t('onboarding.speechTitle', 'Turn speech into text'),
+      line: t(
+        'onboarding.speechBody',
+        'Pick a speech-to-text provider and paste its API key — or run a model on this device.'
+      )
+    },
+    try: {
       title: (
-        <Trans i18nKey="onboarding.doneTitle" components={{ em: <em /> }}>
-          You&apos;re all set. Now just <em>talk</em>.
+        <Trans i18nKey="onboarding.tryTitle" components={{ em: <em /> }}>
+          Now just <em>talk</em>.
         </Trans>
       ),
-      line: t('onboarding.doneBody', 'Click into any text field, hold your key and speak.')
+      line: t('onboarding.tryBody', 'Click in the box, hold your key, say something and let go.')
     }
   }
   const { title, line } = heading[step]
-  const big = step === 'welcome' || step === 'done'
   return (
-    <>
-      <h1 className={`mt-4 text-balance ${big ? 'hero-title text-[28px]' : 'page-title'}`}>
-        {title}
-      </h1>
-      <p className="mt-1 max-w-[520px] text-[13px] leading-snug text-ink-muted text-pretty">
+    <header>
+      {step !== 'welcome' && (
+        <p className="mb-2 text-[12px] font-medium text-signal tabular">
+          {t('onboarding.stepOf', 'Step {{current}} of {{total}}', {
+            current: index + 1,
+            total: STEPS.length
+          })}
+        </p>
+      )}
+      <h1 className="hero-title text-[30px] leading-tight text-balance">{title}</h1>
+      <p className="mt-2 max-w-[500px] text-[14px] leading-snug text-ink-muted text-pretty">
         {line}
       </p>
-    </>
+    </header>
   )
 }
 
 function WelcomeStep({ shortcut }: { shortcut: string }): JSX.Element {
   const { t } = useTranslation()
-  // Illustration: the key held down and the words it produced
+  const features: { icon: ReactNode; title: string; body: string }[] = [
+    {
+      icon: <Keyboard className="h-4 w-4" />,
+      title: t('onboarding.featureDictate', 'Dictate in any app'),
+      body: t('onboarding.featureDictateBody', 'Email, chat, docs, code — wherever your cursor is.')
+    },
+    {
+      icon: <TextCursorInput className="h-4 w-4" />,
+      title: t('onboarding.featureEdit', 'Edit by voice'),
+      body: t(
+        'onboarding.featureEditBody',
+        'Select text, hold the key and say “make it shorter” or “translate to Spanish”.'
+      )
+    },
+    {
+      icon: <Users className="h-4 w-4" />,
+      title: t('onboarding.featureMeetings', 'Meeting notes'),
+      body: t(
+        'onboarding.featureMeetingsBody',
+        'Live transcript and summary. No bot joins the call.'
+      )
+    }
+  ]
   return (
-    <div className="pt-1">
-      <ShortcutKeys accelerator={shortcut} size="lg" pressed />
-      <p className="mt-4 text-[14px] leading-relaxed text-ink" dir="auto">
-        {t(
+    <div className="space-y-7">
+      <WelcomeDemo
+        shortcut={shortcut}
+        text={t(
           'onboarding.welcomeSample',
           'Sounds great — let’s meet Thursday at 4 and go over the launch plan.'
         )}
-        <span
-          aria-hidden="true"
-          className="ms-0.5 inline-block h-[1.1em] w-[2px] translate-y-[3px] bg-signal"
-        />
-      </p>
+      />
+      <ul className="grid grid-cols-3 gap-4">
+        {features.map((f) => (
+          <li key={f.title}>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-signal-tint text-signal">
+              {f.icon}
+            </span>
+            <h3 className="mt-2 text-[13px] font-medium text-ink">{f.title}</h3>
+            <p className="mt-0.5 text-[12px] leading-snug text-ink-soft text-pretty">{f.body}</p>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -479,14 +543,24 @@ function PermissionRow({
 }): JSX.Element {
   const { t } = useTranslation()
   return (
-    <li className="flex min-h-12 items-center gap-3 py-2.5">
-      <span className={`shrink-0 ${granted ? 'text-success' : 'text-ink-soft'}`}>{icon}</span>
+    <li
+      className={`flex items-center gap-3.5 rounded-xl border px-3.5 py-3 transition-colors duration-200 ${
+        granted ? 'border-success/25 bg-success-tint/40' : 'border-hairline bg-raised'
+      }`}
+    >
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+          granted ? 'bg-success-tint text-success' : 'bg-sunken text-ink-muted'
+        }`}
+      >
+        {icon}
+      </span>
       <div className="min-w-0 flex-1">
-        <h3 className="text-[13.5px] text-ink">{title}</h3>
+        <h3 className="text-[13.5px] font-medium text-ink">{title}</h3>
         <p className="text-[12px] leading-snug text-ink-soft">{description}</p>
       </div>
       {granted ? (
-        <span className="inline-flex shrink-0 items-center gap-1 text-[12px] text-success">
+        <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-success">
           <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
           {t('onboarding.granted', 'Granted')}
         </span>
@@ -541,7 +615,8 @@ function MicrophoneStep({
   )
 }
 
-function ShortcutStep({
+/** Hold the key and dictate into a practice box — a real end-to-end test */
+function TryStep({
   shortcut,
   onSave
 }: {
@@ -551,6 +626,10 @@ function ShortcutStep({
   const { t } = useTranslation()
   const pressed = useShortcutPressed()
   const [seenPress, setSeenPress] = useState(false)
+  const [text, setText] = useState('')
+  const [showPicker, setShowPicker] = useState(false)
+  const boxRef = useRef<HTMLTextAreaElement>(null)
+  const dictated = text.trim().length > 0
 
   useEffect(() => {
     if (pressed) setSeenPress(true)
@@ -559,107 +638,82 @@ function ShortcutStep({
   // A new shortcut needs a fresh test
   useEffect(() => setSeenPress(false), [shortcut])
 
+  // The dictated text is pasted where the cursor is: keep it in the box
+  useEffect(() => boxRef.current?.focus(), [])
+
   return (
-    <>
-      <div className="flex flex-col items-center px-4 pb-1 pt-2">
-        <ShortcutKeys accelerator={shortcut} size="lg" pressed={pressed} />
-        <p className="mt-3 text-center text-[13px] text-ink" aria-live="polite">
-          {pressed ? (
-            <span className="inline-flex items-center gap-2 font-medium text-signal">
-              <span className="ember-dot" />
-              {t('onboarding.shortcutHeld', 'Listening — keep holding and speak')}
-            </span>
-          ) : seenPress ? (
-            <span className="inline-flex items-center gap-2 font-medium text-success">
-              <Check className="h-4 w-4" strokeWidth={2.75} />
-              {t('onboarding.shortcutWorks', 'It works. You’re ready to dictate.')}
-            </span>
-          ) : (
-            t('onboarding.shortcutTest', 'Hold it and speak — does the key light up?')
-          )}
-        </p>
-        {IS_MAC && !seenPress && (
-          <p className="mt-1 text-center text-[12px] text-ink-soft">
-            {t(
-              'onboarding.shortcutAccessibilityHint',
-              'Nothing happens? TapWisper needs Accessibility access to hear the key.'
+    <div className="space-y-4">
+      {IS_MAC && sameShortcut(shortcut, 'Fn') && <FnKeyNotice shortcut={shortcut} />}
+
+      <div
+        className={`rounded-2xl border bg-raised transition-[border-color,box-shadow] duration-200 ${
+          pressed
+            ? 'border-signal ring-4 ring-signal/15'
+            : dictated
+              ? 'border-success/40'
+              : 'border-hairline'
+        }`}
+      >
+        <textarea
+          ref={boxRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={4}
+          dir="auto"
+          placeholder={t('onboarding.tryPlaceholder', 'Your words will appear here…')}
+          aria-label={t('onboarding.tryLabel', 'Practice box')}
+          className="block w-full resize-none rounded-2xl bg-transparent px-4 pt-3.5 text-[15px] leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none"
+        />
+        <div className="flex items-center gap-3 px-3.5 pb-3">
+          <ShortcutKeys accelerator={shortcut} size="sm" pressed={pressed} />
+          <p className="min-w-0 flex-1 text-[12.5px]" aria-live="polite">
+            {pressed ? (
+              <span className="inline-flex items-center gap-2 font-medium text-signal">
+                <span className="ember-dot" />
+                {t('onboarding.shortcutHeld', 'Listening — keep holding and speak')}
+              </span>
+            ) : dictated ? (
+              <span className="inline-flex items-center gap-1.5 font-medium text-success">
+                <Check className="h-3.5 w-3.5" strokeWidth={2.75} />
+                {t('onboarding.tryWorks', 'It works. That’s all there is to it.')}
+              </span>
+            ) : seenPress ? (
+              <span className="text-ink-muted">
+                {t('onboarding.tryWaiting', 'Let go to insert the text…')}
+              </span>
+            ) : (
+              <span className="text-ink-soft">
+                {t('onboarding.tryHint', 'Hold the key while you speak, let go to insert.')}
+              </span>
             )}
           </p>
+        </div>
+      </div>
+
+      {IS_MAC && !seenPress && (
+        <p className="text-[12px] text-ink-soft">
+          {t(
+            'onboarding.shortcutAccessibilityHint',
+            'Nothing happens? TapWisper needs Accessibility access to hear the key.'
+          )}
+        </p>
+      )}
+
+      <div>
+        <button
+          type="button"
+          className="btn-ghost btn-sm -ms-2"
+          onClick={() => setShowPicker((v) => !v)}
+          aria-expanded={showPicker}
+        >
+          {t('onboarding.shortcutChoose', 'Choose another key')}
+        </button>
+        {showPicker && (
+          <div className="mt-2">
+            <ShortcutPicker value={shortcut} onSave={onSave} showFnNotice={false} />
+          </div>
         )}
       </div>
-
-      <div className="mt-5">
-        <h2 className="section-label mb-1.5">
-          {t('onboarding.shortcutChoose', 'Choose another key')}
-        </h2>
-        <ShortcutPicker value={shortcut} onSave={onSave} compact />
-      </div>
-    </>
+    </div>
   )
-}
-
-function DoneStep({
-  deviceId,
-  shortcut,
-  speechLanguages
-}: {
-  deviceId: string
-  shortcut: string
-  speechLanguages: string[]
-}): JSX.Element {
-  const { t, i18n } = useTranslation()
-  const languages =
-    speechLanguages.length === 0
-      ? t('settings.speechAutoDetect', 'Auto-detect')
-      : speechLanguages
-          .map((c) =>
-            languageName(
-              c,
-              i18n.language,
-              SPEECH_LANGUAGES.find((l) => l.code === c)?.nativeLabel ?? c
-            )
-          )
-          .join(' + ')
-
-  const rows: { label: string; value: ReactNode }[] = [
-    { label: t('mic.device', 'Microphone'), value: <MicName deviceId={deviceId} /> },
-    {
-      label: t('onboarding.stepShortcut', 'Shortcut'),
-      value: <ShortcutKeys accelerator={shortcut} size="sm" />
-    },
-    { label: t('onboarding.stepLanguages', 'Languages'), value: languages }
-  ]
-
-  return (
-    <dl className="divide-y divide-hairline/70">
-      {rows.map((row) => (
-        <div key={row.label} className="flex min-h-10 items-center gap-3 py-2">
-          <dt className="w-36 shrink-0 text-[13px] text-ink-soft">{row.label}</dt>
-          <dd className="min-w-0 truncate text-[13px] text-ink">{row.value}</dd>
-        </div>
-      ))}
-    </dl>
-  )
-}
-
-/** Human name of the selected microphone ('' = system default) */
-function MicName({ deviceId }: { deviceId: string }): JSX.Element {
-  const { t } = useTranslation()
-  const fallback = t('mic.systemDefault', 'System default')
-  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
-    return <>{fallback}</>
-  }
-  return <MicNameLookup deviceId={deviceId} fallback={fallback} />
-}
-
-function MicNameLookup({
-  deviceId,
-  fallback
-}: {
-  deviceId: string
-  fallback: string
-}): JSX.Element {
-  const { devices } = useMicrophones()
-  const label = devices.find((d) => d.deviceId === deviceId)?.label
-  return <>{label && label !== 'Microphone' ? label : fallback}</>
 }

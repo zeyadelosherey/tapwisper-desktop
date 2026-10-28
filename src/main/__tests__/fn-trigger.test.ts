@@ -44,7 +44,6 @@ const windowManager = {
   },
   showPinnedPanel: vi.fn(),
   hideAllOverlays: vi.fn(),
-  warmCommandPopup: vi.fn(),
   showCommandPopup: vi.fn()
 }
 
@@ -110,25 +109,12 @@ describe('fn / Globe record key', () => {
     expect(sent).not.toContain('recording:stop')
   })
 
-  describe('right after a dictation', () => {
-    it('holding fn records again', () => {
-      shortcuts.setPostRecordingState('hello world')
-      fn('down')
-      advance(1000)
-      fn('up')
-      expect(sent).toEqual(expect.arrayContaining(['recording:start', 'recording:stop']))
-      expect(windowManager.showCommandPopup).not.toHaveBeenCalled()
-    })
-
-    it('a quick tap opens the action panel with the dictated text', () => {
-      shortcuts.setPostRecordingState('hello world')
-      fn('down')
-      advance(100)
-      fn('up')
-      expect(sent).not.toContain('recording:stop')
-      expect(windowManager.showCommandPopup).toHaveBeenCalledWith('hello world', {
-        grabText: false
-      })
-    })
+  it('right after a dictation, holding fn records again', () => {
+    shortcuts.setLastDictation('hello world')
+    fn('down')
+    advance(1000)
+    fn('up')
+    expect(sent).toEqual(expect.arrayContaining(['recording:start', 'recording:stop']))
+    expect(windowManager.showCommandPopup).not.toHaveBeenCalled()
   })
 })

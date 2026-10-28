@@ -21,7 +21,8 @@ export function EngineSettings({
   cloud,
   languages,
   selfHostedKey,
-  onSelfHostedKeyChange
+  onSelfHostedKeyChange,
+  onEngineChange
 }: {
   kind: LocalModelKind
   /** The cloud provider settings (provider, API key, model) */
@@ -29,6 +30,8 @@ export function EngineSettings({
   languages: string[]
   selfHostedKey: string
   onSelfHostedKeyChange: (value: string) => void
+  /** Told the stored engine on load and every change after */
+  onEngineChange?: (engine: AIEngine) => void
 }): JSX.Element {
   const { t } = useTranslation()
   const local = useLocalAi()
@@ -41,14 +44,18 @@ export function EngineSettings({
       window.tapwisper.store.get('localModels')
     ])
       .then(([value, models]) => {
-        if (value === 'local' || value === 'self-hosted') setEngine(value)
+        const stored: AIEngine = value === 'local' || value === 'self-hosted' ? value : 'cloud'
+        setEngine(stored)
+        onEngineChange?.(stored)
         setActiveId((models as Partial<LocalModels> | undefined)?.[kind] ?? null)
       })
       .catch(() => {})
+    // Only on load; later changes are reported by changeEngine
   }, [kind])
 
   const changeEngine = (next: AIEngine): void => {
     setEngine(next)
+    onEngineChange?.(next)
     void window.tapwisper.store.set(ENGINE_KEY[kind], next)
     if (next === 'local' && activeId) void window.tapwisper.localAi.warmUp(kind)
   }

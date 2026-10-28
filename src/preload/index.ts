@@ -9,6 +9,7 @@ import type {
   SidecarStatus,
   TranscribeInput
 } from '../shared/local-ai/types'
+import type { FnKeyUsage } from '../shared/fn-key'
 
 export type IpcCallback = (...args: unknown[]) => void
 
@@ -210,13 +211,10 @@ const api = {
     reset: () => ipcRenderer.invoke('shortcuts:reset'),
     /** macOS: whether the fn/Globe helper is installed (else fn acts as Ctrl+Option) */
     fnAvailable: (): Promise<boolean> => ipcRenderer.invoke('shortcuts:fn-available'),
-    /** macOS: what the system itself does on fn/Globe ("Press 🌐 key to") */
-    fnKeyAction: (): Promise<'nothing' | 'input-source' | 'emoji' | 'dictation' | 'unknown'> =>
-      ipcRenderer.invoke('shortcuts:fn-key-action'),
-    /** macOS: set "Press 🌐 key to" Do Nothing; false if it couldn't be changed */
-    setFnKeyDoNothing: (): Promise<boolean> => ipcRenderer.invoke('shortcuts:fn-key-do-nothing'),
-    openKeyboardSettings: (): Promise<void> =>
-      ipcRenderer.invoke('shortcuts:open-keyboard-settings')
+    /** macOS: what the fn/Globe key does on its own ("Press 🌐 key to") */
+    fnKeyUsage: (): Promise<FnKeyUsage> => ipcRenderer.invoke('shortcuts:fn-key-usage'),
+    /** macOS: set "Press 🌐 key to" Do Nothing and open Keyboard settings */
+    fnKeyDoNothing: (): Promise<FnKeyUsage> => ipcRenderer.invoke('shortcuts:fn-key-do-nothing')
   },
 
   // ── App ────────────────────────────────────────────────────────

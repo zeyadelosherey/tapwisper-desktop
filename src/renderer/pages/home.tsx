@@ -20,6 +20,7 @@ import { formatCompactNumber, formatDate, formatDuration, formatTime } from '../
 import { displayActionName } from '../utils/action-labels'
 import { computeStreak, type StreakInfo } from '../utils/streak'
 import { useRecordShortcut } from '../hooks/use-record-shortcut'
+import { FnKeyNotice } from '../components/fn-key-notice'
 import { useConfirmDialog } from '../components/confirm-dialog'
 import { ShortcutKeys } from '../components/ui/keycap'
 import { Page, Spinner } from '../components/ui/primitives'
@@ -204,6 +205,7 @@ export function Home(): JSX.Element {
       </section>
 
       <Page className="!pt-0">
+        <FnKeyNotice shortcut={shortcut} className="mb-5" />
         {/* ── History ──────────────────────────────────────── */}
         {!isLoaded ? (
           <div className="flex justify-center py-16 text-ink-faint">
