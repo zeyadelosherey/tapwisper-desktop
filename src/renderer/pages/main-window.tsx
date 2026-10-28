@@ -203,7 +203,7 @@ export function MainWindow(): JSX.Element {
   const renderPage = (): JSX.Element => {
     switch (activePage) {
       case 'home':
-        return <Home />
+        return <Home onNavigate={navigate} />
       case 'meetings':
         return <Meetings initialMeetingId={meetingId} />
       case 'dictionary':
@@ -223,7 +223,7 @@ export function MainWindow(): JSX.Element {
       case 'settings':
         return <Settings initialTab={settingsTab} />
       default:
-        return <Home />
+        return <Home onNavigate={navigate} />
     }
   }
 
